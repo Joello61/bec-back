@@ -11,9 +11,9 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
 class DemandeVoter extends Voter
 {
-    public const string EDIT = 'DEMANDE_EDIT';
-    public const string DELETE = 'DEMANDE_DELETE';
-    public const string VIEW = 'DEMANDE_VIEW';
+    public const EDIT = 'DEMANDE_EDIT';
+    public const DELETE = 'DEMANDE_DELETE';
+    public const VIEW = 'DEMANDE_VIEW';
 
     protected function supports(string $attribute, mixed $subject): bool
     {

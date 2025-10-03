@@ -8,15 +8,15 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
-use Symfony\Component\Validator\Exception\ValidationFailedException;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
+use Psr\Log\LoggerInterface;
 
-class ExceptionListener
+readonly class ExceptionListener
 {
     public function __construct(
-        private readonly string $environment
+        private LoggerInterface $logger,
+        private string $environment
     ) {}
 
     public function onKernelException(ExceptionEvent $event): void
@@ -24,59 +24,36 @@ class ExceptionListener
         $exception = $event->getThrowable();
         $request = $event->getRequest();
 
-        // Ne gérer que les requêtes API
+        // Ne gérer que les routes API
         if (!str_starts_with($request->getPathInfo(), '/api')) {
             return;
         }
 
-        $statusCode = Response::HTTP_INTERNAL_SERVER_ERROR;
+        $statusCode = JsonResponse::HTTP_INTERNAL_SERVER_ERROR;
         $message = 'Une erreur est survenue';
-        $errors = null;
+        $errors = [];
 
-        // Déterminer le code et le message selon le type d'exception
+        // Gestion des exceptions HTTP
         if ($exception instanceof HttpExceptionInterface) {
             $statusCode = $exception->getStatusCode();
             $message = $exception->getMessage();
         }
 
-        if ($exception instanceof NotFoundHttpException) {
-            $statusCode = Response::HTTP_NOT_FOUND;
-            $message = 'Ressource non trouvée';
-        }
-
-        if ($exception instanceof AccessDeniedHttpException) {
-            $statusCode = Response::HTTP_FORBIDDEN;
-            $message = 'Accès refusé';
-        }
-
+        // Gestion des erreurs d'authentification
         if ($exception instanceof AuthenticationException) {
             $statusCode = Response::HTTP_UNAUTHORIZED;
             $message = 'Authentification requise';
         }
 
-        if ($exception instanceof ValidationFailedException) {
-            $statusCode = Response::HTTP_BAD_REQUEST;
-            $message = 'Erreur de validation';
-            $errors = [];
-
-            foreach ($exception->getViolations() as $violation) {
-                $errors[$violation->getPropertyPath()][] = $violation->getMessage();
-            }
+        // Gestion des erreurs d'autorisation
+        if ($exception instanceof AccessDeniedException) {
+            $statusCode = Response::HTTP_FORBIDDEN;
+            $message = 'Accès refusé';
         }
 
-        $data = [
-            'error' => true,
-            'message' => $message,
-            'statusCode' => $statusCode,
-        ];
-
-        if ($errors) {
-            $data['errors'] = $errors;
-        }
-
-        // En dev, ajouter plus de détails
+        // En développement, ajouter plus de détails
         if ($this->environment === 'dev') {
-            $data['debug'] = [
+            $errors = [
                 'exception' => get_class($exception),
                 'file' => $exception->getFile(),
                 'line' => $exception->getLine(),
@@ -84,7 +61,22 @@ class ExceptionListener
             ];
         }
 
-        $response = new JsonResponse($data, $statusCode);
+        // Logger l'erreur
+        $this->logger->error('API Exception', [
+            'exception' => get_class($exception),
+            'message' => $exception->getMessage(),
+            'code' => $statusCode,
+            'path' => $request->getPathInfo(),
+            'method' => $request->getMethod(),
+        ]);
+
+        // Créer la réponse JSON
+        $response = new JsonResponse([
+            'success' => false,
+            'message' => $message,
+            'errors' => $errors,
+        ], $statusCode);
+
         $event->setResponse($response);
     }
 }
