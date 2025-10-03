@@ -1,0 +1,132 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Repository;
+
+use App\Entity\Voyage;
+use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\Persistence\ManagerRegistry;
+
+class VoyageRepository extends ServiceEntityRepository
+{
+    public function __construct(ManagerRegistry $registry)
+    {
+        parent::__construct($registry, Voyage::class);
+    }
+
+    public function findPaginated(int $page = 1, int $limit = 10, array $filters = []): array
+    {
+        $offset = ($page - 1) * $limit;
+
+        $qb = $this->createQueryBuilder('v')
+            ->leftJoin('v.voyageur', 'u')
+            ->addSelect('u')
+            ->orderBy('v.createdAt', 'DESC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit);
+
+        if (!empty($filters['villeDepart'])) {
+            $qb->andWhere('v.villeDepart LIKE :villeDepart')
+                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
+        }
+
+        if (!empty($filters['villeArrivee'])) {
+            $qb->andWhere('v.villeArrivee LIKE :villeArrivee')
+                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
+        }
+
+        if (!empty($filters['dateDepart'])) {
+            $qb->andWhere('v.dateDepart >= :dateDepart')
+                ->setParameter('dateDepart', new \DateTime($filters['dateDepart']));
+        }
+
+        if (!empty($filters['statut'])) {
+            $qb->andWhere('v.statut = :statut')
+                ->setParameter('statut', $filters['statut']);
+        } else {
+            $qb->andWhere('v.statut = :statut')
+                ->setParameter('statut', 'actif');
+        }
+
+        $voyages = $qb->getQuery()->getResult();
+
+        $countQb = $this->createQueryBuilder('v')
+            ->select('COUNT(v.id)');
+
+        if (!empty($filters['villeDepart'])) {
+            $countQb->andWhere('v.villeDepart LIKE :villeDepart')
+                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
+        }
+        if (!empty($filters['villeArrivee'])) {
+            $countQb->andWhere('v.villeArrivee LIKE :villeArrivee')
+                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
+        }
+        if (!empty($filters['dateDepart'])) {
+            $countQb->andWhere('v.dateDepart >= :dateDepart')
+                ->setParameter('dateDepart', new \DateTime($filters['dateDepart']));
+        }
+        if (!empty($filters['statut'])) {
+            $countQb->andWhere('v.statut = :statut')
+                ->setParameter('statut', $filters['statut']);
+        } else {
+            $countQb->andWhere('v.statut = :statut')
+                ->setParameter('statut', 'actif');
+        }
+
+        $total = $countQb->getQuery()->getSingleScalarResult();
+
+        return [
+            'data' => $voyages,
+            'pagination' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'pages' => (int) ceil($total / $limit),
+            ],
+        ];
+    }
+
+    public function findByVoyageur(int $voyageurId): array
+    {
+        return $this->createQueryBuilder('v')
+            ->where('v.voyageur = :voyageurId')
+            ->setParameter('voyageurId', $voyageurId)
+            ->orderBy('v.createdAt', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function findActifs(): array
+    {
+        return $this->createQueryBuilder('v')
+            ->where('v.statut = :statut')
+            ->andWhere('v.dateDepart >= :today')
+            ->setParameter('statut', 'actif')
+            ->setParameter('today', new \DateTime())
+            ->orderBy('v.dateDepart', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function findMatchingDemande(string $villeDepart, string $villeArrivee, ?\DateTime $dateDepart = null): array
+    {
+        $qb = $this->createQueryBuilder('v')
+            ->where('v.statut = :statut')
+            ->andWhere('v.villeDepart LIKE :villeDepart')
+            ->andWhere('v.villeArrivee LIKE :villeArrivee')
+            ->setParameter('statut', 'actif')
+            ->setParameter('villeDepart', '%' . $villeDepart . '%')
+            ->setParameter('villeArrivee', '%' . $villeArrivee . '%');
+
+        if ($dateDepart) {
+            $qb->andWhere('v.dateDepart >= :dateDepart')
+                ->setParameter('dateDepart', $dateDepart);
+        }
+
+        return $qb->orderBy('v.dateDepart', 'ASC')
+            ->setMaxResults(10)
+            ->getQuery()
+            ->getResult();
+    }
+}

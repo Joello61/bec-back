@@ -1,0 +1,60 @@
+nelmio_api_doc:
+    documentation:
+        info:
+            title: Bagage Express Cameroun API
+            description: |
+                API REST pour la plateforme de mise en relation entre voyageurs et expéditeurs.
+
+                ## Authentification
+                Cette API utilise JWT (JSON Web Tokens) stocké dans des cookies HTTP-only.
+
+                1. Connectez-vous via `/api/login`
+                2. Le token est automatiquement stocké dans un cookie sécurisé
+                3. Les requêtes suivantes    incluent automatiquement le cookie
+
+                ## Rate Limiting
+                Les endpoints sont limités à 100 requêtes par heure par utilisateur.
+
+                ## Pagination
+                Les listes sont paginées avec les paramètres `page` et `limit`.
+            version: 1.0.0
+            contact:
+                name: Support API
+                email: api@bagage-express.cm
+        servers:
+            - url: http://localhost:8000
+              description: Développement
+            - url: https://api.bagage-express.cm
+              description: Production
+        components:
+            securitySchemes:
+                cookieAuth:
+                    type: apiKey
+                    in: cookie
+                    name: bagage_token
+                    description: "JWT stocké dans un cookie HTTP-only"
+        security:
+            - cookieAuth: []
+        tags:
+            - name: Authentification
+              description: Connexion, inscription, déconnexion
+            - name: Utilisateurs
+              description: Gestion des profils utilisateurs
+            - name: Voyages
+              description: Annonces de voyage
+            - name: Demandes
+              description: Demandes de transport
+            - name: Messages
+              description: Messagerie entre utilisateurs
+            - name: Notifications
+              description: Notifications utilisateur
+            - name: Favoris
+              description: Favoris et signets
+            - name: Avis
+              description: Évaluations et avis
+            - name: Signalements
+              description: Signalement de contenu
+
+    areas:
+        path_patterns:
+            - ^/api(?!/doc$)

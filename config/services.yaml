@@ -1,0 +1,42 @@
+parameters:
+    app.uploads_dir: '%env(UPLOADS_DIR)%'
+    app.max_file_size: '%env(int:MAX_FILE_SIZE)%'
+    app.frontend_url: '%env(FRONTEND_URL)%'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/DependencyInjection/'
+            - '../src/Entity/'
+            - '../src/Kernel.php'
+
+    # EmailService
+    App\Service\EmailService:
+        arguments:
+            $frontendUrl: '%app.frontend_url%'
+
+    App\Controller\:
+        resource: '../src/Controller/'
+        tags: ['controller.service_arguments']
+
+    # JWT Cookie Authenticator
+    App\Security\JWTCookieAuthenticator:
+        parent: lexik_jwt_authentication.security.jwt_authenticator
+
+    # JWT Event Listener
+    App\EventListener\JWTListener:
+        tags:
+            - { name: kernel.event_listener, event: lexik_jwt_authentication.on_authentication_success, method: onAuthenticationSuccess }
+            - { name: kernel.event_listener, event: lexik_jwt_authentication.on_jwt_created, method: onJWTCreated }
+
+    # Exception Listener
+    App\EventListener\ExceptionListener:
+        arguments:
+            $environment: '%kernel.environment%'
+        tags:
+            - { name: kernel.event_listener, event: kernel.exception }
