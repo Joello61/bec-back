@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\DTO\UpdateUserDTO;
+use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\UserStatsService;
 use Doctrine\ORM\EntityManagerInterface;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -23,7 +25,8 @@ class UserController extends AbstractController
 {
     public function __construct(
         private readonly UserRepository $userRepository,
-        private readonly EntityManagerInterface $entityManager
+        private readonly EntityManagerInterface $entityManager,
+        private readonly UserStatsService $userStatsService
     ) {}
 
     #[Route('', name: 'list', methods: ['GET'])]
@@ -143,5 +146,85 @@ class UserController extends AbstractController
         $users = $this->userRepository->search($query);
 
         return $this->json($users, Response::HTTP_OK, [], ['groups' => ['user:read']]);
+    }
+
+    #[Route('/me/dashboard', name: 'dashboard', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    #[OA\Get(
+        path: '/api/users/me/dashboard',
+        summary: 'Tableau de bord de l\'utilisateur connecté',
+        security: [['cookieAuth' => []]]
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Données du dashboard',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(
+                    property: 'summary',
+                    properties: [
+                        new OA\Property(property: 'voyagesActifs', type: 'integer'),
+                        new OA\Property(property: 'demandesEnCours', type: 'integer'),
+                        new OA\Property(property: 'notificationsNonLues', type: 'integer'),
+                        new OA\Property(property: 'messagesNonLus', type: 'integer'),
+                    ],
+                    type: 'object'
+                ),
+                new OA\Property(
+                    property: 'voyages',
+                    properties: [
+                        new OA\Property(property: 'total', type: 'integer'),
+                        new OA\Property(property: 'actifs', type: 'integer'),
+                        new OA\Property(property: 'recents', type: 'array', items: new OA\Items(type: 'object')),
+                    ],
+                    type: 'object'
+                ),
+                new OA\Property(
+                    property: 'demandes',
+                    properties: [
+                        new OA\Property(property: 'total', type: 'integer'),
+                        new OA\Property(property: 'enCours', type: 'integer'),
+                        new OA\Property(property: 'recentes', type: 'array', items: new OA\Items(type: 'object')),
+                    ],
+                    type: 'object'
+                ),
+                new OA\Property(
+                    property: 'notifications',
+                    properties: [
+                        new OA\Property(property: 'nonLues', type: 'integer'),
+                        new OA\Property(property: 'recentes', type: 'array', items: new OA\Items(type: 'object')),
+                    ],
+                    type: 'object'
+                ),
+                new OA\Property(
+                    property: 'messages',
+                    properties: [
+                        new OA\Property(property: 'nonLus', type: 'integer'),
+                        new OA\Property(property: 'recents', type: 'array', items: new OA\Items(type: 'object')),
+                    ],
+                    type: 'object'
+                ),
+                new OA\Property(
+                    property: 'stats',
+                    properties: [
+                        new OA\Property(property: 'voyagesEffectues', type: 'integer'),
+                        new OA\Property(property: 'bagagesTransportes', type: 'integer'),
+                        new OA\Property(property: 'noteMoyenne', type: 'number', format: 'float'),
+                        new OA\Property(property: 'nombreAvis', type: 'integer'),
+                        new OA\Property(property: 'repartitionNotes', type: 'object'),
+                    ],
+                    type: 'object'
+                ),
+            ]
+        )
+    )]
+    public function dashboard(): JsonResponse
+    {
+        /* @var User $user */
+        $user = $this->getUser();
+
+        $dashboard = $this->userStatsService->getUserDashboard($user);
+
+        return $this->json($dashboard, Response::HTTP_OK, [], ['groups' => ['dashboard:read']]);
     }
 }
