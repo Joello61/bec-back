@@ -47,6 +47,16 @@ class Voyage
     #[Groups(['voyage:read', 'voyage:list', 'voyage:write'])]
     private ?string $poidsDisponible = null;
 
+    // ==================== NOUVEAUX CHAMPS PRIX/COMMISSION ====================
+
+    #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
+    #[Groups(['voyage:read', 'voyage:list', 'voyage:write'])]
+    private ?string $prixParKilo = null;
+
+    #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
+    #[Groups(['voyage:read', 'voyage:list', 'voyage:write'])]
+    private ?string $commissionProposeePourUnBagage = null;
+
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Groups(['voyage:read', 'voyage:write'])]
     private ?string $description = null;
@@ -160,6 +170,30 @@ class Voyage
     public function setPoidsDisponible(string $poidsDisponible): static
     {
         $this->poidsDisponible = $poidsDisponible;
+        return $this;
+    }
+
+    // ==================== GETTERS/SETTERS PRIX/COMMISSION ====================
+
+    public function getPrixParKilo(): ?string
+    {
+        return $this->prixParKilo;
+    }
+
+    public function setPrixParKilo(?string $prixParKilo): static
+    {
+        $this->prixParKilo = $prixParKilo;
+        return $this;
+    }
+
+    public function getCommissionProposeePourUnBagage(): ?string
+    {
+        return $this->commissionProposeePourUnBagage;
+    }
+
+    public function setCommissionProposeePourUnBagage(?string $commissionProposeePourUnBagage): static
+    {
+        $this->commissionProposeePourUnBagage = $commissionProposeePourUnBagage;
         return $this;
     }
 

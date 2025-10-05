@@ -17,7 +17,8 @@ readonly class VoyageService
     public function __construct(
         private EntityManagerInterface $entityManager,
         private VoyageRepository $voyageRepository,
-        private NotificationService $notificationService
+        private NotificationService $notificationService,
+        private MatchingService $matchingService
     ) {}
 
     public function getPaginatedVoyages(int $page, int $limit, array $filters = []): array
@@ -45,6 +46,8 @@ readonly class VoyageService
             ->setDateDepart($dto->dateDepart)
             ->setDateArrivee($dto->dateArrivee)
             ->setPoidsDisponible((string) $dto->poidsDisponible)
+            ->setPrixParKilo($dto->prixParKilo ? (string) $dto->prixParKilo : null)
+            ->setCommissionProposeePourUnBagage($dto->commissionProposeePourUnBagage ? (string) $dto->commissionProposeePourUnBagage : null)
             ->setDescription($dto->description)
             ->setStatut('actif');
 
@@ -76,6 +79,12 @@ readonly class VoyageService
         if ($dto->poidsDisponible !== null) {
             $voyage->setPoidsDisponible((string) $dto->poidsDisponible);
         }
+        if ($dto->prixParKilo !== null) {
+            $voyage->setPrixParKilo((string) $dto->prixParKilo);
+        }
+        if ($dto->commissionProposeePourUnBagage !== null) {
+            $voyage->setCommissionProposeePourUnBagage((string) $dto->commissionProposeePourUnBagage);
+        }
         if ($dto->description !== null) {
             $voyage->setDescription($dto->description);
         }
@@ -104,5 +113,14 @@ readonly class VoyageService
     public function getVoyagesByUser(int $userId): array
     {
         return $this->voyageRepository->findByVoyageur($userId);
+    }
+
+    /**
+     * Trouver les demandes correspondantes à un voyage (avec scoring)
+     */
+    public function findMatchingDemandes(int $voyageId, ?User $viewer = null): array
+    {
+        $voyage = $this->getVoyage($voyageId);
+        return $this->matchingService->findMatchingDemandes($voyage, $viewer);
     }
 }

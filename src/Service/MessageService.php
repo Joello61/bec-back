@@ -34,6 +34,16 @@ readonly class MessageService
             throw new BadRequestHttpException('Vous ne pouvez pas vous envoyer un message à vous-même');
         }
 
+        // ==================== VÉRIFIER LES PARAMÈTRES DE CONFIDENTIALITÉ ====================
+        $settings = $destinataire->getSettings();
+
+        if ($settings && !$settings->canReceiveMessageFrom($expediteur)) {
+            throw new BadRequestHttpException(
+                'Cet utilisateur n\'accepte pas les messages de votre part. ' .
+                'Vérifiez que vous êtes un utilisateur vérifié si requis.'
+            );
+        }
+
         $message = new Message();
         $message->setExpediteur($expediteur)
             ->setDestinataire($destinataire)
@@ -43,7 +53,7 @@ readonly class MessageService
         $this->entityManager->persist($message);
         $this->entityManager->flush();
 
-        // Notifier le destinataire
+        // Notifier le destinataire (si ses préférences le permettent)
         $this->notificationService->notifyNewMessage($message);
 
         return $message;

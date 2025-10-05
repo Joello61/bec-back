@@ -43,6 +43,16 @@ class Demande
     #[Groups(['demande:read', 'demande:list', 'demande:write'])]
     private ?string $poidsEstime = null;
 
+    // ==================== NOUVEAUX CHAMPS PRIX/COMMISSION ====================
+
+    #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
+    #[Groups(['demande:read', 'demande:list', 'demande:write'])]
+    private ?string $prixParKilo = null;
+
+    #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
+    #[Groups(['demande:read', 'demande:list', 'demande:write'])]
+    private ?string $commissionProposeePourUnBagage = null;
+
     #[ORM\Column(type: Types::TEXT)]
     #[Groups(['demande:read', 'demande:write'])]
     private ?string $description = null;
@@ -141,6 +151,30 @@ class Demande
     public function setPoidsEstime(string $poidsEstime): static
     {
         $this->poidsEstime = $poidsEstime;
+        return $this;
+    }
+
+    // ==================== GETTERS/SETTERS PRIX/COMMISSION ====================
+
+    public function getPrixParKilo(): ?string
+    {
+        return $this->prixParKilo;
+    }
+
+    public function setPrixParKilo(?string $prixParKilo): static
+    {
+        $this->prixParKilo = $prixParKilo;
+        return $this;
+    }
+
+    public function getCommissionProposeePourUnBagage(): ?string
+    {
+        return $this->commissionProposeePourUnBagage;
+    }
+
+    public function setCommissionProposeePourUnBagage(?string $commissionProposeePourUnBagage): static
+    {
+        $this->commissionProposeePourUnBagage = $commissionProposeePourUnBagage;
         return $this;
     }
 

@@ -80,6 +80,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read'])]
     private ?\DateTimeInterface $updatedAt = null;
 
+    // ==================== NOUVELLE RELATION SETTINGS ====================
+    #[ORM\OneToOne(targetEntity: UserSettings::class, mappedBy: 'user', cascade: ['persist', 'remove'])]
+    #[Groups(['user:read'])]
+    private ?UserSettings $settings = null;
+
     #[ORM\OneToMany(targetEntity: Voyage::class, mappedBy: 'voyageur', cascade: ['remove'])]
     private Collection $voyages;
 
@@ -301,6 +306,24 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getUpdatedAt(): ?\DateTimeInterface
     {
         return $this->updatedAt;
+    }
+
+    // ==================== SETTINGS ====================
+
+    public function getSettings(): ?UserSettings
+    {
+        return $this->settings;
+    }
+
+    public function setSettings(UserSettings $settings): static
+    {
+        // Set the owning side of the relation if necessary
+        if ($settings->getUser() !== $this) {
+            $settings->setUser($this);
+        }
+
+        $this->settings = $settings;
+        return $this;
     }
 
     public function getVoyages(): Collection

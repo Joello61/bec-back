@@ -6,14 +6,19 @@ namespace App\Security\Voter;
 
 use App\Entity\User;
 use App\Entity\Voyage;
+use App\Service\VisibilityService;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
 class VoyageVoter extends Voter
 {
-    public const string EDIT = 'VOYAGE_EDIT';
-    public const string DELETE = 'VOYAGE_DELETE';
-    public const string VIEW = 'VOYAGE_VIEW';
+    public const EDIT = 'VOYAGE_EDIT';
+    public const DELETE = 'VOYAGE_DELETE';
+    public const VIEW = 'VOYAGE_VIEW';
+
+    public function __construct(
+        private readonly VisibilityService $visibilityService
+    ) {}
 
     protected function supports(string $attribute, mixed $subject): bool
     {
@@ -47,18 +52,23 @@ class VoyageVoter extends Voter
 
     private function canView(Voyage $voyage, User $user): bool
     {
-        // Tout le monde peut voir un voyage actif
-        if ($voyage->getStatut() === 'actif') {
-            return true;
-        }
-
-        // Le propriétaire peut voir son propre voyage
+        // Le propriétaire peut toujours voir son propre voyage
         if ($voyage->getVoyageur() === $user) {
             return true;
         }
 
         // Les admins peuvent tout voir
-        return in_array('ROLE_ADMIN', $user->getRoles());
+        if (in_array('ROLE_ADMIN', $user->getRoles())) {
+            return true;
+        }
+
+        // Vérifier le statut ET la visibilité via VisibilityService
+        if ($voyage->getStatut() !== 'actif') {
+            return false;
+        }
+
+        // ==================== UTILISATION DU VISIBILITYSERVICE ====================
+        return $this->visibilityService->isVoyageVisibleFor($voyage, $user);
     }
 
     private function canEdit(Voyage $voyage, User $user): bool

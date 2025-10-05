@@ -17,7 +17,8 @@ readonly class DemandeService
     public function __construct(
         private EntityManagerInterface $entityManager,
         private DemandeRepository $demandeRepository,
-        private NotificationService $notificationService
+        private NotificationService $notificationService,
+        private MatchingService $matchingService
     ) {}
 
     public function getPaginatedDemandes(int $page, int $limit, array $filters = []): array
@@ -44,6 +45,8 @@ readonly class DemandeService
             ->setVilleArrivee($dto->villeArrivee)
             ->setDateLimite($dto->dateLimite)
             ->setPoidsEstime((string) $dto->poidsEstime)
+            ->setPrixParKilo($dto->prixParKilo ? (string) $dto->prixParKilo : null)
+            ->setCommissionProposeePourUnBagage($dto->commissionProposeePourUnBagage ? (string) $dto->commissionProposeePourUnBagage : null)
             ->setDescription($dto->description)
             ->setStatut('en_recherche');
 
@@ -71,6 +74,12 @@ readonly class DemandeService
         }
         if ($dto->poidsEstime !== null) {
             $demande->setPoidsEstime((string) $dto->poidsEstime);
+        }
+        if ($dto->prixParKilo !== null) {
+            $demande->setPrixParKilo((string) $dto->prixParKilo);
+        }
+        if ($dto->commissionProposeePourUnBagage !== null) {
+            $demande->setCommissionProposeePourUnBagage((string) $dto->commissionProposeePourUnBagage);
         }
         if ($dto->description !== null) {
             $demande->setDescription($dto->description);
@@ -100,5 +109,14 @@ readonly class DemandeService
     public function getDemandesByUser(int $userId): array
     {
         return $this->demandeRepository->findByClient($userId);
+    }
+
+    /**
+     * Trouver les voyages correspondants à une demande (avec scoring)
+     */
+    public function findMatchingVoyages(int $demandeId, ?User $viewer = null): array
+    {
+        $demande = $this->getDemande($demandeId);
+        return $this->matchingService->findBestMatchesVoyages($demande, $viewer);
     }
 }

@@ -19,7 +19,8 @@ readonly class UserStatsService
         private DemandeRepository $demandeRepository,
         private AvisRepository $avisRepository,
         private NotificationRepository $notificationRepository,
-        private MessageRepository $messageRepository
+        private MessageRepository $messageRepository,
+        private VisibilityService $visibilityService
     ) {}
 
     public function getUserDashboard(User $user): DashboardDTO
@@ -32,7 +33,7 @@ readonly class UserStatsService
             demandes: $this->getDemandesData($userId),
             notifications: $this->getNotificationsData($userId),
             messages: $this->getMessagesData($userId),
-            stats: $this->getUserStats($userId)
+            stats: $this->getUserStats($userId, $user) // Passer l'utilisateur pour vérifier visibilité
         );
     }
 
@@ -178,7 +179,7 @@ readonly class UserStatsService
         ];
     }
 
-    private function getUserStats(int $userId): array
+    private function getUserStats(int $userId, User $viewer): array
     {
         $voyagesTermines = $this->voyageRepository->count([
             'voyageur' => $userId,
@@ -199,5 +200,78 @@ readonly class UserStatsService
             'nombreAvis' => $avisStats['total'] ?? 0,
             'repartitionNotes' => $avisStats['distribution'] ?? [],
         ];
+    }
+
+    /**
+     * Récupère les statistiques publiques d'un utilisateur
+     * Respecte les préférences de visibilité
+     */
+    public function getUserPublicStats(User $profileOwner, ?User $viewer): array
+    {
+        // ==================== UTILISATION DU VISIBILITYSERVICE ====================
+        if (!$this->visibilityService->areStatsVisibleFor($profileOwner, $viewer)) {
+            return [
+                'visible' => false,
+                'message' => 'Les statistiques de cet utilisateur sont privées'
+            ];
+        }
+
+        $userId = $profileOwner->getId();
+
+        $voyagesTermines = $this->voyageRepository->count([
+            'voyageur' => $userId,
+            'statut' => 'termine'
+        ]);
+
+        $demandesReussies = $this->demandeRepository->count([
+            'client' => $userId,
+            'statut' => 'voyageur_trouve'
+        ]);
+
+        $avisStats = $this->avisRepository->getStatsByUser($userId);
+
+        return [
+            'visible' => true,
+            'voyagesEffectues' => $voyagesTermines,
+            'bagagesTransportes' => $demandesReussies,
+            'noteMoyenne' => $avisStats['average'] ?? 0,
+            'nombreAvis' => $avisStats['total'] ?? 0,
+            'repartitionNotes' => $avisStats['distribution'] ?? [],
+        ];
+    }
+
+    /**
+     * Récupère les informations de profil visibles
+     * Respecte les préférences de visibilité
+     */
+    public function getVisibleProfileData(User $profileOwner, ?User $viewer): array
+    {
+        $data = [
+            'id' => $profileOwner->getId(),
+            'nom' => $profileOwner->getNom(),
+            'prenom' => $profileOwner->getPrenom(),
+            'photo' => $profileOwner->getPhoto(),
+            'bio' => $profileOwner->getBio(),
+            'createdAt' => $profileOwner->getCreatedAt()->format('Y-m-d H:i:s'),
+            'emailVerifie' => $profileOwner->isEmailVerifie(),
+            'telephoneVerifie' => $profileOwner->isTelephoneVerifie(),
+        ];
+
+        // ==================== UTILISATION DU VISIBILITYSERVICE ====================
+
+        // Email visible ?
+        if ($this->visibilityService->isEmailVisibleFor($profileOwner, $viewer)) {
+            $data['email'] = $profileOwner->getEmail();
+        }
+
+        // Téléphone visible ?
+        if ($this->visibilityService->isPhoneVisibleFor($profileOwner, $viewer)) {
+            $data['telephone'] = $profileOwner->getTelephone();
+        }
+
+        // Stats visibles ?
+        $data['stats'] = $this->getUserPublicStats($profileOwner, $viewer);
+
+        return $data;
     }
 }

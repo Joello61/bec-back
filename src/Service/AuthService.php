@@ -21,6 +21,7 @@ readonly class AuthService
         private UserPasswordHasherInterface $passwordHasher,
         private EmailService $emailService,
         private VerificationService $verificationService,
+        private SettingsService $settingsService,
         private LoggerInterface $logger
     ) {}
 
@@ -52,6 +53,9 @@ readonly class AuthService
 
             $this->entityManager->persist($user);
             $this->entityManager->flush();
+
+            // ==================== CRÉER LES SETTINGS PAR DÉFAUT ====================
+            $this->settingsService->createDefaultSettings($user);
 
             // Envoyer les emails/SMS de vérification
             try {
