@@ -32,6 +32,16 @@ class UpdateDemandeDTO
     #[Assert\LessThanOrEqual(value: 50, message: 'Le poids ne peut pas dépasser {{ compared_value }} kg')]
     public ?float $poidsEstime = null;
 
+    // ==================== NOUVEAUX CHAMPS ====================
+
+    #[Assert\Positive(message: 'Le prix par kilo doit être positif')]
+    #[Assert\LessThanOrEqual(value: 100000, message: 'Le prix par kilo ne peut pas dépasser {{ compared_value }} XAF')]
+    public ?float $prixParKilo = null;
+
+    #[Assert\Positive(message: 'La commission doit être positive')]
+    #[Assert\LessThanOrEqual(value: 1000000, message: 'La commission ne peut pas dépasser {{ compared_value }} XAF')]
+    public ?float $commissionProposeePourUnBagage = null;
+
     #[Assert\Length(
         min: 10,
         max: 1000,

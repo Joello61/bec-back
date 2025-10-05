@@ -5,11 +5,8 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\DTO\CreateAvisDTO;
-use App\Entity\Avis;
-use App\Repository\AvisRepository;
-use App\Repository\UserRepository;
-use App\Repository\VoyageRepository;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Entity\User;
+use App\Service\AvisService;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -25,10 +22,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class AvisController extends AbstractController
 {
     public function __construct(
-        private readonly EntityManagerInterface $entityManager,
-        private readonly AvisRepository $avisRepository,
-        private readonly UserRepository $userRepository,
-        private readonly VoyageRepository $voyageRepository
+        private readonly AvisService $avisService
     ) {}
 
     #[Route('/user/{userId}', name: 'by_user', methods: ['GET'])]
@@ -41,8 +35,8 @@ class AvisController extends AbstractController
     #[OA\Response(response: 200, description: 'Liste des avis')]
     public function byUser(int $userId): JsonResponse
     {
-        $avis = $this->avisRepository->findByUser($userId);
-        $stats = $this->avisRepository->getStatsByUser($userId);
+        $avis = $this->avisService->getAvisByUser($userId);
+        $stats = $this->avisService->getStatsByUser($userId);
 
         return $this->json([
             'avis' => $avis,
@@ -65,29 +59,9 @@ class AvisController extends AbstractController
     public function create(
         #[MapRequestPayload] CreateAvisDTO $dto
     ): JsonResponse {
-        $cible = $this->userRepository->find($dto->cibleId);
-        if (!$cible) {
-            return $this->json(['message' => 'Utilisateur cible non trouvé'], Response::HTTP_NOT_FOUND);
-        }
-
-        $voyage = null;
-        if ($dto->voyageId) {
-            $voyage = $this->voyageRepository->find($dto->voyageId);
-            if (!$voyage) {
-                return $this->json(['message' => 'Voyage non trouvé'], Response::HTTP_NOT_FOUND);
-            }
-        }
-
-        $avis = new Avis();
-        $avis->setAuteur($this->getUser())
-            ->setCible($cible)
-            ->setVoyage($voyage)
-            ->setNote($dto->note)
-            ->setCommentaire($dto->commentaire);
-
-        $this->entityManager->persist($avis);
-        $this->entityManager->flush();
-
+        /* @var User $user*/
+        $user = $this->getUser();
+        $avis = $this->avisService->createAvis($dto, $user);
         return $this->json($avis, Response::HTTP_CREATED, [], ['groups' => ['avis:read']]);
     }
 
@@ -110,16 +84,7 @@ class AvisController extends AbstractController
     #[OA\Response(response: 200, description: 'Avis modifié')]
     public function update(int $id, #[MapRequestPayload] CreateAvisDTO $dto): JsonResponse
     {
-        $avis = $this->avisRepository->find($id);
-        if (!$avis) {
-            return $this->json(['message' => 'Avis non trouvé'], Response::HTTP_NOT_FOUND);
-        }
-
-        $avis->setNote($dto->note)
-            ->setCommentaire($dto->commentaire);
-
-        $this->entityManager->flush();
-
+        $avis = $this->avisService->updateAvis($id, $dto);
         return $this->json($avis, Response::HTTP_OK, [], ['groups' => ['avis:read']]);
     }
 
@@ -133,14 +98,7 @@ class AvisController extends AbstractController
     #[OA\Response(response: 204, description: 'Avis supprimé')]
     public function delete(int $id): JsonResponse
     {
-        $avis = $this->avisRepository->find($id);
-        if (!$avis) {
-            return $this->json(['message' => 'Avis non trouvé'], Response::HTTP_NOT_FOUND);
-        }
-
-        $this->entityManager->remove($avis);
-        $this->entityManager->flush();
-
+        $this->avisService->deleteAvis($id);
         return $this->json(null, Response::HTTP_NO_CONTENT);
     }
 }

@@ -21,7 +21,11 @@ class VoyageRepository extends ServiceEntityRepository
 
         $qb = $this->createQueryBuilder('v')
             ->leftJoin('v.voyageur', 'u')
-            ->addSelect('u')
+            ->leftJoin('u.settings', 's')
+            ->addSelect('u', 's')
+            // ==================== FILTRER PAR VISIBILITÉ ====================
+            ->where('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->setParameter('visible', true)
             ->orderBy('v.createdAt', 'DESC')
             ->setFirstResult($offset)
             ->setMaxResults($limit);
@@ -52,7 +56,12 @@ class VoyageRepository extends ServiceEntityRepository
         $voyages = $qb->getQuery()->getResult();
 
         $countQb = $this->createQueryBuilder('v')
-            ->select('COUNT(v.id)');
+            ->select('COUNT(v.id)')
+            ->leftJoin('v.voyageur', 'u')
+            ->leftJoin('u.settings', 's')
+            // ==================== MÊME FILTRE POUR LE COUNT ====================
+            ->where('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->setParameter('visible', true);
 
         if (!empty($filters['villeDepart'])) {
             $countQb->andWhere('v.villeDepart LIKE :villeDepart')
@@ -100,10 +109,16 @@ class VoyageRepository extends ServiceEntityRepository
     public function findActifs(): array
     {
         return $this->createQueryBuilder('v')
+            ->leftJoin('v.voyageur', 'u')
+            ->leftJoin('u.settings', 's')
+            ->addSelect('u', 's')
             ->where('v.statut = :statut')
             ->andWhere('v.dateDepart >= :today')
+            // ==================== FILTRER PAR VISIBILITÉ ====================
+            ->andWhere('s.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('statut', 'actif')
             ->setParameter('today', new \DateTime())
+            ->setParameter('visible', true)
             ->orderBy('v.dateDepart', 'ASC')
             ->getQuery()
             ->getResult();
@@ -112,12 +127,18 @@ class VoyageRepository extends ServiceEntityRepository
     public function findMatchingDemande(string $villeDepart, string $villeArrivee, ?\DateTime $dateDepart = null): array
     {
         $qb = $this->createQueryBuilder('v')
+            ->leftJoin('v.voyageur', 'u')
+            ->leftJoin('u.settings', 's')
+            ->addSelect('u', 's')
             ->where('v.statut = :statut')
             ->andWhere('v.villeDepart LIKE :villeDepart')
             ->andWhere('v.villeArrivee LIKE :villeArrivee')
+            // ==================== FILTRER PAR VISIBILITÉ ====================
+            ->andWhere('s.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('statut', 'actif')
             ->setParameter('villeDepart', '%' . $villeDepart . '%')
-            ->setParameter('villeArrivee', '%' . $villeArrivee . '%');
+            ->setParameter('villeArrivee', '%' . $villeArrivee . '%')
+            ->setParameter('visible', true);
 
         if ($dateDepart) {
             $qb->andWhere('v.dateDepart >= :dateDepart')

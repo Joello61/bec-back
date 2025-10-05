@@ -6,6 +6,7 @@ namespace App\Security\Voter;
 
 use App\Entity\Demande;
 use App\Entity\User;
+use App\Service\VisibilityService;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
@@ -14,6 +15,10 @@ class DemandeVoter extends Voter
     public const EDIT = 'DEMANDE_EDIT';
     public const DELETE = 'DEMANDE_DELETE';
     public const VIEW = 'DEMANDE_VIEW';
+
+    public function __construct(
+        private readonly VisibilityService $visibilityService
+    ) {}
 
     protected function supports(string $attribute, mixed $subject): bool
     {
@@ -47,18 +52,23 @@ class DemandeVoter extends Voter
 
     private function canView(Demande $demande, User $user): bool
     {
-        // Tout le monde peut voir une demande en recherche
-        if ($demande->getStatut() === 'en_recherche') {
-            return true;
-        }
-
-        // Le propriétaire peut voir sa propre demande
+        // Le propriétaire peut toujours voir sa propre demande
         if ($demande->getClient() === $user) {
             return true;
         }
 
         // Les admins peuvent tout voir
-        return in_array('ROLE_ADMIN', $user->getRoles());
+        if (in_array('ROLE_ADMIN', $user->getRoles())) {
+            return true;
+        }
+
+        // Vérifier le statut ET la visibilité via VisibilityService
+        if ($demande->getStatut() !== 'en_recherche') {
+            return false;
+        }
+
+        // ==================== UTILISATION DU VISIBILITYSERVICE ====================
+        return $this->visibilityService->isDemandeVisibleFor($demande, $user);
     }
 
     private function canEdit(Demande $demande, User $user): bool

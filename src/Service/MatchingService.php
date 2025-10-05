@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Entity\Demande;
+use App\Entity\User;
 use App\Entity\Voyage;
 use App\Repository\DemandeRepository;
 use App\Repository\VoyageRepository;
@@ -13,25 +14,32 @@ readonly class MatchingService
 {
     public function __construct(
         private VoyageRepository $voyageRepository,
-        private DemandeRepository $demandeRepository
+        private DemandeRepository $demandeRepository,
+        private VisibilityService $visibilityService
     ) {}
 
-    public function findMatchingVoyages(Demande $demande): array
+    public function findMatchingVoyages(Demande $demande, ?User $viewer = null): array
     {
-        return $this->voyageRepository->findMatchingDemande(
+        $voyages = $this->voyageRepository->findMatchingDemande(
             $demande->getVilleDepart(),
             $demande->getVilleArrivee(),
             $demande->getDateLimite()
         );
+
+        // ==================== UTILISATION DU VISIBILITYSERVICE ====================
+        return $this->visibilityService->filterVisibleVoyages($voyages, $viewer);
     }
 
-    public function findMatchingDemandes(Voyage $voyage): array
+    public function findMatchingDemandes(Voyage $voyage, ?User $viewer = null): array
     {
-        return $this->demandeRepository->findMatchingVoyage(
+        $demandes = $this->demandeRepository->findMatchingVoyage(
             $voyage->getVilleDepart(),
             $voyage->getVilleArrivee(),
             $voyage->getDateDepart()
         );
+
+        // ==================== UTILISATION DU VISIBILITYSERVICE ====================
+        return $this->visibilityService->filterVisibleDemandes($demandes, $viewer);
     }
 
     public function calculateMatchScore(Voyage $voyage, Demande $demande): int
@@ -73,9 +81,9 @@ readonly class MatchingService
         return $score;
     }
 
-    public function findBestMatches(Demande $demande, int $limit = 5): array
+    public function findBestMatchesVoyages(Demande $demande, ?User $viewer = null, int $limit = 5): array
     {
-        $voyages = $this->findMatchingVoyages($demande);
+        $voyages = $this->findMatchingVoyages($demande, $viewer);
 
         $matches = [];
         foreach ($voyages as $voyage) {
@@ -90,4 +98,6 @@ readonly class MatchingService
 
         return array_slice($matches, 0, $limit);
     }
+
+
 }

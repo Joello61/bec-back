@@ -21,7 +21,11 @@ class DemandeRepository extends ServiceEntityRepository
 
         $qb = $this->createQueryBuilder('d')
             ->leftJoin('d.client', 'u')
-            ->addSelect('u')
+            ->leftJoin('u.settings', 's')
+            ->addSelect('u', 's')
+            // ==================== FILTRER PAR VISIBILITÉ ====================
+            ->where('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->setParameter('visible', true)
             ->orderBy('d.createdAt', 'DESC')
             ->setFirstResult($offset)
             ->setMaxResults($limit);
@@ -47,7 +51,12 @@ class DemandeRepository extends ServiceEntityRepository
         $demandes = $qb->getQuery()->getResult();
 
         $countQb = $this->createQueryBuilder('d')
-            ->select('COUNT(d.id)');
+            ->select('COUNT(d.id)')
+            ->leftJoin('d.client', 'u')
+            ->leftJoin('u.settings', 's')
+            // ==================== MÊME FILTRE POUR LE COUNT ====================
+            ->where('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->setParameter('visible', true);
 
         if (!empty($filters['villeDepart'])) {
             $countQb->andWhere('d.villeDepart LIKE :villeDepart')
@@ -91,8 +100,14 @@ class DemandeRepository extends ServiceEntityRepository
     public function findEnRecherche(): array
     {
         return $this->createQueryBuilder('d')
+            ->leftJoin('d.client', 'u')
+            ->leftJoin('u.settings', 's')
+            ->addSelect('u', 's')
             ->where('d.statut = :statut')
+            // ==================== FILTRER PAR VISIBILITÉ ====================
+            ->andWhere('s.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('statut', 'en_recherche')
+            ->setParameter('visible', true)
             ->orderBy('d.createdAt', 'DESC')
             ->getQuery()
             ->getResult();
@@ -101,12 +116,18 @@ class DemandeRepository extends ServiceEntityRepository
     public function findMatchingVoyage(string $villeDepart, string $villeArrivee, ?\DateTime $dateDepart = null): array
     {
         $qb = $this->createQueryBuilder('d')
+            ->leftJoin('d.client', 'u')
+            ->leftJoin('u.settings', 's')
+            ->addSelect('u', 's')
             ->where('d.statut = :statut')
             ->andWhere('d.villeDepart LIKE :villeDepart')
             ->andWhere('d.villeArrivee LIKE :villeArrivee')
+            // ==================== FILTRER PAR VISIBILITÉ ====================
+            ->andWhere('s.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('statut', 'en_recherche')
             ->setParameter('villeDepart', '%' . $villeDepart . '%')
-            ->setParameter('villeArrivee', '%' . $villeArrivee . '%');
+            ->setParameter('villeArrivee', '%' . $villeArrivee . '%')
+            ->setParameter('visible', true);
 
         if ($dateDepart) {
             $qb->andWhere('(d.dateLimite IS NULL OR d.dateLimite >= :dateDepart)')

@@ -80,7 +80,14 @@ class UserController extends AbstractController
             return $this->json(['message' => 'Utilisateur non trouvé'], Response::HTTP_NOT_FOUND);
         }
 
-        return $this->json($user, Response::HTTP_OK, [], ['groups' => ['user:read']]);
+        // ==================== UTILISATION DU USERSTATSSERVICE AVEC VISIBILITÉ ====================
+        /** @var User|null $viewer */
+        $viewer = $this->getUser();
+
+        // Utiliser la méthode qui respecte la visibilité
+        $profileData = $this->userStatsService->getVisibleProfileData($user, $viewer);
+
+        return $this->json($profileData, Response::HTTP_OK);
     }
 
     #[Route('/me', name: 'update_me', methods: ['PUT'])]
@@ -98,6 +105,7 @@ class UserController extends AbstractController
     public function updateMe(
         #[MapRequestPayload] UpdateUserDTO $dto
     ): JsonResponse {
+        /** @var User $user */
         $user = $this->getUser();
 
         if ($dto->nom !== null) {
@@ -220,7 +228,7 @@ class UserController extends AbstractController
     )]
     public function dashboard(): JsonResponse
     {
-        /* @var User $user */
+        /** @var User $user */
         $user = $this->getUser();
 
         $dashboard = $this->userStatsService->getUserDashboard($user);

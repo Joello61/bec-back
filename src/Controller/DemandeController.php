@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\DTO\CreateDemandeDTO;
 use App\DTO\UpdateDemandeDTO;
+use App\Entity\User;
 use App\Service\DemandeService;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -45,7 +46,6 @@ class DemandeController extends AbstractController
         ];
 
         $result = $this->demandeService->getPaginatedDemandes($page, $limit, $filters);
-
         return $this->json($result, Response::HTTP_OK, [], ['groups' => ['demande:list']]);
     }
 
@@ -53,71 +53,48 @@ class DemandeController extends AbstractController
     #[IsGranted('ROLE_USER')]
     #[OA\Get(path: '/api/demandes/{id}', summary: 'Détails d\'une demande', security: [['cookieAuth' => []]])]
     #[OA\Response(response: 200, description: 'Détails')]
-    #[OA\Response(response: 404, description: 'Non trouvé')]
     public function show(int $id): JsonResponse
     {
         $demande = $this->demandeService->getDemande($id);
-
         return $this->json($demande, Response::HTTP_OK, [], ['groups' => ['demande:read']]);
+    }
+
+    #[Route('/{id}/matching-voyages', name: 'matching_voyages', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    #[OA\Get(path: '/api/demandes/{id}/matching-voyages', summary: 'Voyages correspondants avec score', security: [['cookieAuth' => []]])]
+    #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
+    #[OA\Response(response: 200, description: 'Liste des voyages correspondants avec score de correspondance')]
+    public function matchingVoyages(int $id): JsonResponse
+    {
+        $matchingVoyages = $this->demandeService->findMatchingVoyages($id, $this->getUser());
+        return $this->json($matchingVoyages, Response::HTTP_OK, [], ['groups' => ['voyage:list']]);
     }
 
     #[Route('', name: 'create', methods: ['POST'])]
     #[IsGranted('ROLE_USER')]
-    #[OA\Post(
-        path: '/api/demandes',
-        summary: 'Créer une demande',
-        security: [['cookieAuth' => []]],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(ref: new Model(type: CreateDemandeDTO::class))
-        )
-    )]
+    #[OA\Post(path: '/api/demandes', summary: 'Créer une demande', security: [['cookieAuth' => []]], requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: CreateDemandeDTO::class))))]
     #[OA\Response(response: 201, description: 'Demande créée')]
-    public function create(
-        #[MapRequestPayload] CreateDemandeDTO $dto
-    ): JsonResponse {
-        $demande = $this->demandeService->createDemande($dto, $this->getUser());
-
+    public function create(#[MapRequestPayload] CreateDemandeDTO $dto): JsonResponse
+    {
+        /* @var User $user*/
+        $user = $this->getUser();
+        $demande = $this->demandeService->createDemande($dto, $user);
         return $this->json($demande, Response::HTTP_CREATED, [], ['groups' => ['demande:read']]);
     }
 
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
     #[IsGranted('DEMANDE_EDIT', subject: 'id')]
-    #[OA\Put(
-        path: '/api/demandes/{id}',
-        summary: 'Modifier une demande',
-        security: [['cookieAuth' => []]],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(ref: new Model(type: UpdateDemandeDTO::class))
-        )
-    )]
+    #[OA\Put(path: '/api/demandes/{id}', summary: 'Modifier une demande', security: [['cookieAuth' => []]], requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: UpdateDemandeDTO::class))))]
     #[OA\Response(response: 200, description: 'Demande mise à jour')]
-    public function update(
-        int $id,
-        #[MapRequestPayload] UpdateDemandeDTO $dto
-    ): JsonResponse {
+    public function update(int $id, #[MapRequestPayload] UpdateDemandeDTO $dto): JsonResponse
+    {
         $demande = $this->demandeService->updateDemande($id, $dto);
-
         return $this->json($demande, Response::HTTP_OK, [], ['groups' => ['demande:read']]);
     }
 
     #[Route('/{id}/statut', name: 'update_status', methods: ['PATCH'])]
     #[IsGranted('DEMANDE_EDIT', subject: 'id')]
-    #[OA\Patch(
-        path: '/api/demandes/{id}/statut',
-        summary: 'Changer le statut',
-        security: [['cookieAuth' => []]],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(
-                required: ['statut'],
-                properties: [
-                    new OA\Property(property: 'statut', type: 'string', enum: ['en_recherche', 'voyageur_trouve', 'annulee'])
-                ]
-            )
-        )
-    )]
+    #[OA\Patch(path: '/api/demandes/{id}/statut', summary: 'Changer le statut', security: [['cookieAuth' => []]])]
     #[OA\Response(response: 200, description: 'Statut mis à jour')]
     public function updateStatus(int $id, Request $request): JsonResponse
     {
@@ -129,7 +106,6 @@ class DemandeController extends AbstractController
         }
 
         $demande = $this->demandeService->updateStatut($id, $statut);
-
         return $this->json($demande, Response::HTTP_OK, [], ['groups' => ['demande:read']]);
     }
 
@@ -140,7 +116,6 @@ class DemandeController extends AbstractController
     public function delete(int $id): JsonResponse
     {
         $this->demandeService->deleteDemande($id);
-
         return $this->json(null, Response::HTTP_NO_CONTENT);
     }
 
@@ -151,7 +126,6 @@ class DemandeController extends AbstractController
     public function byUser(int $userId): JsonResponse
     {
         $demandes = $this->demandeService->getDemandesByUser($userId);
-
         return $this->json($demandes, Response::HTTP_OK, [], ['groups' => ['demande:list']]);
     }
 }

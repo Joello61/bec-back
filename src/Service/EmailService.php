@@ -5,16 +5,68 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Entity\User;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
 
-class EmailService
+readonly class EmailService
 {
     public function __construct(
-        private readonly MailerInterface $mailer,
-        private readonly string $frontendUrl
+        private MailerInterface $mailer,
+        private string $frontendUrl,
+        private LoggerInterface $logger
     ) {}
 
+    /**
+     * Vérifie si l'utilisateur accepte les emails
+     */
+    private function canSendEmail(User $user, bool $isTransactional = false): bool
+    {
+        $settings = $user->getSettings();
+
+        if (!$settings) {
+            // Si pas de settings (anciens utilisateurs), autoriser
+            return true;
+        }
+
+        // Les emails transactionnels (vérification, reset password) sont toujours envoyés
+        if ($isTransactional) {
+            return true;
+        }
+
+        // Sinon, vérifier les préférences
+        return $settings->canReceiveEmails();
+    }
+
+    /**
+     * Envoie un email en respectant les préférences
+     * @throws TransportExceptionInterface
+     */
+    private function send(Email $email, User $user, bool $isTransactional = false): void
+    {
+        if (!$this->canSendEmail($user, $isTransactional)) {
+            $this->logger->info('Email non envoyé (préférences utilisateur)', [
+                'user_id' => $user->getId(),
+                'email' => $user->getEmail()
+            ]);
+            return;
+        }
+
+        try {
+            $this->mailer->send($email);
+        } catch (TransportExceptionInterface $e) {
+            $this->logger->error('Erreur envoi email', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * @throws TransportExceptionInterface
+     */
     public function sendWelcomeEmail(User $user): void
     {
         $email = (new Email())
@@ -23,9 +75,12 @@ class EmailService
             ->subject('Bienvenue sur Bagage Express Cameroun')
             ->html($this->getWelcomeEmailContent($user));
 
-        $this->mailer->send($email);
+        $this->send($email, $user, true); // Transactionnel
     }
 
+    /**
+     * @throws TransportExceptionInterface
+     */
     public function sendEmailVerificationCode(User $user, string $code): void
     {
         $email = (new Email())
@@ -34,9 +89,12 @@ class EmailService
             ->subject('Code de vérification de votre email')
             ->html($this->getEmailVerificationCodeContent($user, $code));
 
-        $this->mailer->send($email);
+        $this->send($email, $user, true); // Transactionnel
     }
 
+    /**
+     * @throws TransportExceptionInterface
+     */
     public function sendPasswordResetEmail(User $user, string $token): void
     {
         $resetUrl = sprintf('%s/auth/reset-password?token=%s', $this->frontendUrl, $token);
@@ -47,9 +105,12 @@ class EmailService
             ->subject('Réinitialisation de votre mot de passe')
             ->html($this->getPasswordResetEmailContent($user, $resetUrl));
 
-        $this->mailer->send($email);
+        $this->send($email, $user, true); // Transactionnel
     }
 
+    /**
+     * @throws TransportExceptionInterface
+     */
     public function sendPasswordChangedEmail(User $user): void
     {
         $email = (new Email())
@@ -58,7 +119,22 @@ class EmailService
             ->subject('Votre mot de passe a été modifié')
             ->html($this->getPasswordChangedContent($user));
 
-        $this->mailer->send($email);
+        $this->send($email, $user, true); // Transactionnel (sécurité)
+    }
+
+    /**
+     * Email de notification générique (respecte les préférences)
+     * @throws TransportExceptionInterface
+     */
+    public function sendNotificationEmail(User $user, string $subject, string $content): void
+    {
+        $email = (new Email())
+            ->from('noreply@bagage-express.cm')
+            ->to($user->getEmail())
+            ->subject($subject)
+            ->html($content);
+
+        $this->send($email, $user, false); // Non transactionnel
     }
 
     private function getWelcomeEmailContent(User $user): string

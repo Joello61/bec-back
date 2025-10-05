@@ -24,13 +24,40 @@ readonly class NotificationService
         private DemandeRepository $demandeRepository
     ) {}
 
+    /**
+     * Vérifie si l'utilisateur accepte ce type de notification
+     */
+    private function canReceiveNotification(User $user, string $type): bool
+    {
+        $settings = $user->getSettings();
+
+        if (!$settings) {
+            // Si pas de settings, autoriser par défaut
+            return true;
+        }
+
+        return match($type) {
+            'new_message' => $settings->isNotifyOnNewMessage(),
+            'matching_voyage' => $settings->isNotifyOnMatchingVoyage(),
+            'matching_demande' => $settings->isNotifyOnMatchingDemande(),
+            'new_avis' => $settings->isNotifyOnNewAvis(),
+            'favori_update' => $settings->isNotifyOnFavoriUpdate(),
+            default => true, // Pour les types système (vérification, etc.)
+        };
+    }
+
     public function createNotification(
         User $user,
         string $type,
         string $titre,
         string $message,
         ?array $data = null
-    ): Notification {
+    ): ?Notification {
+        // Vérifier les préférences avant de créer
+        if (!$this->canReceiveNotification($user, $type)) {
+            return null;
+        }
+
         $notification = new Notification();
         $notification->setUser($user)
             ->setType($type)
@@ -54,8 +81,15 @@ readonly class NotificationService
         );
 
         foreach ($demandes as $demande) {
+            $client = $demande->getClient();
+
+            // Vérifier les préférences avant notification
+            if (!$this->canReceiveNotification($client, 'matching_voyage')) {
+                continue;
+            }
+
             $this->createNotification(
-                $demande->getClient(),
+                $client,
                 'matching_voyage',
                 'Nouveau voyage disponible',
                 sprintf(
@@ -78,8 +112,15 @@ readonly class NotificationService
         );
 
         foreach ($voyages as $voyage) {
+            $voyageur = $voyage->getVoyageur();
+
+            // Vérifier les préférences avant notification
+            if (!$this->canReceiveNotification($voyageur, 'matching_demande')) {
+                continue;
+            }
+
             $this->createNotification(
-                $voyage->getVoyageur(),
+                $voyageur,
                 'matching_demande',
                 'Nouvelle demande correspondante',
                 sprintf(
@@ -94,8 +135,15 @@ readonly class NotificationService
 
     public function notifyNewMessage(Message $message): void
     {
+        $destinataire = $message->getDestinataire();
+
+        // Vérifier les préférences avant notification
+        if (!$this->canReceiveNotification($destinataire, 'new_message')) {
+            return;
+        }
+
         $this->createNotification(
-            $message->getDestinataire(),
+            $destinataire,
             'new_message',
             'Nouveau message',
             sprintf(

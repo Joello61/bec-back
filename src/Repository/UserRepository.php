@@ -43,12 +43,25 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         $offset = ($page - 1) * $limit;
 
         $qb = $this->createQueryBuilder('u')
+            ->leftJoin('u.settings', 's')
+            ->addSelect('s')
+            // Filtrer uniquement les utilisateurs visibles dans les résultats de recherche
+            ->where('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->setParameter('visible', true)
             ->orderBy('u.createdAt', 'DESC')
             ->setFirstResult($offset)
             ->setMaxResults($limit);
 
         $users = $qb->getQuery()->getResult();
-        $total = $this->count([]);
+
+        // Compter le total avec le même filtre
+        $countQb = $this->createQueryBuilder('u')
+            ->select('COUNT(u.id)')
+            ->leftJoin('u.settings', 's')
+            ->where('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->setParameter('visible', true);
+
+        $total = $countQb->getQuery()->getSingleScalarResult();
 
         return [
             'data' => $users,
@@ -61,11 +74,19 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         ];
     }
 
+    /**
+     * Recherche d'utilisateurs avec filtrage par settings
+     */
     public function search(string $query): array
     {
         return $this->createQueryBuilder('u')
+            ->leftJoin('u.settings', 's')
+            ->addSelect('s')
             ->where('u.nom LIKE :query OR u.prenom LIKE :query OR u.email LIKE :query')
+            // Filtrer uniquement les utilisateurs visibles dans les résultats de recherche
+            ->andWhere('s.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('query', '%' . $query . '%')
+            ->setParameter('visible', true)
             ->setMaxResults(20)
             ->getQuery()
             ->getResult();
