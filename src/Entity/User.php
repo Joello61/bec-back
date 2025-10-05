@@ -31,7 +31,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private array $roles = [];
 
-    #[ORM\Column]
+    #[ORM\Column(nullable: true)]
     private ?string $password = null;
 
     #[ORM\Column(length: 100)]
@@ -61,6 +61,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     #[Groups(['user:read'])]
     private bool $telephoneVerifie = false;
+
+    // Champs OAuth
+    #[ORM\Column(length: 20, nullable: true)]
+    private ?string $authProvider = null; // 'local', 'google', 'facebook'
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $googleId = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $facebookId = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
     #[Groups(['user:read', 'demande:read', 'voyage:read'])]
@@ -108,6 +118,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->avisDonnes = new ArrayCollection();
         $this->avisRecus = new ArrayCollection();
         $this->signalements = new ArrayCollection();
+        $this->authProvider = 'local';
     }
 
     #[ORM\PrePersist]
@@ -157,18 +168,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getPassword(): string
+    public function getPassword(): ?string
     {
         return $this->password;
     }
 
-    public function setPassword(string $password): static
+    public function setPassword(?string $password): static
     {
         $this->password = $password;
         return $this;
     }
 
-    #[\Deprecated(message: 'Method is empty, logic handled elsewhere')]
     public function eraseCredentials(): void
     {
     }
@@ -247,6 +257,39 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setTelephoneVerifie(bool $telephoneVerifie): static
     {
         $this->telephoneVerifie = $telephoneVerifie;
+        return $this;
+    }
+
+    public function getAuthProvider(): ?string
+    {
+        return $this->authProvider;
+    }
+
+    public function setAuthProvider(?string $authProvider): static
+    {
+        $this->authProvider = $authProvider;
+        return $this;
+    }
+
+    public function getGoogleId(): ?string
+    {
+        return $this->googleId;
+    }
+
+    public function setGoogleId(?string $googleId): static
+    {
+        $this->googleId = $googleId;
+        return $this;
+    }
+
+    public function getFacebookId(): ?string
+    {
+        return $this->facebookId;
+    }
+
+    public function setFacebookId(?string $facebookId): static
+    {
+        $this->facebookId = $facebookId;
         return $this;
     }
 

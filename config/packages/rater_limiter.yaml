@@ -1,0 +1,25 @@
+framework:
+    rate_limiter:
+        # Limiter pour le login - 5 tentatives par IP toutes les 15 minutes
+        login:
+            policy: 'sliding_window'
+            limit: 5
+            interval: '15 minutes'
+
+        # Limiter pour le register - 3 inscriptions par IP par heure
+        register:
+            policy: 'sliding_window'
+            limit: 3
+            interval: '1 hour'
+
+        # Limiter pour forgot password - 3 demandes par IP par heure
+        password_reset:
+            policy: 'sliding_window'
+            limit: 3
+            interval: '1 hour'
+
+        # Limiter pour resend verification - 5 renvois par user toutes les 10 minutes
+        verification:
+            policy: 'sliding_window'
+            limit: 5
+            interval: '10 minutes'

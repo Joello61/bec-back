@@ -10,18 +10,27 @@ use Lexik\Bundle\JWTAuthenticationBundle\Event\JWTCreatedEvent;
 use Lexik\Bundle\JWTAuthenticationBundle\Event\AuthenticationFailureEvent;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
 
 class JWTListener
 {
     /**
-     * Appelé après une authentification réussie
-     * Ajoute le token dans un cookie HttpOnly et enrichit la réponse
+     * Appelé après une tentative d'authentification réussie
+     * Vérifie que l'email est vérifié avant d'autoriser la connexion
      */
     public function onAuthenticationSuccess(AuthenticationSuccessEvent $event): void
     {
         $data = $event->getData();
         /** @var User $user */
         $user = $event->getUser();
+
+        // Vérifier que l'email est vérifié pour les comptes locaux
+        if ($user->getAuthProvider() === 'local' && !$user->isEmailVerifie()) {
+            // Empêcher la connexion si l'email n'est pas vérifié
+            throw new CustomUserMessageAuthenticationException(
+                'Veuillez vérifier votre adresse email avant de vous connecter. Un code de vérification vous a été envoyé.'
+            );
+        }
 
         // Enrichir la réponse avec les données utilisateur
         $data['success'] = true;
@@ -35,6 +44,7 @@ class JWTListener
             'emailVerifie' => $user->isEmailVerifie(),
             'telephoneVerifie' => $user->isTelephoneVerifie(),
             'photo' => $user->getPhoto(),
+            'authProvider' => $user->getAuthProvider(),
         ];
 
         // Retirer le token de la réponse JSON pour plus de sécurité
@@ -59,6 +69,7 @@ class JWTListener
         $payload['nom'] = $user->getNom();
         $payload['prenom'] = $user->getPrenom();
         $payload['emailVerifie'] = $user->isEmailVerifie();
+        $payload['authProvider'] = $user->getAuthProvider();
 
         $event->setData($payload);
     }
@@ -69,9 +80,17 @@ class JWTListener
      */
     public function onAuthenticationFailure(AuthenticationFailureEvent $event): void
     {
+        $exception = $event->getException();
+
+        // Personnaliser le message selon le type d'erreur
+        $message = match (true) {
+            str_contains($exception->getMessage(), 'email') => $exception->getMessage(),
+            default => 'Email ou mot de passe incorrect',
+        };
+
         $response = new JsonResponse([
             'success' => false,
-            'message' => 'Email ou mot de passe incorrect',
+            'message' => $message,
         ], Response::HTTP_UNAUTHORIZED);
 
         $event->setResponse($response);
