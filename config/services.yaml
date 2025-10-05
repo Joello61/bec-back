@@ -3,6 +3,16 @@ parameters:
     app.max_file_size: '%env(int:MAX_FILE_SIZE)%'
     app.frontend_url: '%env(FRONTEND_URL)%'
 
+    # OAuth Google
+    google.client_id: '%env(GOOGLE_CLIENT_ID)%'
+    google.client_secret: '%env(GOOGLE_CLIENT_SECRET)%'
+    google.redirect_uri: '%env(GOOGLE_REDIRECT_URI)%'
+
+    # OAuth Facebook
+    facebook.app_id: '%env(FACEBOOK_APP_ID)%'
+    facebook.app_secret: '%env(FACEBOOK_APP_SECRET)%'
+    facebook.redirect_uri: '%env(FACEBOOK_REDIRECT_URI)%'
+
 services:
     _defaults:
         autowire: true
@@ -19,6 +29,20 @@ services:
     App\Service\EmailService:
         arguments:
             $frontendUrl: '%app.frontend_url%'
+
+    # GoogleAuthService
+    App\Service\OAuth\GoogleAuthService:
+        arguments:
+            $googleClientId: '%google.client_id%'
+            $googleClientSecret: '%google.client_secret%'
+            $googleRedirectUri: '%google.redirect_uri%'
+
+    # FacebookAuthService
+    App\Service\OAuth\FacebookAuthService:
+        arguments:
+            $facebookAppId: '%facebook.app_id%'
+            $facebookAppSecret: '%facebook.app_secret%'
+            $facebookRedirectUri: '%facebook.redirect_uri%'
 
     App\Controller\:
         resource: '../src/Controller/'

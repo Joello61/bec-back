@@ -43,8 +43,8 @@ class RegisterDTO
 
     #[Assert\NotBlank(message: 'Le numéro de téléphone est obligatoire')]
     #[Assert\Regex(
-        pattern: '/^(\+2376[5-9]\d{7}|2[3-4]\d{7})$/',
-        message: 'Le numéro de téléphone camerounais n\'est pas valide'
+        pattern: '/^\+?[1-9]\d{1,14}$/',
+        message: 'Le numéro de téléphone n\'est pas valide. Format attendu: +33612345678 ou +237612345678'
     )]
     public string $telephone;
 }

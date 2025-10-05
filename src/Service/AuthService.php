@@ -8,6 +8,7 @@ use App\DTO\RegisterDTO;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Exception;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Psr\Log\LoggerInterface;
@@ -19,6 +20,7 @@ readonly class AuthService
         private UserRepository $userRepository,
         private UserPasswordHasherInterface $passwordHasher,
         private EmailService $emailService,
+        private VerificationService $verificationService,
         private LoggerInterface $logger
     ) {}
 
@@ -30,7 +32,7 @@ readonly class AuthService
             throw new BadRequestHttpException('Cet email est déjà utilisé');
         }
 
-        // Vérifier si le téléphone existe déjà (optionnel)
+        // Vérifier si le téléphone existe déjà
         if ($dto->telephone) {
             $existingPhone = $this->userRepository->findOneBy(['telephone' => $dto->telephone]);
             if ($existingPhone) {
@@ -45,17 +47,18 @@ readonly class AuthService
                 ->setPrenom($dto->prenom)
                 ->setTelephone($dto->telephone)
                 ->setPassword($this->passwordHasher->hashPassword($user, $dto->password))
-                ->setRoles(['ROLE_USER']);
+                ->setRoles(['ROLE_USER'])
+                ->setAuthProvider('local');
 
             $this->entityManager->persist($user);
             $this->entityManager->flush();
 
-            // Envoyer email de bienvenue (de manière asynchrone si possible)
+            // Envoyer les emails/SMS de vérification
             try {
+                $this->verificationService->sendEmailVerification($user);
                 $this->emailService->sendWelcomeEmail($user);
-            } catch (\Exception $e) {
-                // Logger l'erreur mais ne pas bloquer l'inscription
-                $this->logger->error('Erreur lors de l\'envoi de l\'email de bienvenue', [
+            } catch (Exception $e) {
+                $this->logger->error('Erreur lors de l\'envoi des emails', [
                     'user_id' => $user->getId(),
                     'error' => $e->getMessage()
                 ]);
@@ -67,7 +70,7 @@ readonly class AuthService
             ]);
 
             return $user;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger->error('Erreur lors de l\'inscription', [
                 'error' => $e->getMessage(),
                 'email' => $dto->email
@@ -78,6 +81,11 @@ readonly class AuthService
 
     public function changePassword(User $user, string $currentPassword, string $newPassword): void
     {
+        // Vérifier si l'utilisateur a un mot de passe (peut ne pas en avoir si OAuth)
+        if (!$user->getPassword()) {
+            throw new BadRequestHttpException('Ce compte utilise une connexion externe (Google/Facebook)');
+        }
+
         if (!$this->passwordHasher->isPasswordValid($user, $currentPassword)) {
             throw new BadRequestHttpException('Le mot de passe actuel est incorrect');
         }
@@ -90,8 +98,18 @@ readonly class AuthService
             $user->setPassword($this->passwordHasher->hashPassword($user, $newPassword));
             $this->entityManager->flush();
 
+            // Envoyer un email de confirmation
+            try {
+                $this->emailService->sendPasswordChangedEmail($user);
+            } catch (Exception $e) {
+                $this->logger->error('Erreur lors de l\'envoi de l\'email de confirmation', [
+                    'user_id' => $user->getId(),
+                    'error' => $e->getMessage()
+                ]);
+            }
+
             $this->logger->info('Mot de passe changé', ['user_id' => $user->getId()]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger->error('Erreur lors du changement de mot de passe', [
                 'user_id' => $user->getId(),
                 'error' => $e->getMessage()
@@ -100,43 +118,140 @@ readonly class AuthService
         }
     }
 
-    public function verifyEmail(User $user): void
+    public function resetPassword(string $token, string $newPassword): void
     {
-        if ($user->isEmailVerifie()) {
-            throw new BadRequestHttpException('Cet email est déjà vérifié');
+        // Valider le token
+        $resetToken = $this->verificationService->validateResetToken($token);
+        $user = $resetToken->getUser();
+
+        if (strlen($newPassword) < 8) {
+            throw new BadRequestHttpException('Le mot de passe doit contenir au moins 8 caractères');
         }
 
         try {
-            $user->setEmailVerifie(true);
+            // Définir le nouveau mot de passe
+            $user->setPassword($this->passwordHasher->hashPassword($user, $newPassword));
+
+            // Marquer le token comme utilisé
+            $this->verificationService->markTokenAsUsed($resetToken);
+
             $this->entityManager->flush();
 
+            // Envoyer un email de confirmation
+            try {
+                $this->emailService->sendPasswordChangedEmail($user);
+            } catch (Exception $e) {
+                $this->logger->error('Erreur lors de l\'envoi de l\'email', [
+                    'user_id' => $user->getId(),
+                    'error' => $e->getMessage()
+                ]);
+            }
+
+            $this->logger->info('Mot de passe réinitialisé', [
+                'user_id' => $user->getId()
+            ]);
+        } catch (Exception $e) {
+            $this->logger->error('Erreur lors de la réinitialisation', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage()
+            ]);
+            throw new BadRequestHttpException('Erreur lors de la réinitialisation du mot de passe');
+        }
+    }
+
+    public function requestPasswordReset(string $email): void
+    {
+        $user = $this->userRepository->findByEmail($email);
+
+        // Ne pas révéler si l'email existe ou non (sécurité)
+        if (!$user) {
+            $this->logger->warning('Tentative de reset pour email inconnu', ['email' => $email]);
+            return;
+        }
+
+        // Vérifier que l'utilisateur a un mot de passe (pas OAuth)
+        if (!$user->getPassword()) {
+            $this->logger->warning('Tentative de reset pour compte OAuth', [
+                'user_id' => $user->getId(),
+                'provider' => $user->getAuthProvider()
+            ]);
+            throw new BadRequestHttpException('Ce compte utilise une connexion externe (Google/Facebook)');
+        }
+
+        try {
+            $this->verificationService->createPasswordResetToken($user);
+        } catch (Exception $e) {
+            $this->logger->error('Erreur lors de la création du token de reset', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage()
+            ]);
+            throw new BadRequestHttpException($e->getMessage());
+        }
+    }
+
+    /**
+     * @throws Exception
+     */
+    public function verifyEmail(User $user, string $code): void
+    {
+        try {
+            $this->verificationService->verifyEmailCode($user, $code);
             $this->logger->info('Email vérifié', ['user_id' => $user->getId()]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger->error('Erreur lors de la vérification de l\'email', [
                 'user_id' => $user->getId(),
                 'error' => $e->getMessage()
             ]);
-            throw new BadRequestHttpException('Erreur lors de la vérification de l\'email');
+            throw $e;
         }
     }
 
-    public function verifyPhone(User $user): void
+    /**
+     * @throws Exception
+     */
+    public function verifyPhone(User $user, string $code): void
     {
-        if ($user->isTelephoneVerifie()) {
-            throw new BadRequestHttpException('Ce numéro est déjà vérifié');
-        }
-
         try {
-            $user->setTelephoneVerifie(true);
-            $this->entityManager->flush();
-
+            $this->verificationService->verifyPhoneCode($user, $code);
             $this->logger->info('Téléphone vérifié', ['user_id' => $user->getId()]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             $this->logger->error('Erreur lors de la vérification du téléphone', [
                 'user_id' => $user->getId(),
                 'error' => $e->getMessage()
             ]);
-            throw new BadRequestHttpException('Erreur lors de la vérification du téléphone');
+            throw $e;
+        }
+    }
+
+    /**
+     * @throws Exception
+     */
+    public function resendEmailVerification(User $user): void
+    {
+        try {
+            $this->verificationService->sendEmailVerification($user);
+        } catch (Exception $e) {
+            $this->logger->error('Erreur lors du renvoi du code email', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * @throws Exception
+     */
+    public function resendPhoneVerification(User $user): void
+    {
+        try {
+            $this->verificationService->sendPhoneVerification($user);
+        } catch (Exception $e) {
+            $this->logger->error('Erreur lors du renvoi du code SMS', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage()
+            ]);
+            throw $e;
         }
     }
 }

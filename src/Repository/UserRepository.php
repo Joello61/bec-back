@@ -56,7 +56,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
                 'page' => $page,
                 'limit' => $limit,
                 'total' => $total,
-                'pages' => (int) ceil($total / $limit),
+                'pages' => (int)ceil($total / $limit),
             ],
         ];
     }
