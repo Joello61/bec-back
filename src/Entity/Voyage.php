@@ -19,7 +19,7 @@ class Voyage
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['voyage:read', 'voyage:list'])]
+    #[Groups(['voyage:read', 'voyage:list', 'proposition:list'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'voyages')]
@@ -28,19 +28,19 @@ class Voyage
     private ?User $voyageur = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['voyage:read', 'voyage:list', 'voyage:write'])]
+    #[Groups(['voyage:read', 'voyage:list', 'voyage:write', 'proposition:list'])]
     private ?string $villeDepart = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['voyage:read', 'voyage:list', 'voyage:write'])]
+    #[Groups(['voyage:read', 'voyage:list', 'voyage:write', 'proposition:list'])]
     private ?string $villeArrivee = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE)]
-    #[Groups(['voyage:read', 'voyage:list', 'voyage:write'])]
+    #[Groups(['voyage:read', 'voyage:list', 'voyage:write', 'proposition:list'])]
     private ?\DateTimeInterface $dateDepart = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE)]
-    #[Groups(['voyage:read', 'voyage:list', 'voyage:write'])]
+    #[Groups(['voyage:read', 'voyage:list', 'voyage:write', 'proposition:list'])]
     private ?\DateTimeInterface $dateArrivee = null;
 
     #[ORM\Column(type: Types::DECIMAL, precision: 5, scale: 2)]

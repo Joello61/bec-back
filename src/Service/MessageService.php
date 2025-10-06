@@ -7,6 +7,7 @@ namespace App\Service;
 use App\DTO\SendMessageDTO;
 use App\Entity\Message;
 use App\Entity\User;
+use App\Repository\ConversationRepository;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -19,8 +20,10 @@ readonly class MessageService
         private EntityManagerInterface $entityManager,
         private MessageRepository $messageRepository,
         private UserRepository $userRepository,
+        private ConversationRepository $conversationRepository,
         private NotificationService $notificationService
-    ) {}
+    ) {
+    }
 
     public function sendMessage(SendMessageDTO $dto, User $expediteur): Message
     {
@@ -34,7 +37,7 @@ readonly class MessageService
             throw new BadRequestHttpException('Vous ne pouvez pas vous envoyer un message à vous-même');
         }
 
-        // ==================== VÉRIFIER LES PARAMÈTRES DE CONFIDENTIALITÉ ====================
+        // Vérifier les paramètres de confidentialité
         $settings = $destinataire->getSettings();
 
         if ($settings && !$settings->canReceiveMessageFrom($expediteur)) {
@@ -44,8 +47,12 @@ readonly class MessageService
             );
         }
 
+        // Récupérer ou créer la conversation
+        $conversation = $this->conversationRepository->findOrCreateBetweenUsers($expediteur, $destinataire);
+
         $message = new Message();
-        $message->setExpediteur($expediteur)
+        $message->setConversation($conversation)
+            ->setExpediteur($expediteur)
             ->setDestinataire($destinataire)
             ->setContenu($dto->contenu)
             ->setLu(false);
@@ -59,32 +66,22 @@ readonly class MessageService
         return $message;
     }
 
-    public function getConversation(int $userId1, int $userId2): array
-    {
-        return $this->messageRepository->findConversation($userId1, $userId2);
-    }
-
-    public function getConversationsList(int $userId): array
-    {
-        return $this->messageRepository->findConversationsList($userId);
-    }
-
-    public function markAsRead(int $userId, int $otherUserId): void
-    {
-        $this->messageRepository->markAsRead($userId, $otherUserId);
-    }
-
     public function countUnread(int $userId): int
     {
         return $this->messageRepository->countUnread($userId);
     }
 
-    public function deleteMessage(int $id): void
+    public function deleteMessage(int $id, User $user): void
     {
         $message = $this->messageRepository->find($id);
 
         if (!$message) {
             throw new NotFoundHttpException('Message non trouvé');
+        }
+
+        // Vérifier que l'utilisateur est l'expéditeur ou le destinataire
+        if ($message->getExpediteur() !== $user && $message->getDestinataire() !== $user) {
+            throw new BadRequestHttpException('Vous ne pouvez pas supprimer ce message');
         }
 
         $this->entityManager->remove($message);

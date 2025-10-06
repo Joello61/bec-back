@@ -61,11 +61,11 @@ class Proposition
     private ?string $messageRefus = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
-    #[Groups(['proposition:read'])]
+    #[Groups(['proposition:read', 'proposition:list'])]
     private ?\DateTimeInterface $createdAt = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
-    #[Groups(['proposition:read'])]
+    #[Groups(['proposition:read', 'proposition:list'])]
     private ?\DateTimeInterface $updatedAt = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\DTO\SendMessageDTO;
+use App\Entity\User;
 use App\Service\MessageService;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -22,7 +23,8 @@ class MessageController extends AbstractController
 {
     public function __construct(
         private readonly MessageService $messageService
-    ) {}
+    ) {
+    }
 
     #[Route('', name: 'send', methods: ['POST'])]
     #[OA\Post(
@@ -36,60 +38,15 @@ class MessageController extends AbstractController
     )]
     #[OA\Response(response: 201, description: 'Message envoyé')]
     #[OA\Response(response: 400, description: 'Données invalides')]
+    #[OA\Response(response: 404, description: 'Destinataire non trouvé')]
     public function send(
         #[MapRequestPayload] SendMessageDTO $dto
     ): JsonResponse {
-        $message = $this->messageService->sendMessage($dto, $this->getUser());
+        /** @var User $user */
+        $user = $this->getUser();
+        $message = $this->messageService->sendMessage($dto, $user);
 
         return $this->json($message, Response::HTTP_CREATED, [], ['groups' => ['message:read']]);
-    }
-
-    #[Route('/conversations', name: 'conversations', methods: ['GET'])]
-    #[OA\Get(
-        path: '/api/messages/conversations',
-        summary: 'Liste des conversations',
-        security: [['cookieAuth' => []]]
-    )]
-    #[OA\Response(response: 200, description: 'Liste des conversations')]
-    public function conversations(): JsonResponse
-    {
-        $conversations = $this->messageService->getConversationsList($this->getUser()->getId());
-
-        return $this->json($conversations);
-    }
-
-    #[Route('/conversation/{userId}', name: 'conversation', methods: ['GET'])]
-    #[OA\Get(
-        path: '/api/messages/conversation/{userId}',
-        summary: 'Conversation avec un utilisateur',
-        security: [['cookieAuth' => []]]
-    )]
-    #[OA\Parameter(
-        name: 'userId',
-        in: 'path',
-        required: true,
-        schema: new OA\Schema(type: 'integer')
-    )]
-    #[OA\Response(response: 200, description: 'Messages de la conversation')]
-    public function conversation(int $userId): JsonResponse
-    {
-        $messages = $this->messageService->getConversation($this->getUser()->getId(), $userId);
-
-        return $this->json($messages, Response::HTTP_OK, [], ['groups' => ['message:read']]);
-    }
-
-    #[Route('/conversation/{userId}/mark-read', name: 'mark_read', methods: ['POST'])]
-    #[OA\Post(
-        path: '/api/messages/conversation/{userId}/mark-read',
-        summary: 'Marquer les messages comme lus',
-        security: [['cookieAuth' => []]]
-    )]
-    #[OA\Response(response: 200, description: 'Messages marqués comme lus')]
-    public function markAsRead(int $userId): JsonResponse
-    {
-        $this->messageService->markAsRead($this->getUser()->getId(), $userId);
-
-        return $this->json(['message' => 'Messages marqués comme lus']);
     }
 
     #[Route('/unread-count', name: 'unread_count', methods: ['GET'])]
@@ -109,7 +66,9 @@ class MessageController extends AbstractController
     )]
     public function unreadCount(): JsonResponse
     {
-        $count = $this->messageService->countUnread($this->getUser()->getId());
+        /** @var User $user */
+        $user = $this->getUser();
+        $count = $this->messageService->countUnread($user->getId());
 
         return $this->json(['count' => $count]);
     }
@@ -121,10 +80,21 @@ class MessageController extends AbstractController
         summary: 'Supprimer un message',
         security: [['cookieAuth' => []]]
     )]
+    #[OA\Parameter(
+        name: 'id',
+        description: 'ID du message',
+        in: 'path',
+        required: true,
+        schema: new OA\Schema(type: 'integer')
+    )]
     #[OA\Response(response: 204, description: 'Message supprimé')]
+    #[OA\Response(response: 403, description: 'Accès refusé')]
+    #[OA\Response(response: 404, description: 'Message non trouvé')]
     public function delete(int $id): JsonResponse
     {
-        $this->messageService->deleteMessage($id);
+        /** @var User $user */
+        $user = $this->getUser();
+        $this->messageService->deleteMessage($id, $user);
 
         return $this->json(null, Response::HTTP_NO_CONTENT);
     }
