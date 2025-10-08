@@ -12,6 +12,7 @@ use App\Repository\VoyageRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 readonly class FavoriService
 {
@@ -70,12 +71,23 @@ readonly class FavoriService
         return $favori;
     }
 
-    public function removeFromFavoris(int $favoriId): void
+    public function removeFromFavoris(int $entityId, string $type, User $user): void
     {
-        $favori = $this->favoriRepository->find($favoriId);
+
+        if ($type === 'voyage') {
+            $favori = $this->favoriRepository->findByUserAndVoyage($user->getId(), $entityId);
+        } elseif ($type === 'demande') {
+            $favori = $this->favoriRepository->findByUserAndDemande($user->getId(), $entityId);
+        } else {
+            throw new BadRequestHttpException('Type invalide. Utilisez "voyage" ou "demande"');
+        }
 
         if (!$favori) {
             throw new NotFoundHttpException('Favori non trouvé');
+        }
+
+        if ($favori->getUser() !== $user) {
+            throw new AccessDeniedException('Vous ne pouvez pas supprimer ce favori');
         }
 
         $this->entityManager->remove($favori);

@@ -209,4 +209,6 @@ class Proposition
         $this->reponduAt = $reponduAt;
         return $this;
     }
+
+
 }

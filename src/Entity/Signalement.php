@@ -35,12 +35,21 @@ class Signalement
     #[Groups(['signalement:read', 'signalement:list'])]
     private ?Demande $demande = null;
 
+    #[ORM\ManyToOne(targetEntity: Message::class, inversedBy: 'signalements')]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
+    #[Groups(['signalement:read', 'signalement:list'])]
+    private ?Message $message = null;
+
+    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'signalementsRecus')]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'CASCADE')]
+    private ?User $utilisateurSignale = null;
+
     #[ORM\Column(length: 50)]
     #[Groups(['signalement:read', 'signalement:list', 'signalement:write'])]
     private ?string $motif = null;
 
     #[ORM\Column(type: Types::TEXT)]
-    #[Groups(['signalement:read', 'signalement:write'])]
+    #[Groups(['signalement:read', 'signalement:write', 'signalement:list'])]
     private ?string $description = null;
 
     #[ORM\Column(length: 50)]
@@ -56,7 +65,7 @@ class Signalement
     private ?\DateTimeInterface $createdAt = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
-    #[Groups(['signalement:read'])]
+    #[Groups(['signalement:read', 'signalement:list'])]
     private ?\DateTimeInterface $updatedAt = null;
 
     #[ORM\PrePersist]
@@ -107,6 +116,28 @@ class Signalement
     public function setDemande(?Demande $demande): static
     {
         $this->demande = $demande;
+        return $this;
+    }
+
+    public function getMessage(): ?Message
+    {
+        return $this->message;
+    }
+
+    public function setMessage(?Message $message): static
+    {
+        $this->message = $message;
+        return $this;
+    }
+
+    public function getUtilisateurSignale(): ?User
+    {
+        return $this->utilisateurSignale;
+    }
+
+    public function setUtilisateurSignale(?User $utilisateurSignale): static
+    {
+        $this->utilisateurSignale = $utilisateurSignale;
         return $this;
     }
 

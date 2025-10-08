@@ -19,38 +19,38 @@ class Demande
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['demande:read', 'demande:list'])]
+    #[Groups(['demande:read', 'demande:list', 'favori:read', 'favori:list'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'demandes')]
     #[ORM\JoinColumn(nullable: false)]
-    #[Groups(['demande:read', 'demande:list'])]
+    #[Groups(['demande:read', 'demande:list', 'favori:list'])]
     private ?User $client = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['demande:read', 'demande:list', 'demande:write'])]
+    #[Groups(['demande:read', 'demande:list', 'demande:write', 'favori:list', 'signalement:list'])]
     private ?string $villeDepart = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['demande:read', 'demande:list', 'demande:write'])]
+    #[Groups(['demande:read', 'demande:list', 'demande:write', 'favori:list', 'signalement:list'])]
     private ?string $villeArrivee = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true)]
-    #[Groups(['demande:read', 'demande:list', 'demande:write'])]
+    #[Groups(['demande:read', 'demande:list', 'demande:write', 'favori:list'])]
     private ?\DateTimeInterface $dateLimite = null;
 
     #[ORM\Column(type: Types::DECIMAL, precision: 5, scale: 2)]
-    #[Groups(['demande:read', 'demande:list', 'demande:write'])]
+    #[Groups(['demande:read', 'demande:list', 'demande:write', 'favori:list'])]
     private ?string $poidsEstime = null;
 
     // ==================== NOUVEAUX CHAMPS PRIX/COMMISSION ====================
 
     #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
-    #[Groups(['demande:read', 'demande:list', 'demande:write'])]
+    #[Groups(['demande:read', 'demande:list', 'demande:write', 'favori:list'])]
     private ?string $prixParKilo = null;
 
     #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
-    #[Groups(['demande:read', 'demande:list', 'demande:write'])]
+    #[Groups(['demande:read', 'demande:list', 'demande:write', 'favori:list'])]
     private ?string $commissionProposeePourUnBagage = null;
 
     #[ORM\Column(type: Types::TEXT)]
@@ -58,7 +58,7 @@ class Demande
     private ?string $description = null;
 
     #[ORM\Column(length: 50)]
-    #[Groups(['demande:read', 'demande:list'])]
+    #[Groups(['demande:read', 'demande:list', 'favori:list'])]
     private string $statut = 'en_recherche';
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
