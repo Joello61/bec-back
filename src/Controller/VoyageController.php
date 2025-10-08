@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\DTO\CreateVoyageDTO;
 use App\DTO\UpdateVoyageDTO;
 use App\Entity\User;
+use App\Service\AvisService;
 use App\Service\VoyageService;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -17,13 +18,16 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Serializer\Exception\ExceptionInterface;
+use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 
 #[Route('/api/voyages', name: 'api_voyage_')]
 #[OA\Tag(name: 'Voyages')]
 class VoyageController extends AbstractController
 {
     public function __construct(
-        private readonly VoyageService $voyageService
+        private readonly VoyageService $voyageService,
+        private readonly AvisService $avisService,
     ) {}
 
     #[Route('', name: 'list', methods: ['GET'])]
@@ -51,15 +55,24 @@ class VoyageController extends AbstractController
         return $this->json($result, Response::HTTP_OK, [], ['groups' => ['voyage:list']]);
     }
 
+    /**
+     * @throws ExceptionInterface
+     */
     #[Route('/{id}', name: 'show', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
     #[OA\Get(path: '/api/voyages/{id}', summary: 'Détails d\'un voyage', security: [['cookieAuth' => []]])]
     #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
     #[OA\Response(response: 200, description: 'Détails du voyage')]
-    public function show(int $id): JsonResponse
+    public function show(int $id, NormalizerInterface $normalizer): JsonResponse
     {
         $voyage = $this->voyageService->getVoyage($id);
-        return $this->json($voyage, Response::HTTP_OK, [], ['groups' => ['voyage:read']]);
+        $dataVoyage = $normalizer->normalize($voyage, null, ['groups' => ['voyage:read']]);
+
+        $noteAvisMoyen = $this->avisService->getStatsByUser($voyage->getVoyageur()->getId())['average'] ?? 0;
+
+        $dataVoyage['voyageur']['noteAvisMoyen'] = $noteAvisMoyen;
+
+        return $this->json($dataVoyage, Response::HTTP_OK);
     }
 
     #[Route('/{id}/matching-demandes', name: 'matching_demandes', methods: ['GET'])]
