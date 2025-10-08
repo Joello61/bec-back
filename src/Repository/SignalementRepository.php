@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\Signalement;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -23,7 +24,9 @@ class SignalementRepository extends ServiceEntityRepository
             ->leftJoin('s.signaleur', 'u')
             ->leftJoin('s.voyage', 'v')
             ->leftJoin('s.demande', 'd')
-            ->addSelect('u', 'v', 'd')
+            ->leftJoin('s.message', 'm')
+            ->leftJoin('s.utilisateurSignale', 'us')
+            ->addSelect('u', 'v', 'd', 'm', 'us')
             ->orderBy('s.createdAt', 'DESC')
             ->setFirstResult($offset)
             ->setMaxResults($limit);
@@ -56,13 +59,62 @@ class SignalementRepository extends ServiceEntityRepository
         ];
     }
 
+    public function findUserSignalementPaginated(User $user, int $page = 1, int $limit = 10, ?string $statut = null): array
+    {
+        $offset = ($page - 1) * $limit;
+
+        $qb = $this->createQueryBuilder('s')
+            ->leftJoin('s.signaleur', 'u')
+            ->leftJoin('s.voyage', 'v')
+            ->leftJoin('s.demande', 'd')
+            ->leftJoin('s.message', 'm')
+            ->leftJoin('s.utilisateurSignale', 'us')
+            ->addSelect('u', 'v', 'd', 'm', 'us')
+            ->where('s.signaleur = :user')
+            ->setParameter('user', $user)
+            ->orderBy('s.createdAt', 'DESC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit);
+
+        if ($statut) {
+            $qb->andWhere('s.statut = :statut')
+                ->setParameter('statut', $statut);
+        }
+
+        $signalements = $qb->getQuery()->getResult();
+
+        $countQb = $this->createQueryBuilder('s')
+            ->select('COUNT(s.id)')
+            ->where('s.signaleur = :user')  // ← AJOUT
+            ->setParameter('user', $user);;
+
+        if ($statut) {
+            $countQb->andWhere('s.statut = :statut')
+                ->setParameter('statut', $statut);
+        }
+
+        $total = $countQb->getQuery()->getSingleScalarResult();
+
+        return [
+            'data' => $signalements,
+            'pagination' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'pages' => (int) ceil($total / $limit),
+            ],
+        ];
+    }
+
     public function findByStatut(string $statut): array
     {
         return $this->createQueryBuilder('s')
             ->leftJoin('s.signaleur', 'u')
             ->leftJoin('s.voyage', 'v')
             ->leftJoin('s.demande', 'd')
-            ->addSelect('u', 'v', 'd')
+            ->leftJoin('s.message', 'm')
+            ->leftJoin('s.utilisateurSignale', 'us')
+            ->addSelect('u', 'v', 'd', 'm', 'us')
             ->where('s.statut = :statut')
             ->setParameter('statut', $statut)
             ->orderBy('s.createdAt', 'DESC')
@@ -89,6 +141,30 @@ class SignalementRepository extends ServiceEntityRepository
             ->addSelect('u')
             ->where('s.demande = :demandeId')
             ->setParameter('demandeId', $demandeId)
+            ->orderBy('s.createdAt', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function findByMessage(int $messageId): array
+    {
+        return $this->createQueryBuilder('s')
+            ->leftJoin('s.signaleur', 'u')
+            ->addSelect('u')
+            ->where('s.message = :messageId')
+            ->setParameter('messageId', $messageId)
+            ->orderBy('s.createdAt', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function findByUtilisateurSignale(int $utilisateurSignaleId): array
+    {
+        return $this->createQueryBuilder('s')
+            ->leftJoin('s.signaleur', 'u')
+            ->addSelect('u')
+            ->where('s.utilisateurSignale = :utilisateurSignaleId')
+            ->setParameter('utilisateurSignaleId', $utilisateurSignaleId)
             ->orderBy('s.createdAt', 'DESC')
             ->getQuery()
             ->getResult();

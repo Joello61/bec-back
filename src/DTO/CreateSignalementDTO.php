@@ -14,6 +14,12 @@ class CreateSignalementDTO
     #[Assert\Positive(message: 'L\'ID de la demande doit être positif')]
     public ?int $demandeId = null;
 
+    #[Assert\Positive(message: 'L\'ID de du message doit être positif')]
+    public ?int $messageId = null;
+
+    #[Assert\Positive(message: 'L\'ID de l\'utilisateur signalé doit être positif')]
+    public ?int $utilisateurSignaleId = null;
+
     #[Assert\NotBlank(message: 'Le motif est obligatoire')]
     #[Assert\Choice(
         choices: ['contenu_inapproprie', 'spam', 'arnaque', 'objet_illegal', 'autre'],

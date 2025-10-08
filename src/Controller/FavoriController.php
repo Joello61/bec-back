@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Entity\User;
 use App\Service\FavoriService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -30,7 +31,9 @@ class FavoriController extends AbstractController
     #[OA\Response(response: 200, description: 'Liste des favoris')]
     public function list(): JsonResponse
     {
-        $favoris = $this->favoriService->getUserFavoris($this->getUser()->getId());
+        /* @var $user User */
+        $user = $this->getUser();
+        $favoris = $this->favoriService->getUserFavoris($user->getId());
 
         return $this->json($favoris, Response::HTTP_OK, [], ['groups' => ['favori:list']]);
     }
@@ -44,7 +47,9 @@ class FavoriController extends AbstractController
     #[OA\Response(response: 200, description: 'Liste des voyages favoris')]
     public function voyages(): JsonResponse
     {
-        $favoris = $this->favoriService->getUserFavorisVoyages($this->getUser()->getId());
+        /* @var $user User */
+        $user = $this->getUser();
+        $favoris = $this->favoriService->getUserFavorisVoyages($user->getId());
 
         return $this->json($favoris, Response::HTTP_OK, [], ['groups' => ['favori:list']]);
     }
@@ -58,7 +63,9 @@ class FavoriController extends AbstractController
     #[OA\Response(response: 200, description: 'Liste des demandes favorites')]
     public function demandes(): JsonResponse
     {
-        $favoris = $this->favoriService->getUserFavorisDemandes($this->getUser()->getId());
+        /* @var $user User */
+        $user = $this->getUser();
+        $favoris = $this->favoriService->getUserFavorisDemandes($user->getId());
 
         return $this->json($favoris, Response::HTTP_OK, [], ['groups' => ['favori:list']]);
     }
@@ -74,7 +81,9 @@ class FavoriController extends AbstractController
     #[OA\Response(response: 400, description: 'Déjà dans les favoris')]
     public function addVoyage(int $voyageId): JsonResponse
     {
-        $favori = $this->favoriService->addVoyageToFavoris($this->getUser(), $voyageId);
+        /* @var $user User */
+        $user = $this->getUser();
+        $favori = $this->favoriService->addVoyageToFavoris($user, $voyageId);
 
         return $this->json($favori, Response::HTTP_CREATED, [], ['groups' => ['favori:read']]);
     }
@@ -90,22 +99,32 @@ class FavoriController extends AbstractController
     #[OA\Response(response: 400, description: 'Déjà dans les favoris')]
     public function addDemande(int $demandeId): JsonResponse
     {
-        $favori = $this->favoriService->addDemandeToFavoris($this->getUser(), $demandeId);
+        /* @var $user User */
+        $user = $this->getUser();
+        $favori = $this->favoriService->addDemandeToFavoris($user, $demandeId);
 
         return $this->json($favori, Response::HTTP_CREATED, [], ['groups' => ['favori:read']]);
     }
 
-    #[Route('/{id}', name: 'remove', methods: ['DELETE'])]
+    #[Route('/{type}/{id}', name: 'remove', methods: ['DELETE'])]
     #[OA\Delete(
-        path: '/api/favoris/{id}',
+        path: '/api/favoris/{type}/{id}',
         summary: 'Retirer des favoris',
         security: [['cookieAuth' => []]]
     )]
     #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
     #[OA\Response(response: 204, description: 'Retiré des favoris')]
-    public function remove(int $id): JsonResponse
+    public function remove(int $id, string $type): JsonResponse
     {
-        $this->favoriService->removeFromFavoris($id);
+
+        /* @var $user User */
+        $user = $this->getUser();
+
+        if (!$user) {
+            return $this->json(["message" => "Vous devez être connecté"], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $this->favoriService->removeFromFavoris($id, $type, $user);
 
         return $this->json(null, Response::HTTP_NO_CONTENT);
     }

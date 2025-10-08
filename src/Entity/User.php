@@ -21,7 +21,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['user:read', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'message:read', 'avis:read', 'proposition:list', 'message:list', 'conversation:list', 'conversation:read'])]
+    #[Groups(['user:read', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'message:read', 'avis:read', 'proposition:list', 'message:list', 'conversation:list', 'conversation:read', 'favori:read', 'favori:list'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 180, unique: true)]
@@ -35,11 +35,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $password = null;
 
     #[ORM\Column(length: 100)]
-    #[Groups(['user:read', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'message:read', 'proposition:list', 'message:list', 'conversation:list', 'conversation:read'])]
+    #[Groups(['user:read', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'message:read', 'proposition:list', 'message:list', 'conversation:list', 'conversation:read', 'favori:read', 'favori:list', 'signalement:list'])]
     private ?string $nom = null;
 
     #[ORM\Column(length: 100)]
-    #[Groups(['user:read', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'message:read', 'proposition:list', 'message:list', 'conversation:list', 'conversation:read'])]
+    #[Groups(['user:read', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'message:read', 'proposition:list', 'message:list', 'conversation:list', 'conversation:read', 'favori:read', 'favori:list', 'signalement:list'])]
     private ?string $prenom = null;
 
     #[ORM\Column(length: 20, nullable: true)]
@@ -118,6 +118,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: Conversation::class, mappedBy: 'participant2')]
     private Collection $conversationsAsParticipant2;
 
+    #[ORM\OneToMany(targetEntity: Signalement::class, mappedBy: 'utilisateurSignale')]
+    private Collection $signalementsRecus;
+
     public function __construct()
     {
         $this->voyages = new ArrayCollection();
@@ -132,6 +135,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->conversationsAsParticipant1 = new ArrayCollection();
         $this->conversationsAsParticipant2 = new ArrayCollection();
         $this->authProvider = 'local';
+        $this->signalementsRecus = new ArrayCollection();
     }
 
     #[ORM\PrePersist]
@@ -377,6 +381,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getSignalements(): Collection
     {
         return $this->signalements;
+    }
+
+    public function getSignalementsRecus(): Collection
+    {
+        return $this->signalementsRecus;
     }
 
     public function getConversationsAsParticipant1(): Collection

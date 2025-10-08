@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Entity;
 
 use App\Repository\MessageRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
@@ -51,10 +53,14 @@ class Message
     #[Groups(['message:read', 'message:list', 'conversation:read', 'conversation:list'])]
     private ?\DateTimeInterface $createdAt = null;
 
+    #[ORM\OneToMany(targetEntity: Signalement::class, mappedBy: 'message', cascade: ['remove'])]
+    private Collection $signalements;
+
     #[ORM\PrePersist]
     public function setCreatedAtValue(): void
     {
         $this->createdAt = new \DateTime();
+        $this->signalements = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -136,5 +142,10 @@ class Message
     public function getCreatedAt(): ?\DateTimeInterface
     {
         return $this->createdAt;
+    }
+
+    public function getSignalements(): Collection
+    {
+        return $this->signalements;
     }
 }
