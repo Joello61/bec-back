@@ -1,47 +1,61 @@
-# Étape 1 : builder l’application PHP (Base : composer)
+# --------------------------------------------------------------------------
+# Étape 1 : Builder l’application PHP avec Composer
+# --------------------------------------------------------------------------
 FROM composer:2 AS vendor
 
 WORKDIR /app
 
-# Copier seulement les fichiers de dépendances pour accélérer le build
+# Copier uniquement les fichiers de dépendances pour accélérer le build
 COPY composer.json composer.lock ./
-# Installation des dépendances sans les outils de développement (prod only)
-RUN composer install --no-dev --no-scripts --no-progress --prefer-dist
+
+# Installer les dépendances sans les outils de dev
+RUN composer install --no-dev --no-scripts --no-progress --prefer-dist --no-cache
 
 # Copier le reste du projet
 COPY . .
 
-# Optimiser l'autoload
+# Optimiser l'autoload pour la production
 RUN composer dump-autoload --no-dev --optimize
 
-
 # --------------------------------------------------------------------------
-# Étape 2 : image finale (Base : php-fpm-alpine)
+# Étape 2 : Image finale PHP-FPM Alpine
 # --------------------------------------------------------------------------
 FROM php:8.2-fpm-alpine AS symfony
 
-# Installer les dépendances système et les extensions PHP nécessaires à Symfony
-RUN apk add --no-cache bash git unzip libpq-dev icu-dev \
+# Installer les dépendances système nécessaires à Symfony
+RUN apk add --no-cache bash libpq icu-dev \
     && docker-php-ext-install intl pdo pdo_pgsql opcache
 
-WORKDIR /var/www/html
+# Activer OPCache pour la production
+RUN docker-php-ext-enable opcache
 
-# Copier les fichiers du projet et les dépendances vendor depuis l'étape précédente
+# Copier l'application depuis l'étape précédente
+WORKDIR /var/www/html
 COPY --from=vendor /app ./
 
-# Créer les dossiers nécessaires (cache, logs, uploads)
+# Créer les dossiers critiques
 RUN mkdir -p var/cache var/log public/uploads
 
-# ********** CORRECTION CRITIQUE DES PERMISSIONS **********
-# Définir l'utilisateur www-data comme propriétaire des dossiers critiques.
-# C'est l'utilisateur qui exécute PHP-FPM et doit écrire le cache et les uploads.
-RUN chown -R www-data:www-data var public/uploads
+# Créer un utilisateur dédié pour plus de sécurité
+RUN addgroup -g 1000 appgroup && adduser -u 1000 -G appgroup -D appuser \
+    && chown -R appuser:appgroup var public/uploads
 
-# Définir l'utilisateur www-data par défaut
-USER www-data
+# Définir l'utilisateur non-root
+USER appuser
 
-# Exposer le port PHP-FPM (doit correspondre au port 9000 configuré dans CapCaptain)
+# --------------------------------------------------------------------------
+# Correction critique pour éviter le 502 :
+# PHP-FPM doit écouter sur 0.0.0.0:9000 pour que CapRover/Nginx accède au container
+# --------------------------------------------------------------------------
+USER root
+RUN sed -i 's/listen = .*/listen = 0.0.0.0:9000/' /usr/local/etc/php-fpm.d/www.conf
+USER appuser
+
+# Exposer le port PHP-FPM pour CapRover
 EXPOSE 9000
+
+# Healthcheck pour CapRover
+HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://localhost:9000 || exit 1
 
 # Lancer PHP-FPM
 CMD ["php-fpm"]
