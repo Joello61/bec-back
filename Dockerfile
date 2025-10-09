@@ -66,4 +66,4 @@ EXPOSE 9000
 HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://localhost:9000 || exit 1
 
 # Lancer PHP-FPM
-CMD ["php-fpm"]
+CMD ["php-fpm", "-F"]
