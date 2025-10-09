@@ -22,12 +22,12 @@ class Conversation
     #[Groups(['conversation:read', 'conversation:list'])]
     private ?int $id = null;
 
-    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'conversationsAsParticipant1')]
     #[ORM\JoinColumn(nullable: false)]
     #[Groups(['conversation:read', 'conversation:list'])]
     private ?User $participant1 = null;
 
-    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'conversationsAsParticipant2')]
     #[ORM\JoinColumn(nullable: false)]
     #[Groups(['conversation:read', 'conversation:list'])]
     private ?User $participant2 = null;
