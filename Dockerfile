@@ -56,7 +56,7 @@ USER appuser
 # PHP-FPM doit écouter sur 0.0.0.0:9000 pour que CapRover/Nginx accède au container
 # --------------------------------------------------------------------------
 USER root
-RUN sed -i 's/listen = .*/listen = 0.0.0.0:9000/' /usr/local/etc/php-fpm.d/www.conf
+RUN sed -i 's/listen = .*/listen = 0.0.0.0:3040/' /usr/local/etc/php-fpm.d/www.conf
 USER appuser
 
 # Exposer le port PHP-FPM pour CapRover
