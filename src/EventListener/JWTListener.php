@@ -78,7 +78,7 @@ class JWTListener
      * Appelé en cas d'échec de l'authentification
      * Personnalise le message d'erreur
      */
-    public function onAuthenticationFailure(AuthenticationFailureEvent $event): void
+    /*public function onAuthenticationFailure(AuthenticationFailureEvent $event): void
     {
         $exception = $event->getException();
 
@@ -91,6 +91,21 @@ class JWTListener
         $response = new JsonResponse([
             'success' => false,
             'message' => $message,
+        ], Response::HTTP_UNAUTHORIZED);
+
+        $event->setResponse($response);
+    }*/
+
+    public function onAuthenticationFailure(AuthenticationFailureEvent $event): void
+    {
+        $exception = $event->getException();
+
+        // TEMPORAIREMENT : Afficher l'erreur complète
+        $response = new JsonResponse([
+            'success' => false,
+            'message' => $exception->getMessage(),  // ← Message réel !
+            'type' => get_class($exception),         // ← Type d'exception
+            'trace' => $exception->getTraceAsString() // ← Stack trace
         ], Response::HTTP_UNAUTHORIZED);
 
         $event->setResponse($response);
