@@ -11,8 +11,8 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
 class MessageVoter extends Voter
 {
-    public const string VIEW = 'MESSAGE_VIEW';
-    public const string DELETE = 'MESSAGE_DELETE';
+    public const VIEW = 'MESSAGE_VIEW';
+    public const DELETE = 'MESSAGE_DELETE';
 
     protected function supports(string $attribute, mixed $subject): bool
     {
