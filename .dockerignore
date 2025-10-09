@@ -1,37 +1,16 @@
-# Git
 .git
 .github
-.gitignore
-
-# IDE
 .idea
 .vscode
-*.swp
-*.swo
-
-# Cache et logs Symfony
 var/cache/*
 !var/cache/.gitkeep
 var/log/*
 !var/log/.gitkeep
-
-# Dépendances
 vendor/
 node_modules/
-
-# Variables d'environnement locales
 .env.local
 .env.*.local
 .env.test
-
-# Uploads et assets
 public/uploads/*
 !public/uploads/.gitkeep
-
-# Tests
 tests/
-phpunit.xml.dist
-
-# Documentation
-README.md
-docs/
