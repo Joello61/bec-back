@@ -60,7 +60,7 @@ RUN sed -i 's/listen = .*/listen = 0.0.0.0:9000/' /usr/local/etc/php-fpm.d/www.c
 USER appuser
 
 # Exposer le port PHP-FPM pour CapRover
-EXPOSE 9000
+EXPOSE 3040
 
 # Healthcheck pour CapRover
 HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://localhost:9000 || exit 1
