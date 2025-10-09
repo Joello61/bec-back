@@ -63,7 +63,7 @@ USER appuser
 EXPOSE 3040
 
 # Healthcheck pour CapRover
-HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://localhost:9000 || exit 1
+HEALTHCHECK --interval=30s --timeout=5s CMD wget -qO- http://localhost:3040 || exit 1
 
 # Lancer PHP-FPM
 CMD ["php-fpm", "-F"]
