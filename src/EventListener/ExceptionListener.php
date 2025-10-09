@@ -51,13 +51,15 @@ readonly class ExceptionListener
             $message = 'Accès refusé';
         }
 
-        // En développement, ajouter plus de détails
-        if ($this->environment === 'dev') {
+        // En développement OU si APP_DEBUG=1, ajouter plus de détails
+        if ($this->environment === 'dev' || $_ENV['APP_DEBUG'] ?? false) {
+            $message = $exception->getMessage();  // ← AJOUTER : Message réel !
             $errors = [
                 'exception' => get_class($exception),
+                'message' => $exception->getMessage(),
                 'file' => $exception->getFile(),
                 'line' => $exception->getLine(),
-                'trace' => $exception->getTraceAsString(),
+                'trace' => explode("\n", $exception->getTraceAsString()),
             ];
         }
 
