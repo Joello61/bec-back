@@ -11,8 +11,8 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
 class AvisVoter extends Voter
 {
-    public const string EDIT = 'AVIS_EDIT';
-    public const string DELETE = 'AVIS_DELETE';
+    public const EDIT = 'AVIS_EDIT';
+    public const DELETE = 'AVIS_DELETE';
 
     protected function supports(string $attribute, mixed $subject): bool
     {
