@@ -124,7 +124,7 @@ class VoyageRepository extends ServiceEntityRepository
             ->getResult();
     }
 
-    public function findMatchingDemande(string $villeDepart, string $villeArrivee, ?\DateTime $dateDepart = null): array
+    public function findMatchingDemande(string $villeDepart, string $villeArrivee, ?\DateTimeInterface $dateDepart = null): array
     {
         $qb = $this->createQueryBuilder('v')
             ->leftJoin('v.voyageur', 'u')
