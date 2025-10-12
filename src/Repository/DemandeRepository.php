@@ -139,4 +139,89 @@ class DemandeRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Liste TOUTES les demandes (pour admin) sans filtre de visibilité
+     */
+    public function findAllPaginatedAdmin(int $page, int $limit, array $filters = []): array
+    {
+        $offset = ($page - 1) * $limit;
+
+        $qb = $this->createQueryBuilder('d')
+            ->leftJoin('d.client', 'u')
+            ->leftJoin('u.settings', 's')
+            ->addSelect('u', 's')
+            ->orderBy('d.createdAt', 'DESC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit);
+
+        // Pas de filtre showInSearchResults pour admin
+
+        if (!empty($filters['villeDepart'])) {
+            $qb->andWhere('d.villeDepart LIKE :villeDepart')
+                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
+        }
+
+        if (!empty($filters['villeArrivee'])) {
+            $qb->andWhere('d.villeArrivee LIKE :villeArrivee')
+                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
+        }
+
+        if (!empty($filters['statut'])) {
+            $qb->andWhere('d.statut = :statut')
+                ->setParameter('statut', $filters['statut']);
+        }
+
+        $demandes = $qb->getQuery()->getResult();
+
+        $countQb = $this->createQueryBuilder('d')
+            ->select('COUNT(d.id)');
+
+        if (!empty($filters['villeDepart'])) {
+            $countQb->andWhere('d.villeDepart LIKE :villeDepart')
+                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
+        }
+        if (!empty($filters['villeArrivee'])) {
+            $countQb->andWhere('d.villeArrivee LIKE :villeArrivee')
+                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
+        }
+        if (!empty($filters['statut'])) {
+            $countQb->andWhere('d.statut = :statut')
+                ->setParameter('statut', $filters['statut']);
+        }
+
+        $total = $countQb->getQuery()->getSingleScalarResult();
+
+        return [
+            'data' => $demandes,
+            'pagination' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'pages' => (int) ceil($total / $limit),
+            ],
+        ];
+    }
+
+    /**
+     * Compte les demandes par statut
+     */
+    public function countByStatut(string $statut): int
+    {
+        return $this->count(['statut' => $statut]);
+    }
+
+    /**
+     * Compte les demandes créées entre deux dates
+     */
+    public function countCreatedBetween(\DateTimeInterface $start, \DateTimeInterface $end): int
+    {
+        return (int) $this->createQueryBuilder('d')
+            ->select('COUNT(d.id)')
+            ->where('d.createdAt BETWEEN :start AND :end')
+            ->setParameter('start', $start)
+            ->setParameter('end', $end)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 }

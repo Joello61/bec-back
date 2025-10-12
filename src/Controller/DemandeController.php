@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\DTO\CreateDemandeDTO;
 use App\DTO\UpdateDemandeDTO;
 use App\Entity\User;
+use App\Repository\DemandeRepository;
 use App\Service\DemandeService;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -23,7 +24,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class DemandeController extends AbstractController
 {
     public function __construct(
-        private readonly DemandeService $demandeService
+        private readonly DemandeService $demandeService,
+        private readonly DemandeRepository $demandeRepository,
     ) {}
 
     #[Route('', name: 'list', methods: ['GET'])]
@@ -78,26 +80,45 @@ class DemandeController extends AbstractController
     {
         /* @var User $user*/
         $user = $this->getUser();
+
+        $this->denyAccessUnlessGranted('DEMANDE_CREATE');
+
         $demande = $this->demandeService->createDemande($dto, $user);
         return $this->json($demande, Response::HTTP_CREATED, [], ['groups' => ['demande:read']]);
     }
 
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
-    #[IsGranted('DEMANDE_EDIT', subject: 'id')]
+    #[IsGranted('ROLE_USER')]
     #[OA\Put(path: '/api/demandes/{id}', summary: 'Modifier une demande', security: [['cookieAuth' => []]], requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: UpdateDemandeDTO::class))))]
     #[OA\Response(response: 200, description: 'Demande mise à jour')]
     public function update(int $id, #[MapRequestPayload] UpdateDemandeDTO $dto): JsonResponse
     {
-        $demande = $this->demandeService->updateDemande($id, $dto);
-        return $this->json($demande, Response::HTTP_OK, [], ['groups' => ['demande:read']]);
+        $demande = $this->demandeRepository->find($id);
+
+        if (!$demande) {
+            throw $this->createNotFoundException('Demande non trouvée');
+        }
+
+        $this->denyAccessUnlessGranted('DEMANDE_EDIT', $demande);
+
+        $updatedDemande = $this->demandeService->updateDemande($id, $dto);
+        return $this->json($updatedDemande, Response::HTTP_OK, [], ['groups' => ['demande:read']]);
     }
 
     #[Route('/{id}/statut', name: 'update_status', methods: ['PATCH'])]
-    #[IsGranted('DEMANDE_EDIT', subject: 'id')]
+    #[IsGranted('ROLE_USER')]
     #[OA\Patch(path: '/api/demandes/{id}/statut', summary: 'Changer le statut', security: [['cookieAuth' => []]])]
     #[OA\Response(response: 200, description: 'Statut mis à jour')]
     public function updateStatus(int $id, Request $request): JsonResponse
     {
+        $demande = $this->demandeRepository->find($id);
+
+        if (!$demande) {
+            throw $this->createNotFoundException('Demande non trouvée');
+        }
+
+        $this->denyAccessUnlessGranted('DEMANDE_EDIT', $demande);
+
         $data = json_decode($request->getContent(), true);
         $statut = $data['statut'] ?? null;
 
@@ -105,16 +126,24 @@ class DemandeController extends AbstractController
             return $this->json(['message' => 'Statut invalide'], Response::HTTP_BAD_REQUEST);
         }
 
-        $demande = $this->demandeService->updateStatut($id, $statut);
-        return $this->json($demande, Response::HTTP_OK, [], ['groups' => ['demande:read']]);
+        $updatedDemande = $this->demandeService->updateStatut($id, $statut);
+        return $this->json($updatedDemande, Response::HTTP_OK, [], ['groups' => ['demande:read']]);
     }
 
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
-    #[IsGranted('DEMANDE_DELETE', subject: 'id')]
+    #[IsGranted('ROLE_USER')]
     #[OA\Delete(path: '/api/demandes/{id}', summary: 'Supprimer une demande', security: [['cookieAuth' => []]])]
     #[OA\Response(response: 204, description: 'Demande supprimée')]
     public function delete(int $id): JsonResponse
     {
+        $demande = $this->demandeRepository->find($id);
+
+        if (!$demande) {
+            throw $this->createNotFoundException('Demande non trouvée');
+        }
+
+        $this->denyAccessUnlessGranted('DEMANDE_DELETE', $demande);
+
         $this->demandeService->deleteDemande($id);
         return $this->json(null, Response::HTTP_NO_CONTENT);
     }

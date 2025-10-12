@@ -88,7 +88,7 @@ readonly class PropositionService
             'new_proposition',
             'Nouvelle proposition reçue',
             sprintf(
-                '%s %s a fait une proposition pour votre voyage %s → %s',
+                '%s %s a fait une proposition pour votre voyage %s vers %s',
                 $client->getPrenom(),
                 $client->getNom(),
                 $voyage->getVilleDepart(),
@@ -134,7 +134,7 @@ readonly class PropositionService
                 'proposition_acceptee',
                 'Proposition acceptée',
                 sprintf(
-                    '%s %s a accepté votre proposition pour le voyage %s → %s',
+                    '%s %s a accepté votre proposition pour le voyage %s vers %s',
                     $voyageur->getPrenom(),
                     $voyageur->getNom(),
                     $proposition->getVoyage()->getVilleDepart(),
@@ -156,7 +156,7 @@ readonly class PropositionService
                 'proposition_refusee',
                 'Proposition refusée',
                 sprintf(
-                    '%s %s a refusé votre proposition pour le voyage %s → %s',
+                    '%s %s a refusé votre proposition pour le voyage %s vers %s',
                     $voyageur->getPrenom(),
                     $voyageur->getNom(),
                     $proposition->getVoyage()->getVilleDepart(),

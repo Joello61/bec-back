@@ -7,6 +7,7 @@ namespace App\EventListener;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
@@ -63,6 +64,35 @@ readonly class ExceptionListener
             ];
         }
 
+        // ==================== ACCESS DENIED (Voters) ====================
+        if ($exception instanceof AccessDeniedException || $exception instanceof AccessDeniedHttpException) {
+            $user = $request->attributes->get('_security_user');
+
+            // Vérifier si c'est un problème de profil incomplet
+            if ($user && method_exists($user, 'isProfileComplete') && !$user->isProfileComplete()) {
+                $response = new JsonResponse([
+                    'success' => false,
+                    'error' => 'PROFILE_INCOMPLETE',
+                    'message' => 'Vous devez compléter votre profil pour effectuer cette action',
+                    'profileComplete' => false,
+                    'details' => $this->getProfileMissingFields($user)
+                ], Response::HTTP_FORBIDDEN);
+
+                $event->setResponse($response);
+                return;
+            }
+
+            // Autres cas d'access denied
+            $response = new JsonResponse([
+                'success' => false,
+                'error' => 'ACCESS_DENIED',
+                'message' => 'Vous n\'avez pas les permissions nécessaires pour effectuer cette action'
+            ], Response::HTTP_FORBIDDEN);
+
+            $event->setResponse($response);
+            return;
+        }
+
         // Logger l'erreur
         $this->logger->error('API Exception', [
             'exception' => get_class($exception),
@@ -80,5 +110,38 @@ readonly class ExceptionListener
         ], $statusCode);
 
         $event->setResponse($response);
+    }
+
+        /**
+         * Retourne les champs manquants du profil
+         */
+        private function getProfileMissingFields($user): array
+    {
+        $missing = [];
+
+        if (!$user->isEmailVerifie()) {
+            $missing[] = 'email_verification';
+        }
+
+        if (!$user->getTelephone()) {
+            $missing[] = 'telephone';
+        }
+
+        if (!$user->isTelephoneVerifie() && $user->getTelephone()) {
+            $missing[] = 'telephone_verification';
+        }
+
+        if (!$user->getPays() || !$user->getVille()) {
+            $missing[] = 'location';
+        }
+
+        $africanFormat = $user->getQuartier() !== null;
+        $diasporaFormat = $user->getAdresseLigne1() !== null && $user->getCodePostal() !== null;
+
+        if (!$africanFormat && !$diasporaFormat) {
+            $missing[] = 'address';
+        }
+
+        return $missing;
     }
 }

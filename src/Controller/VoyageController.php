@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\DTO\CreateVoyageDTO;
 use App\DTO\UpdateVoyageDTO;
 use App\Entity\User;
+use App\Repository\VoyageRepository;
 use App\Service\AvisService;
 use App\Service\VoyageService;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -16,7 +17,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Serializer\Exception\ExceptionInterface;
 use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
@@ -25,9 +26,11 @@ use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 #[OA\Tag(name: 'Voyages')]
 class VoyageController extends AbstractController
 {
+
     public function __construct(
         private readonly VoyageService $voyageService,
         private readonly AvisService $avisService,
+        private readonly VoyageRepository $voyageRepository,
     ) {}
 
     #[Route('', name: 'list', methods: ['GET'])]
@@ -94,26 +97,47 @@ class VoyageController extends AbstractController
     {
         /* @var User $user*/
         $user = $this->getUser();
+
+        $this->denyAccessUnlessGranted('VOYAGE_CREATE');
+
         $voyage = $this->voyageService->createVoyage($dto, $user);
         return $this->json($voyage, Response::HTTP_CREATED, [], ['groups' => ['voyage:read']]);
     }
 
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
-    #[IsGranted('VOYAGE_EDIT', subject: 'id')]
+    #[IsGranted('ROLE_USER')]
     #[OA\Put(path: '/api/voyages/{id}', summary: 'Modifier un voyage', security: [['cookieAuth' => []]], requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: UpdateVoyageDTO::class))))]
     #[OA\Response(response: 200, description: 'Voyage mis à jour')]
     public function update(int $id, #[MapRequestPayload] UpdateVoyageDTO $dto): JsonResponse
     {
-        $voyage = $this->voyageService->updateVoyage($id, $dto);
-        return $this->json($voyage, Response::HTTP_OK, [], ['groups' => ['voyage:read']]);
+        // Charger le voyage pour vérifier les permissions
+        $voyage = $this->voyageRepository->find($id);
+
+        if (!$voyage) {
+            throw $this->createNotFoundException('Voyage non trouvé');
+        }
+
+        $this->denyAccessUnlessGranted('VOYAGE_EDIT', $voyage);
+
+        $updatedVoyage = $this->voyageService->updateVoyage($id, $dto);
+        return $this->json($updatedVoyage, Response::HTTP_OK, [], ['groups' => ['voyage:read']]);
     }
 
     #[Route('/{id}/statut', name: 'update_status', methods: ['PATCH'])]
-    #[IsGranted('VOYAGE_EDIT', subject: 'id')]
+    #[IsGranted('ROLE_USER')]
     #[OA\Patch(path: '/api/voyages/{id}/statut', summary: 'Changer le statut', security: [['cookieAuth' => []]])]
     #[OA\Response(response: 200, description: 'Statut mis à jour')]
     public function updateStatus(int $id, Request $request): JsonResponse
     {
+        // Charger le voyage pour vérifier les permissions
+        $voyage = $this->voyageRepository->find($id);
+
+        if (!$voyage) {
+            throw $this->createNotFoundException('Voyage non trouvé');
+        }
+
+        $this->denyAccessUnlessGranted('VOYAGE_EDIT', $voyage);
+
         $data = json_decode($request->getContent(), true);
         $statut = $data['statut'] ?? null;
 
@@ -121,16 +145,25 @@ class VoyageController extends AbstractController
             return $this->json(['message' => 'Statut invalide'], Response::HTTP_BAD_REQUEST);
         }
 
-        $voyage = $this->voyageService->updateStatut($id, $statut);
-        return $this->json($voyage, Response::HTTP_OK, [], ['groups' => ['voyage:read']]);
+        $updatedVoyage = $this->voyageService->updateStatut($id, $statut);
+        return $this->json($updatedVoyage, Response::HTTP_OK, [], ['groups' => ['voyage:read']]);
     }
 
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
-    #[IsGranted('VOYAGE_DELETE', subject: 'id')]
+    #[IsGranted('ROLE_USER')]
     #[OA\Delete(path: '/api/voyages/{id}', summary: 'Supprimer un voyage', security: [['cookieAuth' => []]])]
     #[OA\Response(response: 204, description: 'Voyage supprimé')]
     public function delete(int $id): JsonResponse
     {
+        // Charger le voyage et vérifier les permissions
+        $voyage = $this->voyageRepository->find($id);
+
+        if (!$voyage) {
+            throw $this->createNotFoundException('Voyage non trouvé');
+        }
+
+        $this->denyAccessUnlessGranted('VOYAGE_DELETE', $voyage);
+
         $this->voyageService->deleteVoyage($id);
         return $this->json(null, Response::HTTP_NO_CONTENT);
     }

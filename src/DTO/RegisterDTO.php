@@ -40,11 +40,4 @@ class RegisterDTO
         message: 'Le mot de passe doit contenir au moins une minuscule, une majuscule et un chiffre'
     )]
     public string $password;
-
-    #[Assert\NotBlank(message: 'Le numéro de téléphone est obligatoire')]
-    #[Assert\Regex(
-        pattern: '/^\+?[1-9]\d{1,14}$/',
-        message: 'Le numéro de téléphone n\'est pas valide. Format attendu: +33612345678 ou +237612345678'
-    )]
-    public string $telephone;
 }

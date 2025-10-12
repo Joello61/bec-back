@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\DTO\CompleteProfileDTO;
 use App\DTO\UpdateUserDTO;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\UserStatsService;
+use App\Service\VerificationService;
 use Doctrine\ORM\EntityManagerInterface;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -26,8 +28,157 @@ class UserController extends AbstractController
     public function __construct(
         private readonly UserRepository $userRepository,
         private readonly EntityManagerInterface $entityManager,
-        private readonly UserStatsService $userStatsService
+        private readonly UserStatsService $userStatsService,
+        private readonly VerificationService $verificationService
     ) {}
+
+    // ==================== NOUVELLE ROUTE : STATUT PROFIL ====================
+
+    /**
+     * Vérifie si le profil de l'utilisateur est complet
+     * Utilisé par le frontend pour rediriger vers la page de complétion
+     */
+    #[Route('/me/profile-status', name: 'profile_status', methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    #[OA\Get(
+        path: '/api/users/me/profile-status',
+        summary: 'Vérifier si le profil est complet',
+        security: [['cookieAuth' => []]]
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Statut du profil',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'isComplete', type: 'boolean'),
+                new OA\Property(property: 'missing', type: 'array', items: new OA\Items(type: 'string')),
+                new OA\Property(property: 'emailVerifie', type: 'boolean'),
+                new OA\Property(property: 'telephoneVerifie', type: 'boolean'),
+            ]
+        )
+    )]
+    public function profileStatus(): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $missing = [];
+
+        if (!$user->isEmailVerifie()) {
+            $missing[] = 'email_verification';
+        }
+
+        if (!$user->getTelephone()) {
+            $missing[] = 'telephone';
+        }
+
+        if (!$user->isTelephoneVerifie() && $user->getTelephone()) {
+            $missing[] = 'telephone_verification';
+        }
+
+        if (!$user->getPays() || !$user->getVille()) {
+            $missing[] = 'location';
+        }
+
+        // Vérifier qu'au moins un format d'adresse est complet
+        $africanFormat = $user->getQuartier() !== null;
+        $diasporaFormat = $user->getAdresseLigne1() !== null && $user->getCodePostal() !== null;
+
+        if (!$africanFormat && !$diasporaFormat) {
+            $missing[] = 'address';
+        }
+
+        return $this->json([
+            'isComplete' => $user->isProfileComplete(),
+            'missing' => $missing,
+            'emailVerifie' => $user->isEmailVerifie(),
+            'telephoneVerifie' => $user->isTelephoneVerifie(),
+        ]);
+    }
+
+    // ==================== NOUVELLE ROUTE : COMPLÉTER PROFIL ====================
+
+    /**
+     * Compléter le profil utilisateur après inscription
+     * Demande : téléphone + adresse (format africain OU diaspora)
+     */
+    #[Route('/me/complete-profile', name: 'complete_profile', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
+    #[OA\Post(
+        path: '/api/users/me/complete-profile',
+        summary: 'Compléter son profil',
+        security: [['cookieAuth' => []]],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(ref: new Model(type: CompleteProfileDTO::class))
+        )
+    )]
+    #[OA\Response(response: 200, description: 'Profil complété, code SMS envoyé')]
+    #[OA\Response(response: 400, description: 'Données invalides')]
+    public function completeProfile(
+        #[MapRequestPayload] CompleteProfileDTO $dto
+    ): JsonResponse {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        // Mettre à jour le téléphone
+        $user->setTelephone($dto->telephone);
+
+        // Mettre à jour l'adresse
+        $user->setPays($dto->pays)
+            ->setVille($dto->ville);
+
+        // Format Afrique
+        if ($dto->quartier) {
+            $user->setQuartier($dto->quartier);
+        }
+
+        // Format Diaspora
+        if ($dto->adresseLigne1) {
+            $user->setAdresseLigne1($dto->adresseLigne1);
+        }
+        if ($dto->adresseLigne2) {
+            $user->setAdresseLigne2($dto->adresseLigne2);
+        }
+        if ($dto->codePostal) {
+            $user->setCodePostal($dto->codePostal);
+        }
+
+        // Champs optionnels
+        if ($dto->bio) {
+            $user->setBio($dto->bio);
+        }
+        if ($dto->photo) {
+            $user->setPhoto($dto->photo);
+        }
+
+        $this->entityManager->flush();
+
+        // ==================== ENVOYER CODE SMS POUR VÉRIFICATION ====================
+        try {
+            $this->verificationService->sendPhoneVerification($user);
+        } catch (\Exception $e) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Profil mis à jour mais erreur lors de l\'envoi du SMS : ' . $e->getMessage()
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return $this->json([
+            'success' => true,
+            'message' => 'Profil complété. Un code de vérification a été envoyé par SMS.',
+            'user' => [
+                'id' => $user->getId(),
+                'telephone' => $user->getTelephone(),
+                'pays' => $user->getPays(),
+                'ville' => $user->getVille(),
+                'quartier' => $user->getQuartier(),
+                'adresseLigne1' => $user->getAdresseLigne1(),
+                'codePostal' => $user->getCodePostal(),
+                'isProfileComplete' => $user->isProfileComplete(),
+            ]
+        ]);
+    }
 
     #[Route('', name: 'list', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
@@ -80,11 +231,9 @@ class UserController extends AbstractController
             return $this->json(['message' => 'Utilisateur non trouvé'], Response::HTTP_NOT_FOUND);
         }
 
-        // ==================== UTILISATION DU USERSTATSSERVICE AVEC VISIBILITÉ ====================
         /** @var User|null $viewer */
         $viewer = $this->getUser();
 
-        // Utiliser la méthode qui respecte la visibilité
         $profileData = $this->userStatsService->getVisibleProfileData($user, $viewer);
 
         return $this->json($profileData, Response::HTTP_OK);
@@ -163,69 +312,7 @@ class UserController extends AbstractController
         summary: 'Tableau de bord de l\'utilisateur connecté',
         security: [['cookieAuth' => []]]
     )]
-    #[OA\Response(
-        response: 200,
-        description: 'Données du dashboard',
-        content: new OA\JsonContent(
-            properties: [
-                new OA\Property(
-                    property: 'summary',
-                    properties: [
-                        new OA\Property(property: 'voyagesActifs', type: 'integer'),
-                        new OA\Property(property: 'demandesEnCours', type: 'integer'),
-                        new OA\Property(property: 'notificationsNonLues', type: 'integer'),
-                        new OA\Property(property: 'messagesNonLus', type: 'integer'),
-                    ],
-                    type: 'object'
-                ),
-                new OA\Property(
-                    property: 'voyages',
-                    properties: [
-                        new OA\Property(property: 'total', type: 'integer'),
-                        new OA\Property(property: 'actifs', type: 'integer'),
-                        new OA\Property(property: 'recents', type: 'array', items: new OA\Items(type: 'object')),
-                    ],
-                    type: 'object'
-                ),
-                new OA\Property(
-                    property: 'demandes',
-                    properties: [
-                        new OA\Property(property: 'total', type: 'integer'),
-                        new OA\Property(property: 'enCours', type: 'integer'),
-                        new OA\Property(property: 'recentes', type: 'array', items: new OA\Items(type: 'object')),
-                    ],
-                    type: 'object'
-                ),
-                new OA\Property(
-                    property: 'notifications',
-                    properties: [
-                        new OA\Property(property: 'nonLues', type: 'integer'),
-                        new OA\Property(property: 'recentes', type: 'array', items: new OA\Items(type: 'object')),
-                    ],
-                    type: 'object'
-                ),
-                new OA\Property(
-                    property: 'messages',
-                    properties: [
-                        new OA\Property(property: 'nonLus', type: 'integer'),
-                        new OA\Property(property: 'recents', type: 'array', items: new OA\Items(type: 'object')),
-                    ],
-                    type: 'object'
-                ),
-                new OA\Property(
-                    property: 'stats',
-                    properties: [
-                        new OA\Property(property: 'voyagesEffectues', type: 'integer'),
-                        new OA\Property(property: 'bagagesTransportes', type: 'integer'),
-                        new OA\Property(property: 'noteMoyenne', type: 'number', format: 'float'),
-                        new OA\Property(property: 'nombreAvis', type: 'integer'),
-                        new OA\Property(property: 'repartitionNotes', type: 'object'),
-                    ],
-                    type: 'object'
-                ),
-            ]
-        )
-    )]
+    #[OA\Response(response: 200, description: 'Données du dashboard')]
     public function dashboard(): JsonResponse
     {
         /** @var User $user */

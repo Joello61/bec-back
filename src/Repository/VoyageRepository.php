@@ -150,4 +150,98 @@ class VoyageRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Liste TOUS les voyages (pour admin) sans filtre de visibilité
+     */
+    public function findAllPaginatedAdmin(int $page, int $limit, array $filters = []): array
+    {
+        $offset = ($page - 1) * $limit;
+
+        $qb = $this->createQueryBuilder('v')
+            ->leftJoin('v.voyageur', 'u')
+            ->leftJoin('u.settings', 's')
+            ->addSelect('u', 's')
+            ->orderBy('v.createdAt', 'DESC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit);
+
+        // Pas de filtre showInSearchResults pour admin
+
+        if (!empty($filters['villeDepart'])) {
+            $qb->andWhere('v.villeDepart LIKE :villeDepart')
+                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
+        }
+
+        if (!empty($filters['villeArrivee'])) {
+            $qb->andWhere('v.villeArrivee LIKE :villeArrivee')
+                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
+        }
+
+        if (!empty($filters['dateDepart'])) {
+            $qb->andWhere('v.dateDepart >= :dateDepart')
+                ->setParameter('dateDepart', new \DateTime($filters['dateDepart']));
+        }
+
+        if (!empty($filters['statut'])) {
+            $qb->andWhere('v.statut = :statut')
+                ->setParameter('statut', $filters['statut']);
+        }
+
+        $voyages = $qb->getQuery()->getResult();
+
+        $countQb = $this->createQueryBuilder('v')
+            ->select('COUNT(v.id)');
+
+        if (!empty($filters['villeDepart'])) {
+            $countQb->andWhere('v.villeDepart LIKE :villeDepart')
+                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
+        }
+        if (!empty($filters['villeArrivee'])) {
+            $countQb->andWhere('v.villeArrivee LIKE :villeArrivee')
+                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
+        }
+        if (!empty($filters['dateDepart'])) {
+            $countQb->andWhere('v.dateDepart >= :dateDepart')
+                ->setParameter('dateDepart', new \DateTime($filters['dateDepart']));
+        }
+        if (!empty($filters['statut'])) {
+            $countQb->andWhere('v.statut = :statut')
+                ->setParameter('statut', $filters['statut']);
+        }
+
+        $total = $countQb->getQuery()->getSingleScalarResult();
+
+        return [
+            'data' => $voyages,
+            'pagination' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'pages' => (int) ceil($total / $limit),
+            ],
+        ];
+    }
+
+    /**
+     * Compte les voyages par statut
+     */
+    public function countByStatut(string $statut): int
+    {
+        return $this->count(['statut' => $statut]);
+    }
+
+    /**
+     * Compte les voyages créés entre deux dates
+     */
+    public function countCreatedBetween(\DateTimeInterface $start, \DateTimeInterface $end): int
+    {
+        return (int) $this->createQueryBuilder('v')
+            ->select('COUNT(v.id)')
+            ->where('v.createdAt BETWEEN :start AND :end')
+            ->setParameter('start', $start)
+            ->setParameter('end', $end)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 }

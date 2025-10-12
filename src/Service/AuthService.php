@@ -33,20 +33,11 @@ readonly class AuthService
             throw new BadRequestHttpException('Cet email est déjà utilisé');
         }
 
-        // Vérifier si le téléphone existe déjà
-        if ($dto->telephone) {
-            $existingPhone = $this->userRepository->findOneBy(['telephone' => $dto->telephone]);
-            if ($existingPhone) {
-                throw new BadRequestHttpException('Ce numéro de téléphone est déjà utilisé');
-            }
-        }
-
         try {
             $user = new User();
             $user->setEmail($dto->email)
                 ->setNom($dto->nom)
                 ->setPrenom($dto->prenom)
-                ->setTelephone($dto->telephone)
                 ->setPassword($this->passwordHasher->hashPassword($user, $dto->password))
                 ->setRoles(['ROLE_USER'])
                 ->setAuthProvider('local');
@@ -54,10 +45,10 @@ readonly class AuthService
             $this->entityManager->persist($user);
             $this->entityManager->flush();
 
-            // ==================== CRÉER LES SETTINGS PAR DÉFAUT ====================
+            // Créer les settings par défaut
             $this->settingsService->createDefaultSettings($user);
 
-            // Envoyer les emails/SMS de vérification
+            // Envoyer le code de vérification email IMMÉDIATEMENT
             try {
                 $this->verificationService->sendEmailVerification($user);
                 $this->emailService->sendWelcomeEmail($user);

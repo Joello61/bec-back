@@ -100,4 +100,133 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->getQuery()
             ->getResult();
     }
+
+    public function countByRole(string $role): int
+    {
+        // Récupérer tous les users et filtrer en PHP
+        $qb = $this->createQueryBuilder('u')
+            ->select('u.id, u.roles');
+
+        $users = $qb->getQuery()->getResult();
+
+        $count = 0;
+        foreach ($users as $user) {
+            if (in_array($role, $user['roles'])) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * Liste TOUS les utilisateurs (pour admin) sans filtre de visibilité
+     */
+    public function findAllPaginatedAdmin(int $page, int $limit, array $filters = []): array
+    {
+        $offset = ($page - 1) * $limit;
+
+        $qb = $this->createQueryBuilder('u')
+            ->leftJoin('u.settings', 's')
+            ->addSelect('s')
+            ->orderBy('u.createdAt', 'DESC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit);
+
+        if (isset($filters['banned'])) {
+            $qb->andWhere('u.isBanned = :banned')
+                ->setParameter('banned', $filters['banned']);
+        }
+
+        if (isset($filters['role'])) {
+            $qb->andWhere('u.roles LIKE :role')
+                ->setParameter('role', '%' . $filters['role'] . '%');
+        }
+
+        if (isset($filters['verified'])) {
+            $qb->andWhere('u.emailVerifie = :verified')
+                ->setParameter('verified', $filters['verified']);
+        }
+
+        $users = $qb->getQuery()->getResult();
+
+        // Compter avec les mêmes filtres
+        $countQb = $this->createQueryBuilder('u')
+            ->select('COUNT(u.id)');
+
+        if (isset($filters['banned'])) {
+            $countQb->andWhere('u.isBanned = :banned')
+                ->setParameter('banned', $filters['banned']);
+        }
+
+        if (isset($filters['role'])) {
+            $countQb->andWhere('u.roles LIKE :role')
+                ->setParameter('role', '%' . $filters['role'] . '%');
+        }
+
+        if (isset($filters['verified'])) {
+            $countQb->andWhere('u.emailVerifie = :verified')
+                ->setParameter('verified', $filters['verified']);
+        }
+
+        $total = $countQb->getQuery()->getSingleScalarResult();
+
+        return [
+            'data' => $users,
+            'pagination' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'pages' => (int)ceil($total / $limit),
+            ],
+        ];
+    }
+
+    /**
+     * Trouve les utilisateurs par rôle
+     */
+    public function findByRole(string $role): array
+    {
+        return $this->createQueryBuilder('u')
+            ->where('u.roles LIKE :role')
+            ->setParameter('role', '%' . $role . '%')
+            ->orderBy('u.createdAt', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Compte les utilisateurs bannis
+     */
+    public function countBanned(): int
+    {
+        return $this->count(['isBanned' => true]);
+    }
+
+    /**
+     * Trouve les utilisateurs bannis
+     */
+    public function findBanned(): array
+    {
+        return $this->createQueryBuilder('u')
+            ->where('u.isBanned = :banned')
+            ->setParameter('banned', true)
+            ->orderBy('u.bannedAt', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Compte les nouvelles inscriptions entre deux dates
+     */
+    public function countCreatedBetween(\DateTimeInterface $start, \DateTimeInterface $end): int
+    {
+        return (int) $this->createQueryBuilder('u')
+            ->select('COUNT(u.id)')
+            ->where('u.createdAt BETWEEN :start AND :end')
+            ->setParameter('start', $start)
+            ->setParameter('end', $end)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 }

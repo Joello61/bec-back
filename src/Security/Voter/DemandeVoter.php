@@ -15,6 +15,7 @@ class DemandeVoter extends Voter
     public const EDIT = 'DEMANDE_EDIT';
     public const DELETE = 'DEMANDE_DELETE';
     public const VIEW = 'DEMANDE_VIEW';
+    public const CREATE = 'DEMANDE_CREATE'; // ⬅️ NOUVEAU
 
     public function __construct(
         private readonly VisibilityService $visibilityService
@@ -22,6 +23,11 @@ class DemandeVoter extends Voter
 
     protected function supports(string $attribute, mixed $subject): bool
     {
+        // CREATE ne nécessite pas de subject (juste vérifier l'utilisateur)
+        if ($attribute === self::CREATE) {
+            return true;
+        }
+
         return in_array($attribute, [self::EDIT, self::DELETE, self::VIEW])
             && ($subject instanceof Demande || is_int($subject));
     }
@@ -34,20 +40,33 @@ class DemandeVoter extends Voter
             return false;
         }
 
-        // Si c'est un ID, on vérifie juste les rôles admin
-        if (is_int($subject)) {
-            return in_array('ROLE_ADMIN', $user->getRoles());
-        }
-
-        /** @var Demande $demande */
-        $demande = $subject;
-
         return match($attribute) {
-            self::VIEW => $this->canView($demande, $user),
-            self::EDIT => $this->canEdit($demande, $user),
-            self::DELETE => $this->canDelete($demande, $user),
+            self::CREATE => $this->canCreate($user),
+            self::VIEW => $this->canView($subject, $user),
+            self::EDIT => $this->canEdit($subject, $user),
+            self::DELETE => $this->canDelete($subject, $user),
             default => false,
         };
+    }
+
+    // ==================== NOUVELLE MÉTHODE : VÉRIFICATION PROFIL ====================
+
+    /**
+     * Vérifie si l'utilisateur peut créer une demande
+     * Nécessite un profil complet
+     */
+    private function canCreate(User $user): bool
+    {
+        // Les admins peuvent toujours créer
+        if (in_array('ROLE_ADMIN', $user->getRoles())) {
+            return true;
+        }
+
+        if (!$user->isProfileComplete()) {
+            return false;
+        }
+
+        return true;
     }
 
     private function canView(Demande $demande, User $user): bool
@@ -67,7 +86,6 @@ class DemandeVoter extends Voter
             return false;
         }
 
-        // ==================== UTILISATION DU VISIBILITYSERVICE ====================
         return $this->visibilityService->isDemandeVisibleFor($demande, $user);
     }
 

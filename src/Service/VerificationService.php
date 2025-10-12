@@ -10,6 +10,7 @@ use App\Entity\VerificationCode;
 use App\Repository\PasswordResetTokenRepository;
 use App\Repository\VerificationCodeRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Random\RandomException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Psr\Log\LoggerInterface;
 
@@ -20,6 +21,7 @@ readonly class VerificationService
         private VerificationCodeRepository $verificationCodeRepository,
         private PasswordResetTokenRepository $passwordResetTokenRepository,
         private EmailService $emailService,
+        private TwilioService $twilioService,
         private LoggerInterface $logger
     ) {}
 
@@ -93,6 +95,7 @@ readonly class VerificationService
     }
 
     /**
+     * ==================== ENVOI SMS AVEC TWILIO ====================
      * Génère et envoie un code de vérification SMS
      */
     public function sendPhoneVerification(User $user): void
@@ -103,6 +106,11 @@ readonly class VerificationService
 
         if ($user->isTelephoneVerifie()) {
             throw new BadRequestHttpException('Ce numéro est déjà vérifié');
+        }
+
+        // Vérifier que le numéro est valide
+        if (!$this->twilioService->isValidPhoneNumber($user->getTelephone())) {
+            throw new BadRequestHttpException('Numéro de téléphone invalide');
         }
 
         // Supprimer les anciens codes pour ce numéro
@@ -121,13 +129,22 @@ readonly class VerificationService
         $this->entityManager->persist($verificationCode);
         $this->entityManager->flush();
 
-        // TODO: Envoyer le SMS via Twilio ou autre service
-        // Pour le moment, on log juste le code (à supprimer en production)
-        $this->logger->info('Code de vérification SMS généré', [
-            'user_id' => $user->getId(),
-            'phone' => $user->getTelephone(),
-            'code' => $code // À SUPPRIMER EN PRODUCTION
-        ]);
+        // ==================== ENVOYER LE SMS VIA TWILIO ====================
+        try {
+            $this->twilioService->sendVerificationCode($user->getTelephone(), $code);
+
+            $this->logger->info('Code de vérification SMS envoyé', [
+                'user_id' => $user->getId(),
+                'phone' => $user->getTelephone()
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Erreur lors de l\'envoi du SMS', [
+                'user_id' => $user->getId(),
+                'phone' => $user->getTelephone(),
+                'error' => $e->getMessage()
+            ]);
+            throw new BadRequestHttpException('Erreur lors de l\'envoi du SMS');
+        }
     }
 
     /**
@@ -245,6 +262,7 @@ readonly class VerificationService
 
     /**
      * Génère un code numérique aléatoire
+     * @throws RandomException
      */
     private function generateNumericCode(int $length): string
     {

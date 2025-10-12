@@ -35,20 +35,32 @@ security:
             provider: app_user_provider
 
     access_control:
+        # Routes publiques
         - { path: ^/api/login, roles: PUBLIC_ACCESS }
         - { path: ^/api/register, roles: PUBLIC_ACCESS }
         - { path: ^/api/forgot-password, roles: PUBLIC_ACCESS }
         - { path: ^/api/reset-password, roles: PUBLIC_ACCESS }
+        - { path: ^/api/verify-email, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/google, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/google/callback, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/facebook, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/facebook/callback, roles: PUBLIC_ACCESS }
         - { path: ^/api/doc, roles: PUBLIC_ACCESS }
+
+        # ==================== ROUTES ADMIN ====================
+        # Toutes les routes /api/admin nécessitent ROLE_ADMIN
+        - { path: ^/api/admin, roles: ROLE_ADMIN }
+
+        # Routes API standards nécessitent authentification
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
 
+    # ==================== HIÉRARCHIE DES RÔLES ====================
     role_hierarchy:
-        ROLE_ADMIN: [ROLE_USER, ROLE_MODERATOR]
+        # Un modérateur a les droits d'un utilisateur standard
         ROLE_MODERATOR: ROLE_USER
+
+        # Un admin a tous les droits (modérateur + user)
+        ROLE_ADMIN: [ROLE_MODERATOR, ROLE_USER]
 
 when@test:
     security:

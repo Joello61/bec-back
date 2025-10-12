@@ -108,6 +108,8 @@ class SignalementController extends AbstractController
         /* @var User $currentUser*/
         $currentUser = $this->getUser();
 
+        $this->denyAccessUnlessGranted('SIGNALEMENT_CREATE');
+
         $voyage = null;
         $demande = null;
         $message = null;

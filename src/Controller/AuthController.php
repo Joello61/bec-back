@@ -13,6 +13,7 @@ use App\DTO\ResetPasswordDTO;
 use App\DTO\VerifyEmailDTO;
 use App\DTO\VerifyPhoneDTO;
 use App\Entity\User;
+use App\Repository\UserRepository;
 use App\Service\AuthService;
 use App\Service\OAuth\FacebookAuthService;
 use App\Service\OAuth\GoogleAuthService;
@@ -40,6 +41,7 @@ class AuthController extends AbstractController
         private readonly GoogleAuthService $googleAuthService,
         private readonly FacebookAuthService $facebookAuthService,
         private readonly JWTTokenManagerInterface $jwtManager,
+        private readonly UserRepository $userRepository,
     ) {}
 
     /**
@@ -84,6 +86,10 @@ class AuthController extends AbstractController
         // Elle existe uniquement pour la documentation OpenAPI
     }
 
+    /**
+     * ==================== REGISTER MODIFIÉ ====================
+     * Ne retourne PAS de JWT, l'utilisateur doit vérifier son email d'abord
+     */
     #[Route('/register', name: 'register', methods: ['POST'])]
     #[OA\Post(
         path: '/api/register',
@@ -130,6 +136,8 @@ class AuthController extends AbstractController
 
         $user = $this->authService->register($dto);
 
+        // ==================== PAS DE JWT ICI ====================
+        // L'utilisateur doit d'abord vérifier son email
         return $this->json([
             'success' => true,
             'message' => 'Inscription réussie. Un code de vérification a été envoyé à votre email.',
@@ -203,18 +211,27 @@ class AuthController extends AbstractController
             'authProvider' => $user->getAuthProvider(),
             'roles' => $user->getRoles(),
             'createdAt' => $user->getCreatedAt()?->format('c'),
+            // ==================== NOUVEAU : INFOS ADRESSE ====================
+            'pays' => $user->getPays(),
+            'ville' => $user->getVille(),
+            'quartier' => $user->getQuartier(),
+            'adresseLigne1' => $user->getAdresseLigne1(),
+            'adresseLigne2' => $user->getAdresseLigne2(),
+            'codePostal' => $user->getCodePostal(),
+            'isProfileComplete' => $user->isProfileComplete(),
         ]);
     }
 
     /**
+     * ==================== VERIFY EMAIL MODIFIÉ ====================
+     * Retourne maintenant un JWT après vérification réussie
+     *
      * @throws Exception
      */
     #[Route('/verify-email', name: 'verify_email', methods: ['POST'])]
-    #[IsGranted('ROLE_USER')]
     #[OA\Post(
         path: '/api/verify-email',
         summary: 'Vérifier l\'email avec un code',
-        security: [['cookieAuth' => []]],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(ref: new Model(type: VerifyEmailDTO::class))
@@ -223,17 +240,65 @@ class AuthController extends AbstractController
     #[OA\Response(response: 200, description: 'Email vérifié avec succès')]
     #[OA\Response(response: 400, description: 'Code invalide ou expiré')]
     public function verifyEmail(
-        #[MapRequestPayload] VerifyEmailDTO $dto
+        #[MapRequestPayload] VerifyEmailDTO $dto,
+        Request $request
     ): JsonResponse {
-        /** @var User $user */
-        $user = $this->getUser();
+        // Récupérer l'email depuis le body
+        $data = json_decode($request->getContent(), true);
+        $email = $data['email'] ?? null;
 
+        if (!$email) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Email requis'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Trouver l'utilisateur par email (pas encore authentifié)
+        $user = $this->userRepository->findOneBy(['email' => $email]);
+
+        if (!$user) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Utilisateur non trouvé'
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        // Vérifier le code
         $this->authService->verifyEmail($user, $dto->code);
 
-        return $this->json([
+        // ==================== GÉNÉRER JWT APRÈS VÉRIFICATION ====================
+        $token = $this->jwtManager->create($user);
+
+        // Créer le cookie JWT
+        $cookieName = $_ENV['JWT_COOKIE_NAME'] ?? 'bagage_token';
+        $cookieTtl = (int)($_ENV['JWT_TTL'] ?? 86400);
+
+        $cookie = Cookie::create($cookieName)
+            ->withValue($token)
+            ->withExpires(time() + $cookieTtl)
+            ->withPath('/')
+            ->withDomain($_ENV['JWT_COOKIE_DOMAIN'] ?? null)
+            ->withSecure((bool)($_ENV['JWT_COOKIE_SECURE'] ?? false))
+            ->withHttpOnly((bool)($_ENV['JWT_COOKIE_HTTPONLY'] ?? true))
+            ->withSameSite($_ENV['JWT_COOKIE_SAMESITE'] ?? 'lax');
+
+        $response = $this->json([
             'success' => true,
-            'message' => 'Email vérifié avec succès'
+            'message' => 'Email vérifié avec succès',
+            'user' => [
+                'id' => $user->getId(),
+                'email' => $user->getEmail(),
+                'nom' => $user->getNom(),
+                'prenom' => $user->getPrenom(),
+                'emailVerifie' => $user->isEmailVerifie(),
+                'isProfileComplete' => $user->isProfileComplete(),
+            ]
         ]);
+
+        $response->headers->setCookie($cookie);
+
+        return $response;
     }
 
     /**
@@ -269,11 +334,9 @@ class AuthController extends AbstractController
      * @throws Exception
      */
     #[Route('/resend-verification', name: 'resend_verification', methods: ['POST'])]
-    #[IsGranted('ROLE_USER')]
     #[OA\Post(
         path: '/api/resend-verification',
         summary: 'Renvoyer un code de vérification',
-        security: [['cookieAuth' => []]],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(ref: new Model(type: ResendVerificationDTO::class))
@@ -285,8 +348,27 @@ class AuthController extends AbstractController
         RateLimiterFactory $verificationLimiter,
         Request $request
     ): JsonResponse {
-        /** @var User $user */
-        $user = $this->getUser();
+        // Récupérer l'email depuis le body
+        $data = json_decode($request->getContent(), true);
+        $email = $data['email'] ?? null;
+
+        if (!$email) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Email requis'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Trouver l'utilisateur
+        $user = $this->userRepository->findOneBy(['email' => $email]);
+
+        if (!$user) {
+            // Ne pas révéler si l'utilisateur existe
+            return $this->json([
+                'success' => true,
+                'message' => 'Si cet email existe, un code a été envoyé.'
+            ]);
+        }
 
         // Rate limiting
         $limiter = $verificationLimiter->create($user->getId());

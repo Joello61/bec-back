@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\DTO\SendMessageDTO;
 use App\Entity\User;
+use App\Repository\MessageRepository;
 use App\Service\MessageService;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -22,7 +23,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class MessageController extends AbstractController
 {
     public function __construct(
-        private readonly MessageService $messageService
+        private readonly MessageService $messageService,
+        private readonly MessageRepository $messageRepository,
     ) {
     }
 
@@ -44,6 +46,9 @@ class MessageController extends AbstractController
     ): JsonResponse {
         /** @var User $user */
         $user = $this->getUser();
+
+        $this->denyAccessUnlessGranted('MESSAGE_SEND');
+
         $message = $this->messageService->sendMessage($dto, $user);
 
         return $this->json($message, Response::HTTP_CREATED, [], ['groups' => ['message:read']]);
@@ -74,7 +79,7 @@ class MessageController extends AbstractController
     }
 
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
-    #[IsGranted('MESSAGE_DELETE', subject: 'id')]
+    #[IsGranted('ROLE_USER')]
     #[OA\Delete(
         path: '/api/messages/{id}',
         summary: 'Supprimer un message',
@@ -92,6 +97,16 @@ class MessageController extends AbstractController
     #[OA\Response(response: 404, description: 'Message non trouvé')]
     public function delete(int $id): JsonResponse
     {
+
+        $message = $this->messageRepository->find($id);
+
+        if (!$message) {
+            throw $this->createNotFoundException('Message non trouvé');
+        }
+
+        //Vérifier avec le Voter
+        $this->denyAccessUnlessGranted('MESSAGE_DELETE', $message);
+
         /** @var User $user */
         $user = $this->getUser();
         $this->messageService->deleteMessage($id, $user);
