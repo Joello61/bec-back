@@ -14,12 +14,12 @@ class CreatePropositionDTO
 
     #[Assert\NotBlank(message: 'Le prix par kilo est obligatoire')]
     #[Assert\Positive(message: 'Le prix par kilo doit être positif')]
-    #[Assert\LessThanOrEqual(value: 100000, message: 'Le prix par kilo ne peut pas dépasser {{ compared_value }} XAF')]
+    #[Assert\LessThanOrEqual(value: 1000000, message: 'Le prix par kilo ne peut pas dépasser {{ compared_value }}')]
     public float $prixParKilo;
 
     #[Assert\NotBlank(message: 'La commission proposée est obligatoire')]
     #[Assert\Positive(message: 'La commission doit être positive')]
-    #[Assert\LessThanOrEqual(value: 1000000, message: 'La commission ne peut pas dépasser {{ compared_value }} XAF')]
+    #[Assert\LessThanOrEqual(value: 10000000, message: 'La commission ne peut pas dépasser {{ compared_value }}')]
     public float $commissionProposeePourUnBagage;
 
     #[Assert\Length(

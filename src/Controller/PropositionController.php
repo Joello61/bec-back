@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\DTO\CreatePropositionDTO;
 use App\DTO\RespondPropositionDTO;
 use App\Entity\User;
+use App\Service\CurrencyService;
 use App\Service\PropositionService;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -23,7 +24,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class PropositionController extends AbstractController
 {
     public function __construct(
-        private readonly PropositionService $propositionService
+        private readonly PropositionService $propositionService,
+        private readonly CurrencyService $currencyService,
     ) {}
 
     #[Route('/voyage/{voyageId}', name: 'create', methods: ['POST'])]
@@ -86,9 +88,18 @@ class PropositionController extends AbstractController
     #[OA\Response(response: 200, description: 'Liste des propositions')]
     public function byVoyage(int $voyageId): JsonResponse
     {
+        /** @var User $user */
+        $user = $this->getUser();
+
         $propositions = $this->propositionService->getPropositionsByVoyage($voyageId);
 
-        return $this->json($propositions, Response::HTTP_OK, [], ['groups' => ['proposition:list']]);
+        // ==================== CONVERSION AUTOMATIQUE ====================
+        // Les propositions sont converties dans la devise du voyageur
+        $propositionsWithConversion = array_map(function ($proposition) use ($user) {
+            return $this->propositionService->getPropositionSummaryWithConversion($proposition, $user);
+        }, $propositions);
+
+        return $this->json($propositionsWithConversion, Response::HTTP_OK);
     }
 
     #[Route('/voyage/{voyageId}/accepted', name: 'accepted_by_voyage', methods: ['GET'])]
@@ -101,9 +112,17 @@ class PropositionController extends AbstractController
     #[OA\Response(response: 200, description: 'Liste des propositions acceptées')]
     public function acceptedByVoyage(int $voyageId): JsonResponse
     {
+        /** @var User $user */
+        $user = $this->getUser();
+
         $propositions = $this->propositionService->getAcceptedPropositionsByVoyage($voyageId);
 
-        return $this->json($propositions, Response::HTTP_OK, [], ['groups' => ['proposition:list']]);
+        // ==================== CONVERSION AUTOMATIQUE ====================
+        $propositionsWithConversion = array_map(function ($proposition) use ($user) {
+            return $this->propositionService->getPropositionSummaryWithConversion($proposition, $user);
+        }, $propositions);
+
+        return $this->json($propositionsWithConversion, Response::HTTP_OK);
     }
 
     #[Route('/me/sent', name: 'my_sent', methods: ['GET'])]
@@ -117,9 +136,19 @@ class PropositionController extends AbstractController
     {
         /** @var User $user */
         $user = $this->getUser();
+        $viewerCurrency = $user->getSettings()?->getDevise()
+            ?? $this->currencyService->getDefaultCurrency();
+
         $propositions = $this->propositionService->getPropositionsByClient($user->getId());
 
-        return $this->json($propositions, Response::HTTP_OK, [], ['groups' => ['proposition:list']]);
+        // ==================== CONVERSION AUTOMATIQUE ====================
+        // Les propositions du client sont déjà dans sa devise (celle de sa demande)
+        // Mais on ajoute quand même les infos de conversion
+        $propositionsWithConversion = array_map(function ($proposition) use ($user) {
+            return $this->propositionService->getPropositionSummaryWithConversion($proposition, $user);
+        }, $propositions);
+
+        return $this->json($propositionsWithConversion, Response::HTTP_OK);
     }
 
     #[Route('/me/received', name: 'my_received', methods: ['GET'])]
@@ -133,9 +162,16 @@ class PropositionController extends AbstractController
     {
         /** @var User $user */
         $user = $this->getUser();
+
         $propositions = $this->propositionService->getPropositionsByVoyageur($user->getId());
 
-        return $this->json($propositions, Response::HTTP_OK, [], ['groups' => ['proposition:list']]);
+        // ==================== CONVERSION AUTOMATIQUE ====================
+        // Convertir dans la devise du voyageur
+        $propositionsWithConversion = array_map(function ($proposition) use ($user) {
+            return $this->propositionService->getPropositionSummaryWithConversion($proposition, $user);
+        }, $propositions);
+
+        return $this->json($propositionsWithConversion, Response::HTTP_OK);
     }
 
     #[Route('/me/pending-count', name: 'my_pending_count', methods: ['GET'])]

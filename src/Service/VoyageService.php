@@ -10,6 +10,7 @@ use App\Entity\User;
 use App\Entity\Voyage;
 use App\Repository\VoyageRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 readonly class VoyageService
@@ -18,7 +19,8 @@ readonly class VoyageService
         private EntityManagerInterface $entityManager,
         private VoyageRepository $voyageRepository,
         private NotificationService $notificationService,
-        private MatchingService $matchingService
+        private MatchingService $matchingService,
+        private CurrencyService $currencyService
     ) {}
 
     public function getPaginatedVoyages(int $page, int $limit, array $filters = []): array
@@ -39,6 +41,15 @@ readonly class VoyageService
 
     public function createVoyage(CreateVoyageDTO $dto, User $user): Voyage
     {
+        // ==================== DEVISE DEPUIS SETTINGS UNIQUEMENT ====================
+        $currency = $user->getSettings()?->getDevise()
+            ?? $this->currencyService->getDefaultCurrency();
+
+        // Valider que la devise existe (normalement toujours le cas)
+        if (!$this->currencyService->isSupported($currency)) {
+            throw new BadRequestHttpException("La devise '{$currency}' n'est pas supportée");
+        }
+
         $voyage = new Voyage();
         $voyage->setVoyageur($user)
             ->setVilleDepart($dto->villeDepart)
@@ -48,6 +59,7 @@ readonly class VoyageService
             ->setPoidsDisponible((string) $dto->poidsDisponible)
             ->setPrixParKilo($dto->prixParKilo ? (string) $dto->prixParKilo : null)
             ->setCommissionProposeePourUnBagage($dto->commissionProposeePourUnBagage ? (string) $dto->commissionProposeePourUnBagage : null)
+            ->setCurrency($currency)
             ->setDescription($dto->description)
             ->setStatut('actif');
 
@@ -122,5 +134,42 @@ readonly class VoyageService
     {
         $voyage = $this->getVoyage($voyageId);
         return $this->matchingService->findMatchingDemandes($voyage, $viewer);
+    }
+
+    /**
+     * Convertir les montants d'un voyage dans une devise cible
+     */
+    public function convertVoyageAmounts(Voyage $voyage, string $targetCurrency): array
+    {
+        $result = [
+            'originalCurrency' => $voyage->getCurrency(),
+            'targetCurrency' => $targetCurrency,
+        ];
+
+        if ($voyage->getPrixParKilo()) {
+            $result['prixParKilo'] = $this->currencyService->convert(
+                (float) $voyage->getPrixParKilo(),
+                $voyage->getCurrency(),
+                $targetCurrency
+            );
+            $result['prixParKiloFormatted'] = $this->currencyService->formatAmount(
+                $result['prixParKilo'],
+                $targetCurrency
+            );
+        }
+
+        if ($voyage->getCommissionProposeePourUnBagage()) {
+            $result['commission'] = $this->currencyService->convert(
+                (float) $voyage->getCommissionProposeePourUnBagage(),
+                $voyage->getCurrency(),
+                $targetCurrency
+            );
+            $result['commissionFormatted'] = $this->currencyService->formatAmount(
+                $result['commission'],
+                $targetCurrency
+            );
+        }
+
+        return $result;
     }
 }

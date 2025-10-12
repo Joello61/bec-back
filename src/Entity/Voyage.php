@@ -57,6 +57,15 @@ class Voyage
     #[Groups(['voyage:read', 'voyage:list', 'voyage:write', 'favori:list'])]
     private ?string $commissionProposeePourUnBagage = null;
 
+    // ==================== DEVISE ====================
+
+    /**
+     * Code ISO 4217 de la devise (EUR, USD, XAF, etc.)
+     */
+    #[ORM\Column(length: 3)]
+    #[Groups(['voyage:read', 'voyage:list', 'voyage:write', 'favori:list'])]
+    private string $currency = 'EUR';
+
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Groups(['voyage:read', 'voyage:write'])]
     private ?string $description = null;
@@ -194,6 +203,19 @@ class Voyage
     public function setCommissionProposeePourUnBagage(?string $commissionProposeePourUnBagage): static
     {
         $this->commissionProposeePourUnBagage = $commissionProposeePourUnBagage;
+        return $this;
+    }
+
+    // ==================== GETTER/SETTER CURRENCY ====================
+
+    public function getCurrency(): string
+    {
+        return $this->currency;
+    }
+
+    public function setCurrency(string $currency): static
+    {
+        $this->currency = strtoupper($currency);
         return $this;
     }
 

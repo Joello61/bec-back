@@ -8,6 +8,7 @@ use App\DTO\CreateDemandeDTO;
 use App\DTO\UpdateDemandeDTO;
 use App\Entity\User;
 use App\Repository\DemandeRepository;
+use App\Service\CurrencyService;
 use App\Service\DemandeService;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -18,6 +19,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Serializer\SerializerInterface;
 
 #[Route('/api/demandes', name: 'api_demande_')]
 #[OA\Tag(name: 'Demandes')]
@@ -26,6 +28,8 @@ class DemandeController extends AbstractController
     public function __construct(
         private readonly DemandeService $demandeService,
         private readonly DemandeRepository $demandeRepository,
+        private readonly CurrencyService $currencyService,
+        private readonly SerializerInterface $serializer,
     ) {}
 
     #[Route('', name: 'list', methods: ['GET'])]
@@ -39,6 +43,11 @@ class DemandeController extends AbstractController
     #[OA\Response(response: 200, description: 'Liste paginée')]
     public function list(Request $request): JsonResponse
     {
+        /** @var User $currentUser */
+        $currentUser = $this->getUser();
+        $viewerCurrency = $currentUser->getSettings()?->getDevise()
+            ?? $this->currencyService->getDefaultCurrency();
+
         $page = $request->query->getInt('page', 1);
         $limit = $request->query->getInt('limit', 10);
         $filters = [
@@ -48,7 +57,27 @@ class DemandeController extends AbstractController
         ];
 
         $result = $this->demandeService->getPaginatedDemandes($page, $limit, $filters);
-        return $this->json($result, Response::HTTP_OK, [], ['groups' => ['demande:list']]);
+
+        // ==================== CONVERSION AUTOMATIQUE ====================
+        $demandesWithConversion = array_map(function ($demande) use ($viewerCurrency) {
+            $demandeData = json_decode(
+                $this->serializer->serialize($demande, 'json', ['groups' => ['demande:list']]),
+                true
+            );
+
+            // Ajouter les montants convertis si la devise est différente
+            if ($demande->getCurrency() !== $viewerCurrency) {
+                $converted = $this->demandeService->convertDemandeAmounts($demande, $viewerCurrency);
+                $demandeData['converted'] = $converted;
+            }
+            $demandeData['viewerCurrency'] = $viewerCurrency;
+
+            return $demandeData;
+        }, $result['data']);
+
+        $result['data'] = $demandesWithConversion;
+
+        return $this->json($result, Response::HTTP_OK);
     }
 
     #[Route('/{id}', name: 'show', methods: ['GET'])]
@@ -57,8 +86,26 @@ class DemandeController extends AbstractController
     #[OA\Response(response: 200, description: 'Détails')]
     public function show(int $id): JsonResponse
     {
+        /** @var User $currentUser */
+        $currentUser = $this->getUser();
+        $viewerCurrency = $currentUser->getSettings()?->getDevise()
+            ?? $this->currencyService->getDefaultCurrency();
+
         $demande = $this->demandeService->getDemande($id);
-        return $this->json($demande, Response::HTTP_OK, [], ['groups' => ['demande:read']]);
+
+        $demandeData = json_decode(
+            $this->serializer->serialize($demande, 'json', ['groups' => ['demande:read']]),
+            true
+        );
+
+        // ==================== CONVERSION AUTOMATIQUE ====================
+        if ($demande->getCurrency() !== $viewerCurrency) {
+            $converted = $this->demandeService->convertDemandeAmounts($demande, $viewerCurrency);
+            $demandeData['converted'] = $converted;
+        }
+        $demandeData['viewerCurrency'] = $viewerCurrency;
+
+        return $this->json($demandeData, Response::HTTP_OK);
     }
 
     #[Route('/{id}/matching-voyages', name: 'matching_voyages', methods: ['GET'])]
@@ -68,8 +115,63 @@ class DemandeController extends AbstractController
     #[OA\Response(response: 200, description: 'Liste des voyages correspondants avec score de correspondance')]
     public function matchingVoyages(int $id): JsonResponse
     {
-        $matchingVoyages = $this->demandeService->findMatchingVoyages($id, $this->getUser());
-        return $this->json($matchingVoyages, Response::HTTP_OK, [], ['groups' => ['voyage:list']]);
+        /** @var User $currentUser */
+        $currentUser = $this->getUser();
+        $viewerCurrency = $currentUser->getSettings()?->getDevise()
+            ?? $this->currencyService->getDefaultCurrency();
+
+        $matchingVoyages = $this->demandeService->findMatchingVoyages($id, $currentUser);
+
+        // ==================== CONVERSION AUTOMATIQUE ====================
+        $matchingVoyagesWithConversion = array_map(function ($match) use ($viewerCurrency) {
+            if (isset($match['voyage']) && $match['voyage']->getCurrency() !== $viewerCurrency) {
+                $voyageData = json_decode(
+                    $this->serializer->serialize($match['voyage'], 'json', ['groups' => ['voyage:list']]),
+                    true
+                );
+
+                // Conversion des montants
+                if ($match['voyage']->getPrixParKilo() || $match['voyage']->getCommissionProposeePourUnBagage()) {
+                    $converted = [
+                        'originalCurrency' => $match['voyage']->getCurrency(),
+                        'targetCurrency' => $viewerCurrency,
+                    ];
+
+                    if ($match['voyage']->getPrixParKilo()) {
+                        $converted['prixParKilo'] = $this->currencyService->convert(
+                            (float) $match['voyage']->getPrixParKilo(),
+                            $match['voyage']->getCurrency(),
+                            $viewerCurrency
+                        );
+                        $converted['prixParKiloFormatted'] = $this->currencyService->formatAmount(
+                            $converted['prixParKilo'],
+                            $viewerCurrency
+                        );
+                    }
+
+                    if ($match['voyage']->getCommissionProposeePourUnBagage()) {
+                        $converted['commission'] = $this->currencyService->convert(
+                            (float) $match['voyage']->getCommissionProposeePourUnBagage(),
+                            $match['voyage']->getCurrency(),
+                            $viewerCurrency
+                        );
+                        $converted['commissionFormatted'] = $this->currencyService->formatAmount(
+                            $converted['commission'],
+                            $viewerCurrency
+                        );
+                    }
+
+                    $voyageData['converted'] = $converted;
+                }
+
+                $voyageData['viewerCurrency'] = $viewerCurrency;
+                $match['voyage'] = $voyageData;
+            }
+
+            return $match;
+        }, $matchingVoyages);
+
+        return $this->json($matchingVoyagesWithConversion, Response::HTTP_OK);
     }
 
     #[Route('', name: 'create', methods: ['POST'])]
@@ -154,7 +256,29 @@ class DemandeController extends AbstractController
     #[OA\Response(response: 200, description: 'Liste')]
     public function byUser(int $userId): JsonResponse
     {
+        /** @var User $currentUser */
+        $currentUser = $this->getUser();
+        $viewerCurrency = $currentUser->getSettings()?->getDevise()
+            ?? $this->currencyService->getDefaultCurrency();
+
         $demandes = $this->demandeService->getDemandesByUser($userId);
-        return $this->json($demandes, Response::HTTP_OK, [], ['groups' => ['demande:list']]);
+
+        // ==================== CONVERSION AUTOMATIQUE ====================
+        $demandesWithConversion = array_map(function ($demande) use ($viewerCurrency) {
+            $demandeData = json_decode(
+                $this->serializer->serialize($demande, 'json', ['groups' => ['demande:list']]),
+                true
+            );
+
+            if ($demande->getCurrency() !== $viewerCurrency) {
+                $converted = $this->demandeService->convertDemandeAmounts($demande, $viewerCurrency);
+                $demandeData['converted'] = $converted;
+            }
+            $demandeData['viewerCurrency'] = $viewerCurrency;
+
+            return $demandeData;
+        }, $demandes);
+
+        return $this->json($demandesWithConversion, Response::HTTP_OK);
     }
 }

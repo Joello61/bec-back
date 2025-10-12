@@ -96,7 +96,7 @@ class UserSettings
 
     #[ORM\Column(type: Types::STRING, length: 3)]
     #[Groups(['settings:read', 'settings:write'])]
-    private string $devise = 'XAF'; // 'XAF', 'EUR', 'USD'
+    private string $devise = 'EUR'; // 'XAF', 'EUR', 'USD'
 
     #[ORM\Column(type: Types::STRING, length: 50)]
     #[Groups(['settings:read', 'settings:write'])]
