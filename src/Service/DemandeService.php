@@ -10,6 +10,7 @@ use App\Entity\Demande;
 use App\Entity\User;
 use App\Repository\DemandeRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 readonly class DemandeService
@@ -18,7 +19,8 @@ readonly class DemandeService
         private EntityManagerInterface $entityManager,
         private DemandeRepository $demandeRepository,
         private NotificationService $notificationService,
-        private MatchingService $matchingService
+        private MatchingService $matchingService,
+        private CurrencyService $currencyService
     ) {}
 
     public function getPaginatedDemandes(int $page, int $limit, array $filters = []): array
@@ -39,6 +41,15 @@ readonly class DemandeService
 
     public function createDemande(CreateDemandeDTO $dto, User $user): Demande
     {
+        // ==================== DEVISE DEPUIS SETTINGS UNIQUEMENT ====================
+        $currency = $user->getSettings()?->getDevise()
+            ?? $this->currencyService->getDefaultCurrency();
+
+        // Valider que la devise existe (normalement toujours le cas)
+        if (!$this->currencyService->isSupported($currency)) {
+            throw new BadRequestHttpException("La devise '{$currency}' n'est pas supportée");
+        }
+
         $demande = new Demande();
         $demande->setClient($user)
             ->setVilleDepart($dto->villeDepart)
@@ -47,6 +58,7 @@ readonly class DemandeService
             ->setPoidsEstime((string) $dto->poidsEstime)
             ->setPrixParKilo($dto->prixParKilo ? (string) $dto->prixParKilo : null)
             ->setCommissionProposeePourUnBagage($dto->commissionProposeePourUnBagage ? (string) $dto->commissionProposeePourUnBagage : null)
+            ->setCurrency($currency) // ⬅️ Toujours depuis settings
             ->setDescription($dto->description)
             ->setStatut('en_recherche');
 
@@ -85,6 +97,8 @@ readonly class DemandeService
             $demande->setDescription($dto->description);
         }
 
+        // ⬅️ PAS de modification de devise possible
+
         $this->entityManager->flush();
 
         return $demande;
@@ -118,5 +132,42 @@ readonly class DemandeService
     {
         $demande = $this->getDemande($demandeId);
         return $this->matchingService->findBestMatchesVoyages($demande, $viewer);
+    }
+
+    /**
+     * Convertir les montants d'une demande dans une devise cible
+     */
+    public function convertDemandeAmounts(Demande $demande, string $targetCurrency): array
+    {
+        $result = [
+            'originalCurrency' => $demande->getCurrency(),
+            'targetCurrency' => $targetCurrency,
+        ];
+
+        if ($demande->getPrixParKilo()) {
+            $result['prixParKilo'] = $this->currencyService->convert(
+                (float) $demande->getPrixParKilo(),
+                $demande->getCurrency(),
+                $targetCurrency
+            );
+            $result['prixParKiloFormatted'] = $this->currencyService->formatAmount(
+                $result['prixParKilo'],
+                $targetCurrency
+            );
+        }
+
+        if ($demande->getCommissionProposeePourUnBagage()) {
+            $result['commission'] = $this->currencyService->convert(
+                (float) $demande->getCommissionProposeePourUnBagage(),
+                $demande->getCurrency(),
+                $targetCurrency
+            );
+            $result['commissionFormatted'] = $this->currencyService->formatAmount(
+                $result['commission'],
+                $targetCurrency
+            );
+        }
+
+        return $result;
     }
 }

@@ -53,6 +53,15 @@ class Demande
     #[Groups(['demande:read', 'demande:list', 'demande:write', 'favori:list'])]
     private ?string $commissionProposeePourUnBagage = null;
 
+    // ==================== DEVISE ====================
+
+    /**
+     * Code ISO 4217 de la devise (EUR, USD, XAF, etc.)
+     */
+    #[ORM\Column(length: 3)]
+    #[Groups(['demande:read', 'demande:list', 'demande:write', 'favori:list'])]
+    private string $currency = 'EUR';
+
     #[ORM\Column(type: Types::TEXT)]
     #[Groups(['demande:read', 'demande:write'])]
     private ?string $description = null;
@@ -175,6 +184,19 @@ class Demande
     public function setCommissionProposeePourUnBagage(?string $commissionProposeePourUnBagage): static
     {
         $this->commissionProposeePourUnBagage = $commissionProposeePourUnBagage;
+        return $this;
+    }
+
+    // ==================== GETTER/SETTER CURRENCY ====================
+
+    public function getCurrency(): string
+    {
+        return $this->currency;
+    }
+
+    public function setCurrency(string $currency): static
+    {
+        $this->currency = strtoupper($currency);
         return $this;
     }
 

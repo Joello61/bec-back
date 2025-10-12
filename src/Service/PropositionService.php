@@ -23,6 +23,7 @@ readonly class PropositionService
         private VoyageRepository $voyageRepository,
         private DemandeRepository $demandeRepository,
         private NotificationService $notificationService,
+        private CurrencyService $currencyService,
     ) {}
 
     /**
@@ -68,6 +69,10 @@ readonly class PropositionService
             throw new BadRequestHttpException('Vous avez déjà fait une proposition pour ce voyage');
         }
 
+        // ==================== DEVISE DE LA DEMANDE ====================
+        // La proposition utilise TOUJOURS la devise de la demande du client
+        $currency = $demande->getCurrency();
+
         // Créer la proposition
         $proposition = new Proposition();
         $proposition->setVoyage($voyage)
@@ -76,6 +81,7 @@ readonly class PropositionService
             ->setVoyageur($voyage->getVoyageur())
             ->setPrixParKilo((string) $dto->prixParKilo)
             ->setCommissionProposeePourUnBagage((string) $dto->commissionProposeePourUnBagage)
+            ->setCurrency($currency) // ⬅️ Toujours la devise de la demande
             ->setMessage($dto->message)
             ->setStatut('en_attente');
 
@@ -212,5 +218,90 @@ readonly class PropositionService
     public function countPendingByVoyageur(int $voyageurId): int
     {
         return $this->propositionRepository->countPendingByVoyageur($voyageurId);
+    }
+
+    /**
+     * Convertir les montants d'une proposition dans une devise cible
+     */
+    public function convertPropositionAmounts(Proposition $proposition, string $targetCurrency): array
+    {
+        $result = [
+            'originalCurrency' => $proposition->getCurrency(),
+            'targetCurrency' => $targetCurrency,
+        ];
+
+        $result['prixParKilo'] = $this->currencyService->convert(
+            (float) $proposition->getPrixParKilo(),
+            $proposition->getCurrency(),
+            $targetCurrency
+        );
+        $result['prixParKiloFormatted'] = $this->currencyService->formatAmount(
+            $result['prixParKilo'],
+            $targetCurrency
+        );
+
+        $result['commission'] = $this->currencyService->convert(
+            (float) $proposition->getCommissionProposeePourUnBagage(),
+            $proposition->getCurrency(),
+            $targetCurrency
+        );
+        $result['commissionFormatted'] = $this->currencyService->formatAmount(
+            $result['commission'],
+            $targetCurrency
+        );
+
+        return $result;
+    }
+
+    /**
+     * Obtenir le récapitulatif d'une proposition avec conversion
+     * Utile pour afficher au voyageur les montants dans sa devise
+     */
+    public function getPropositionSummaryWithConversion(Proposition $proposition, User $viewer): array
+    {
+        $viewerCurrency = $viewer->getSettings()?->getDevise() ?? $this->currencyService->getDefaultCurrency();
+
+        $summary = [
+            'id' => $proposition->getId(),
+            'statut' => $proposition->getStatut(),
+            'message' => $proposition->getMessage(),
+            'createdAt' => $proposition->getCreatedAt(),
+            'client' => [
+                'id' => $proposition->getClient()->getId(),
+                'nom' => $proposition->getClient()->getNom(),
+                'prenom' => $proposition->getClient()->getPrenom(),
+            ],
+            'demande' => [
+                'id' => $proposition->getDemande()->getId(),
+                'villeDepart' => $proposition->getDemande()->getVilleDepart(),
+                'villeArrivee' => $proposition->getDemande()->getVilleArrivee(),
+            ],
+            'voyage' => [
+                'id' => $proposition->getVoyage()->getId(),
+                'villeDepart' => $proposition->getVoyage()->getVilleDepart(),
+                'villeArrivee' => $proposition->getVoyage()->getVilleArrivee(),
+            ],
+            'montants' => [
+                'original' => [
+                    'currency' => $proposition->getCurrency(),
+                    'prixParKilo' => (float) $proposition->getPrixParKilo(),
+                    'commission' => (float) $proposition->getCommissionProposeePourUnBagage(),
+                ],
+            ],
+        ];
+
+        // Ajouter la conversion si la devise du viewer est différente
+        if ($proposition->getCurrency() !== $viewerCurrency) {
+            $converted = $this->convertPropositionAmounts($proposition, $viewerCurrency);
+            $summary['montants']['converted'] = [
+                'currency' => $viewerCurrency,
+                'prixParKilo' => $converted['prixParKilo'],
+                'prixParKiloFormatted' => $converted['prixParKiloFormatted'],
+                'commission' => $converted['commission'],
+                'commissionFormatted' => $converted['commissionFormatted'],
+            ];
+        }
+
+        return $summary;
     }
 }

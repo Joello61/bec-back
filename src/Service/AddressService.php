@@ -16,6 +16,7 @@ readonly class AddressService
     public function __construct(
         private EntityManagerInterface $entityManager,
         private AddressRepository $addressRepository,
+        private CurrencyService $currencyService,
         private LoggerInterface $logger
     ) {}
 
@@ -54,6 +55,18 @@ readonly class AddressService
             $address->setCodePostal($data['codePostal']);
         }
 
+        // ==================== DÉTECTION AUTOMATIQUE DE LA DEVISE ====================
+        $detectedCurrency = $this->currencyService->getCurrencyByCountry($data['pays']);
+
+        // Mettre à jour la devise de l'utilisateur dans ses settings
+        $user->getSettings()?->setDevise($detectedCurrency);
+
+        $this->logger->info('Devise détectée automatiquement', [
+            'user_id' => $user->getId(),
+            'pays' => $data['pays'],
+            'devise' => $detectedCurrency
+        ]);
+
         // Marquer comme créée (lastModifiedAt reste null pour première création)
         $this->entityManager->persist($address);
         $this->entityManager->flush();
@@ -88,8 +101,11 @@ readonly class AddressService
         // Valider les nouvelles données
         $this->validateAddressData($data);
 
+        $oldCountry = $address->getPays();
+        $newCountry = $data['pays'];
+
         // Mettre à jour les champs
-        $address->setPays($data['pays'])
+        $address->setPays($newCountry)
             ->setVille($data['ville']);
 
         // Reset des champs de format
@@ -112,6 +128,20 @@ readonly class AddressService
         }
         if (isset($data['codePostal'])) {
             $address->setCodePostal($data['codePostal']);
+        }
+
+        // ==================== MISE À JOUR DE LA DEVISE SI LE PAYS A CHANGÉ ====================
+        if ($oldCountry !== $newCountry) {
+            $newCurrency = $this->currencyService->getCurrencyByCountry($newCountry);
+
+            $address->getUser()->getSettings()?->setDevise($newCurrency);
+
+            $this->logger->info('Devise mise à jour suite au changement de pays', [
+                'user_id' => $address->getUser()->getId(),
+                'old_country' => $oldCountry,
+                'new_country' => $newCountry,
+                'new_currency' => $newCurrency
+            ]);
         }
 
         // ==================== MARQUER COMME MODIFIÉE ====================

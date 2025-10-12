@@ -104,9 +104,6 @@ readonly class SettingsService
         if ($dto->langue !== null) {
             $settings->setLangue($dto->langue);
         }
-        if ($dto->devise !== null) {
-            $settings->setDevise($dto->devise);
-        }
         if ($dto->timezone !== null) {
             $settings->setTimezone($dto->timezone);
         }

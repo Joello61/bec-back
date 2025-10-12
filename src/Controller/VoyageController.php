@@ -9,6 +9,7 @@ use App\DTO\UpdateVoyageDTO;
 use App\Entity\User;
 use App\Repository\VoyageRepository;
 use App\Service\AvisService;
+use App\Service\CurrencyService;
 use App\Service\VoyageService;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -21,6 +22,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Serializer\Exception\ExceptionInterface;
 use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
+use Symfony\Component\Serializer\SerializerInterface;
 
 #[Route('/api/voyages', name: 'api_voyage_')]
 #[OA\Tag(name: 'Voyages')]
@@ -31,6 +33,8 @@ class VoyageController extends AbstractController
         private readonly VoyageService $voyageService,
         private readonly AvisService $avisService,
         private readonly VoyageRepository $voyageRepository,
+        private readonly CurrencyService $currencyService,
+        private readonly SerializerInterface $serializer,
     ) {}
 
     #[Route('', name: 'list', methods: ['GET'])]
@@ -45,6 +49,11 @@ class VoyageController extends AbstractController
     #[OA\Response(response: 200, description: 'Liste paginée des voyages')]
     public function list(Request $request): JsonResponse
     {
+        /** @var User $currentUser */
+        $currentUser = $this->getUser();
+        $viewerCurrency = $currentUser->getSettings()?->getDevise()
+            ?? $this->currencyService->getDefaultCurrency();
+
         $page = $request->query->getInt('page', 1);
         $limit = $request->query->getInt('limit', 10);
         $filters = [
@@ -55,7 +64,27 @@ class VoyageController extends AbstractController
         ];
 
         $result = $this->voyageService->getPaginatedVoyages($page, $limit, $filters);
-        return $this->json($result, Response::HTTP_OK, [], ['groups' => ['voyage:list']]);
+
+        // ==================== CONVERSION AUTOMATIQUE ====================
+        $voyagesWithConversion = array_map(function ($voyage) use ($viewerCurrency) {
+            $voyageData = json_decode(
+                $this->serializer->serialize($voyage, 'json', ['groups' => ['voyage:list']]),
+                true
+            );
+
+            // Ajouter les montants convertis si la devise est différente
+            if ($voyage->getCurrency() !== $viewerCurrency) {
+                $converted = $this->voyageService->convertVoyageAmounts($voyage, $viewerCurrency);
+                $voyageData['converted'] = $converted;
+            }
+            $voyageData['viewerCurrency'] = $viewerCurrency;
+
+            return $voyageData;
+        }, $result['data']);
+
+        $result['data'] = $voyagesWithConversion;
+
+        return $this->json($result, Response::HTTP_OK);
     }
 
     /**
@@ -68,12 +97,23 @@ class VoyageController extends AbstractController
     #[OA\Response(response: 200, description: 'Détails du voyage')]
     public function show(int $id, NormalizerInterface $normalizer): JsonResponse
     {
+        /** @var User $currentUser */
+        $currentUser = $this->getUser();
+        $viewerCurrency = $currentUser->getSettings()?->getDevise()
+            ?? $this->currencyService->getDefaultCurrency();
+
         $voyage = $this->voyageService->getVoyage($id);
         $dataVoyage = $normalizer->normalize($voyage, null, ['groups' => ['voyage:read']]);
 
         $noteAvisMoyen = $this->avisService->getStatsByUser($voyage->getVoyageur()->getId())['average'] ?? 0;
-
         $dataVoyage['voyageur']['noteAvisMoyen'] = $noteAvisMoyen;
+
+        // ==================== CONVERSION AUTOMATIQUE ====================
+        if ($voyage->getCurrency() !== $viewerCurrency) {
+            $converted = $this->voyageService->convertVoyageAmounts($voyage, $viewerCurrency);
+            $dataVoyage['converted'] = $converted;
+        }
+        $dataVoyage['viewerCurrency'] = $viewerCurrency;
 
         return $this->json($dataVoyage, Response::HTTP_OK);
     }
@@ -85,8 +125,63 @@ class VoyageController extends AbstractController
     #[OA\Response(response: 200, description: 'Liste des demandes correspondantes')]
     public function matchingDemandes(int $id): JsonResponse
     {
-        $demandes = $this->voyageService->findMatchingDemandes($id, $this->getUser());
-        return $this->json($demandes, Response::HTTP_OK, [], ['groups' => ['demande:list']]);
+        /** @var User $currentUser */
+        $currentUser = $this->getUser();
+        $viewerCurrency = $currentUser->getSettings()?->getDevise()
+            ?? $this->currencyService->getDefaultCurrency();
+
+        $demandes = $this->voyageService->findMatchingDemandes($id, $currentUser);
+
+        // ==================== CONVERSION AUTOMATIQUE ====================
+        $demandesWithConversion = array_map(function ($match) use ($viewerCurrency) {
+            if (isset($match['demande']) && $match['demande']->getCurrency() !== $viewerCurrency) {
+                $demandeData = json_decode(
+                    $this->serializer->serialize($match['demande'], 'json', ['groups' => ['demande:list']]),
+                    true
+                );
+
+                // Conversion des montants
+                if ($match['demande']->getPrixParKilo() || $match['demande']->getCommissionProposeePourUnBagage()) {
+                    $converted = [
+                        'originalCurrency' => $match['demande']->getCurrency(),
+                        'targetCurrency' => $viewerCurrency,
+                    ];
+
+                    if ($match['demande']->getPrixParKilo()) {
+                        $converted['prixParKilo'] = $this->currencyService->convert(
+                            (float) $match['demande']->getPrixParKilo(),
+                            $match['demande']->getCurrency(),
+                            $viewerCurrency
+                        );
+                        $converted['prixParKiloFormatted'] = $this->currencyService->formatAmount(
+                            $converted['prixParKilo'],
+                            $viewerCurrency
+                        );
+                    }
+
+                    if ($match['demande']->getCommissionProposeePourUnBagage()) {
+                        $converted['commission'] = $this->currencyService->convert(
+                            (float) $match['demande']->getCommissionProposeePourUnBagage(),
+                            $match['demande']->getCurrency(),
+                            $viewerCurrency
+                        );
+                        $converted['commissionFormatted'] = $this->currencyService->formatAmount(
+                            $converted['commission'],
+                            $viewerCurrency
+                        );
+                    }
+
+                    $demandeData['converted'] = $converted;
+                }
+
+                $demandeData['viewerCurrency'] = $viewerCurrency;
+                $match['demande'] = $demandeData;
+            }
+
+            return $match;
+        }, $demandes);
+
+        return $this->json($demandesWithConversion, Response::HTTP_OK);
     }
 
     #[Route('', name: 'create', methods: ['POST'])]
@@ -174,7 +269,29 @@ class VoyageController extends AbstractController
     #[OA\Response(response: 200, description: 'Liste des voyages')]
     public function byUser(int $userId): JsonResponse
     {
+        /** @var User $currentUser */
+        $currentUser = $this->getUser();
+        $viewerCurrency = $currentUser->getSettings()?->getDevise()
+            ?? $this->currencyService->getDefaultCurrency();
+
         $voyages = $this->voyageService->getVoyagesByUser($userId);
-        return $this->json($voyages, Response::HTTP_OK, [], ['groups' => ['voyage:list']]);
+
+        // ==================== CONVERSION AUTOMATIQUE ====================
+        $voyagesWithConversion = array_map(function ($voyage) use ($viewerCurrency) {
+            $voyageData = json_decode(
+                $this->serializer->serialize($voyage, 'json', ['groups'=> ['voyage:list']]),
+                true
+            );
+
+            if ($voyage->getCurrency() !== $viewerCurrency) {
+                $converted = $this->voyageService->convertVoyageAmounts($voyage, $viewerCurrency);
+                $voyageData['converted'] = $converted;
+            }
+            $voyageData['viewerCurrency'] = $viewerCurrency;
+
+            return $voyageData;
+        }, $voyages);
+
+        return $this->json($voyagesWithConversion, Response::HTTP_OK);
     }
 }

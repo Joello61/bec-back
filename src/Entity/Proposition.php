@@ -48,6 +48,15 @@ class Proposition
     #[Groups(['proposition:read', 'proposition:list', 'proposition:write'])]
     private ?string $commissionProposeePourUnBagage = null;
 
+    // ==================== DEVISE ====================
+
+    /**
+     * Code ISO 4217 de la devise (EUR, USD, XAF, etc.)
+     */
+    #[ORM\Column(length: 3)]
+    #[Groups(['proposition:read', 'proposition:list', 'proposition:write'])]
+    private string $currency = 'EUR';
+
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Groups(['proposition:read', 'proposition:write'])]
     private ?string $message = null;
@@ -156,6 +165,19 @@ class Proposition
         return $this;
     }
 
+    // ==================== GETTER/SETTER CURRENCY ====================
+
+    public function getCurrency(): string
+    {
+        return $this->currency;
+    }
+
+    public function setCurrency(string $currency): static
+    {
+        $this->currency = strtoupper($currency);
+        return $this;
+    }
+
     public function getMessage(): ?string
     {
         return $this->message;
@@ -209,6 +231,4 @@ class Proposition
         $this->reponduAt = $reponduAt;
         return $this;
     }
-
-
 }

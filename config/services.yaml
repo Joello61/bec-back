@@ -13,6 +13,9 @@ parameters:
     facebook.app_secret: '%env(FACEBOOK_APP_SECRET)%'
     facebook.redirect_uri: '%env(FACEBOOK_REDIRECT_URI)%'
 
+    app.default_currency: '%env(DEFAULT_CURRENCY)%'
+    app.exchange_rate_api_key: '%env(EXCHANGE_RATE_API_KEY)%'
+
 services:
     _defaults:
         autowire: true
@@ -29,6 +32,11 @@ services:
     App\Service\EmailService:
         arguments:
             $frontendUrl: '%app.frontend_url%'
+
+    App\Service\CurrencyService:
+        arguments:
+            $exchangeRateApiKey: '%app.exchange_rate_api_key%'
+            $defaultCurrency: '%app.default_currency%'
 
     # ==================== CONFIGURATION TWILIO ====================
     App\Service\TwilioService:
