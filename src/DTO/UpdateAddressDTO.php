@@ -7,22 +7,11 @@ namespace App\DTO;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
- * DTO pour la complétion du profil utilisateur
- * Utilisé après l'inscription et la vérification email
- *
- * Supporte 2 formats d'adresse :
- * - Format Afrique : quartier (obligatoire)
- * - Format Diaspora : adresse postale normalisée (ligne1 + code postal obligatoires)
+ * DTO pour la mise à jour de l'adresse utilisateur
+ * Soumis à la contrainte des 6 mois
  */
-class CompleteProfileDTO
+class UpdateAddressDTO
 {
-    #[Assert\NotBlank(message: 'Le numéro de téléphone est obligatoire')]
-    #[Assert\Regex(
-        pattern: '/^\+?[1-9]\d{1,14}$/',
-        message: 'Le numéro de téléphone n\'est pas valide. Format attendu: +237612345678 ou +33612345678'
-    )]
-    public string $telephone;
-
     #[Assert\NotBlank(message: 'Le pays est obligatoire')]
     #[Assert\Length(
         min: 2,
@@ -71,17 +60,6 @@ class CompleteProfileDTO
     )]
     public ?string $codePostal = null;
 
-    // ==================== CHAMPS OPTIONNELS ====================
-
-    #[Assert\Length(
-        max: 500,
-        maxMessage: 'La bio ne peut pas dépasser {{ limit }} caractères'
-    )]
-    public ?string $bio = null;
-
-    #[Assert\Url(message: 'L\'URL de la photo n\'est pas valide')]
-    public ?string $photo = null;
-
     /**
      * Validation personnalisée : au moins un format d'adresse doit être complet
      */
@@ -94,34 +72,5 @@ class CompleteProfileDTO
         $diasporaFormat = !empty($this->adresseLigne1) && !empty($this->codePostal);
 
         return $africanFormat || $diasporaFormat;
-    }
-
-    /**
-     * Convertit le DTO en tableau pour AddressService
-     */
-    public function toAddressArray(): array
-    {
-        $data = [
-            'pays' => $this->pays,
-            'ville' => $this->ville,
-        ];
-
-        if ($this->quartier !== null) {
-            $data['quartier'] = $this->quartier;
-        }
-
-        if ($this->adresseLigne1 !== null) {
-            $data['adresseLigne1'] = $this->adresseLigne1;
-        }
-
-        if ($this->adresseLigne2 !== null) {
-            $data['adresseLigne2'] = $this->adresseLigne2;
-        }
-
-        if ($this->codePostal !== null) {
-            $data['codePostal'] = $this->codePostal;
-        }
-
-        return $data;
     }
 }

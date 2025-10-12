@@ -47,35 +47,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'admin:user:read'])]
     private ?string $telephone = null;
 
-    // ==================== NOUVEAUX CHAMPS ADRESSE ====================
+    // ==================== RELATION ADRESSE ====================
 
-    #[ORM\Column(length: 100, nullable: true)]
-    #[Groups(['user:read', 'user:write', 'voyage:read', 'demande:read', 'admin:user:read'])]
-    private ?string $pays = null;
-
-    #[ORM\Column(length: 100, nullable: true)]
-    #[Groups(['user:read', 'user:write', 'voyage:read', 'demande:read', 'admin:user:read'])]
-    private ?string $ville = null;
-
-    // Format Afrique : Quartier (ex: Bastos, Bonanjo)
-    #[ORM\Column(length: 100, nullable: true)]
-    #[Groups(['user:read', 'user:write', 'voyage:read', 'demande:read', 'admin:user:read'])]
-    private ?string $quartier = null;
-
-    // Format Diaspora : Adresse postale normalisée
-    #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['user:read', 'user:write', 'admin:user:read'])]
-    private ?string $adresseLigne1 = null; // Ex: "21 rue du Cher"
-
-    #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['user:read', 'user:write', 'admin:user:read'])]
-    private ?string $adresseLigne2 = null; // Ex: "Appartement 3B"
-
-    #[ORM\Column(length: 20, nullable: true)]
-    #[Groups(['user:read', 'user:write', 'admin:user:read'])]
-    private ?string $codePostal = null; // Ex: "31100"
-
-    // ==================== FIN NOUVEAUX CHAMPS ====================
+    #[ORM\OneToOne(targetEntity: Address::class, mappedBy: 'user', cascade: ['persist', 'remove'])]
+    #[Groups(['user:read', 'admin:user:read'])]
+    private ?Address $address = null;
 
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['user:read', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'proposition:list', 'message:list', 'conversation:read'])]
@@ -203,26 +179,23 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     /**
      * Vérifie si le profil de l'utilisateur est complet
      * Requis pour créer des demandes, voyages, avis ou envoyer des messages
-     *
-     * Adresse valide = SOIT format Afrique (quartier) SOIT format Diaspora (adresse postale)
      */
     public function isProfileComplete(): bool
     {
         $baseComplete = $this->emailVerifie
             && $this->telephoneVerifie
-            && $this->telephone !== null
-            && $this->pays !== null
-            && $this->ville !== null;
+            && $this->telephone !== null;
 
         if (!$baseComplete) {
             return false;
         }
 
-        // Vérifier qu'au moins un format d'adresse est complet
-        $africanFormat = $this->quartier !== null;
-        $diasporaFormat = $this->adresseLigne1 !== null && $this->codePostal !== null;
+        // Vérification via l'entité Address
+        if (!$this->address) {
+            return false;
+        }
 
-        return $africanFormat || $diasporaFormat;
+        return $this->address->isValid();
     }
 
     /**
@@ -230,13 +203,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     public function getAddressType(): ?string
     {
-        if ($this->quartier !== null) {
-            return 'african';
-        }
-        if ($this->adresseLigne1 !== null && $this->codePostal !== null) {
-            return 'postal';
-        }
-        return null;
+        return $this->address?->getAddressType();
     }
 
     // ==================== GETTERS & SETTERS STANDARDS ====================
@@ -323,71 +290,26 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    // ==================== GETTERS & SETTERS ADRESSE ====================
+    // ==================== GETTER & SETTER ADRESSE ====================
 
-    public function getPays(): ?string
+    public function getAddress(): ?Address
     {
-        return $this->pays;
+        return $this->address;
     }
 
-    public function setPays(?string $pays): static
+    public function setAddress(?Address $address): static
     {
-        $this->pays = $pays;
-        return $this;
-    }
+        // Gérer la relation bidirectionnelle
+        if ($address === null && $this->address !== null) {
+            $this->address->setUser(null);
+        }
 
-    public function getVille(): ?string
-    {
-        return $this->ville;
-    }
+        $this->address = $address;
 
-    public function setVille(?string $ville): static
-    {
-        $this->ville = $ville;
-        return $this;
-    }
+        if ($address !== null && $address->getUser() !== $this) {
+            $address->setUser($this);
+        }
 
-    public function getQuartier(): ?string
-    {
-        return $this->quartier;
-    }
-
-    public function setQuartier(?string $quartier): static
-    {
-        $this->quartier = $quartier;
-        return $this;
-    }
-
-    public function getAdresseLigne1(): ?string
-    {
-        return $this->adresseLigne1;
-    }
-
-    public function setAdresseLigne1(?string $adresseLigne1): static
-    {
-        $this->adresseLigne1 = $adresseLigne1;
-        return $this;
-    }
-
-    public function getAdresseLigne2(): ?string
-    {
-        return $this->adresseLigne2;
-    }
-
-    public function setAdresseLigne2(?string $adresseLigne2): static
-    {
-        $this->adresseLigne2 = $adresseLigne2;
-        return $this;
-    }
-
-    public function getCodePostal(): ?string
-    {
-        return $this->codePostal;
-    }
-
-    public function setCodePostal(?string $codePostal): static
-    {
-        $this->codePostal = $codePostal;
         return $this;
     }
 
