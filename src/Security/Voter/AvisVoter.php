@@ -11,12 +11,19 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
 class AvisVoter extends Voter
 {
+    public const CREATE = 'AVIS_CREATE';
     public const EDIT = 'AVIS_EDIT';
     public const DELETE = 'AVIS_DELETE';
+    public const VIEW = 'AVIS_VIEW';
 
     protected function supports(string $attribute, mixed $subject): bool
     {
-        return in_array($attribute, [self::EDIT, self::DELETE])
+        // CREATE ne nécessite pas de subject
+        if ($attribute === self::CREATE) {
+            return true;
+        }
+
+        return in_array($attribute, [self::EDIT, self::DELETE, self::VIEW])
             && $subject instanceof Avis;
     }
 
@@ -28,32 +35,63 @@ class AvisVoter extends Voter
             return false;
         }
 
-        /** @var Avis $avis */
-        $avis = $subject;
-
         return match($attribute) {
-            self::EDIT => $this->canEdit($avis, $user),
-            self::DELETE => $this->canDelete($avis, $user),
+            self::CREATE => $this->canCreate($user),
+            self::VIEW => $this->canView($subject, $user),
+            self::EDIT => $this->canEdit($subject, $user),
+            self::DELETE => $this->canDelete($subject, $user),
             default => false,
         };
     }
 
-    private function canEdit(Avis $avis, User $user): bool
+    /**
+     * ==================== CRÉATION AVIS : PROFIL COMPLET REQUIS ====================
+     * Un utilisateur ne peut donner un avis que si son profil est complet
+     */
+    private function canCreate(User $user): bool
     {
-        // Seul l'auteur peut modifier son avis
-        return $avis->getAuteur() === $user
-            || in_array('ROLE_ADMIN', $user->getRoles());
+        // Les admins peuvent toujours créer
+        if (in_array('ROLE_ADMIN', $user->getRoles())) {
+            return true;
+        }
+
+        // Profil complet obligatoire
+        if (!$user->isProfileComplete()) {
+            return false;
+        }
+
+        return true;
     }
 
-    private function canDelete(Avis $avis, User $user): bool
+    /**
+     * Tout le monde peut voir les avis (ils sont publics)
+     */
+    private function canView(Avis $avis, User $user): bool
     {
-        // L'auteur peut supprimer son avis
+        return true;
+    }
+
+    /**
+     * Seul l'auteur de l'avis peut le modifier
+     */
+    private function canEdit(Avis $avis, User $user): bool
+    {
+        // L'auteur peut modifier son propre avis
         if ($avis->getAuteur() === $user) {
             return true;
         }
 
-        // La personne évaluée peut supprimer un avis la concernant
-        if ($avis->getCible() === $user) {
+        // Les admins peuvent modifier
+        return in_array('ROLE_ADMIN', $user->getRoles());
+    }
+
+    /**
+     * L'auteur ou un admin peut supprimer un avis
+     */
+    private function canDelete(Avis $avis, User $user): bool
+    {
+        // L'auteur peut supprimer son propre avis
+        if ($avis->getAuteur() === $user) {
             return true;
         }
 

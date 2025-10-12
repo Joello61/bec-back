@@ -21,30 +21,61 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['user:read', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'message:read', 'avis:read', 'proposition:list', 'message:list', 'conversation:list', 'conversation:read', 'favori:read', 'favori:list'])]
+    #[Groups(['user:read', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'message:read', 'avis:read', 'proposition:list', 'message:list', 'conversation:list', 'conversation:read', 'favori:read', 'favori:list', 'admin:user:list', 'admin:user:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 180, unique: true)]
-    #[Groups(['user:read', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list'])]
+    #[Groups(['user:read', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'admin:user:list', 'admin:user:read'])]
     private ?string $email = null;
 
     #[ORM\Column]
+    #[Groups(['admin:user:list','admin:user:read'])]
     private array $roles = [];
 
     #[ORM\Column(nullable: true)]
     private ?string $password = null;
 
     #[ORM\Column(length: 100)]
-    #[Groups(['user:read', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'message:read', 'proposition:list', 'message:list', 'conversation:list', 'conversation:read', 'favori:read', 'favori:list', 'signalement:list'])]
+    #[Groups(['user:read', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'message:read', 'proposition:list', 'message:list', 'conversation:list', 'conversation:read', 'favori:read', 'favori:list', 'signalement:list', 'admin:user:list', 'admin:user:read'])]
     private ?string $nom = null;
 
     #[ORM\Column(length: 100)]
-    #[Groups(['user:read', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'message:read', 'proposition:list', 'message:list', 'conversation:list', 'conversation:read', 'favori:read', 'favori:list', 'signalement:list'])]
+    #[Groups(['user:read', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'message:read', 'proposition:list', 'message:list', 'conversation:list', 'conversation:read', 'favori:read', 'favori:list', 'signalement:list', 'admin:user:list', 'admin:user:read'])]
     private ?string $prenom = null;
 
     #[ORM\Column(length: 20, nullable: true)]
-    #[Groups(['user:read', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list'])]
+    #[Groups(['user:read', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'admin:user:read'])]
     private ?string $telephone = null;
+
+    // ==================== NOUVEAUX CHAMPS ADRESSE ====================
+
+    #[ORM\Column(length: 100, nullable: true)]
+    #[Groups(['user:read', 'user:write', 'voyage:read', 'demande:read', 'admin:user:read'])]
+    private ?string $pays = null;
+
+    #[ORM\Column(length: 100, nullable: true)]
+    #[Groups(['user:read', 'user:write', 'voyage:read', 'demande:read', 'admin:user:read'])]
+    private ?string $ville = null;
+
+    // Format Afrique : Quartier (ex: Bastos, Bonanjo)
+    #[ORM\Column(length: 100, nullable: true)]
+    #[Groups(['user:read', 'user:write', 'voyage:read', 'demande:read', 'admin:user:read'])]
+    private ?string $quartier = null;
+
+    // Format Diaspora : Adresse postale normalisée
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['user:read', 'user:write', 'admin:user:read'])]
+    private ?string $adresseLigne1 = null; // Ex: "21 rue du Cher"
+
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['user:read', 'user:write', 'admin:user:read'])]
+    private ?string $adresseLigne2 = null; // Ex: "Appartement 3B"
+
+    #[ORM\Column(length: 20, nullable: true)]
+    #[Groups(['user:read', 'user:write', 'admin:user:read'])]
+    private ?string $codePostal = null; // Ex: "31100"
+
+    // ==================== FIN NOUVEAUX CHAMPS ====================
 
     #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['user:read', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'proposition:list', 'message:list', 'conversation:read'])]
@@ -55,16 +86,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $bio = null;
 
     #[ORM\Column]
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'admin:user:list'])]
     private bool $emailVerifie = false;
 
     #[ORM\Column]
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'admin:user:list'])]
     private bool $telephoneVerifie = false;
 
     // Champs OAuth
     #[ORM\Column(length: 20, nullable: true)]
-    private ?string $authProvider = null; // 'local', 'google', 'facebook'
+    private ?string $authProvider = null;
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $googleId = null;
@@ -73,14 +104,30 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $facebookId = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
-    #[Groups(['user:read', 'demande:read', 'voyage:read'])]
+    #[Groups(['user:read', 'demande:read', 'voyage:read', 'admin:user:list', 'admin:user:read'])]
     private ?\DateTimeInterface $createdAt = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
     #[Groups(['user:read'])]
     private ?\DateTimeInterface $updatedAt = null;
 
-    // ==================== NOUVELLE RELATION SETTINGS ====================
+    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
+    #[Groups(['user:read', 'admin:user:list'])]
+    private bool $isBanned = false;
+
+    #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
+    #[Groups(['user:read', 'admin:user:list'])]
+    private ?\DateTimeInterface $bannedAt = null;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Groups(['admin:user:list'])]
+    private ?string $banReason = null;
+
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['admin:user:list'])]
+    private ?User $bannedBy = null;
+
     #[ORM\OneToOne(targetEntity: UserSettings::class, mappedBy: 'user', cascade: ['persist', 'remove'])]
     #[Groups(['user:read'])]
     private ?UserSettings $settings = null;
@@ -150,6 +197,49 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         $this->updatedAt = new \DateTime();
     }
+
+    // ==================== MÉTHODE CRITIQUE : VÉRIFICATION PROFIL COMPLET ====================
+
+    /**
+     * Vérifie si le profil de l'utilisateur est complet
+     * Requis pour créer des demandes, voyages, avis ou envoyer des messages
+     *
+     * Adresse valide = SOIT format Afrique (quartier) SOIT format Diaspora (adresse postale)
+     */
+    public function isProfileComplete(): bool
+    {
+        $baseComplete = $this->emailVerifie
+            && $this->telephoneVerifie
+            && $this->telephone !== null
+            && $this->pays !== null
+            && $this->ville !== null;
+
+        if (!$baseComplete) {
+            return false;
+        }
+
+        // Vérifier qu'au moins un format d'adresse est complet
+        $africanFormat = $this->quartier !== null;
+        $diasporaFormat = $this->adresseLigne1 !== null && $this->codePostal !== null;
+
+        return $africanFormat || $diasporaFormat;
+    }
+
+    /**
+     * Détermine le type d'adresse utilisé
+     */
+    public function getAddressType(): ?string
+    {
+        if ($this->quartier !== null) {
+            return 'african';
+        }
+        if ($this->adresseLigne1 !== null && $this->codePostal !== null) {
+            return 'postal';
+        }
+        return null;
+    }
+
+    // ==================== GETTERS & SETTERS STANDARDS ====================
 
     public function getId(): ?int
     {
@@ -232,6 +322,76 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->telephone = $telephone;
         return $this;
     }
+
+    // ==================== GETTERS & SETTERS ADRESSE ====================
+
+    public function getPays(): ?string
+    {
+        return $this->pays;
+    }
+
+    public function setPays(?string $pays): static
+    {
+        $this->pays = $pays;
+        return $this;
+    }
+
+    public function getVille(): ?string
+    {
+        return $this->ville;
+    }
+
+    public function setVille(?string $ville): static
+    {
+        $this->ville = $ville;
+        return $this;
+    }
+
+    public function getQuartier(): ?string
+    {
+        return $this->quartier;
+    }
+
+    public function setQuartier(?string $quartier): static
+    {
+        $this->quartier = $quartier;
+        return $this;
+    }
+
+    public function getAdresseLigne1(): ?string
+    {
+        return $this->adresseLigne1;
+    }
+
+    public function setAdresseLigne1(?string $adresseLigne1): static
+    {
+        $this->adresseLigne1 = $adresseLigne1;
+        return $this;
+    }
+
+    public function getAdresseLigne2(): ?string
+    {
+        return $this->adresseLigne2;
+    }
+
+    public function setAdresseLigne2(?string $adresseLigne2): static
+    {
+        $this->adresseLigne2 = $adresseLigne2;
+        return $this;
+    }
+
+    public function getCodePostal(): ?string
+    {
+        return $this->codePostal;
+    }
+
+    public function setCodePostal(?string $codePostal): static
+    {
+        $this->codePostal = $codePostal;
+        return $this;
+    }
+
+    // ==================== AUTRES GETTERS & SETTERS ====================
 
     public function getPhoto(): ?string
     {
@@ -320,8 +480,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->updatedAt;
     }
 
-    // ==================== SETTINGS ====================
-
     public function getSettings(): ?UserSettings
     {
         return $this->settings;
@@ -329,11 +487,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function setSettings(UserSettings $settings): static
     {
-        // Set the owning side of the relation if necessary
         if ($settings->getUser() !== $this) {
             $settings->setUser($this);
         }
-
         $this->settings = $settings;
         return $this;
     }
@@ -404,5 +560,72 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             $this->conversationsAsParticipant1->toArray(),
             $this->conversationsAsParticipant2->toArray()
         );
+    }
+
+    public function isBanned(): bool
+    {
+        return $this->isBanned;
+    }
+
+    public function setIsBanned(bool $isBanned): static
+    {
+        $this->isBanned = $isBanned;
+        if (!$isBanned) {
+            $this->bannedAt = null;
+            $this->banReason = null;
+            $this->bannedBy = null;
+        }
+        return $this;
+    }
+
+    public function getBannedAt(): ?\DateTimeInterface
+    {
+        return $this->bannedAt;
+    }
+
+    public function setBannedAt(?\DateTimeInterface $bannedAt): static
+    {
+        $this->bannedAt = $bannedAt;
+        return $this;
+    }
+
+    public function getBanReason(): ?string
+    {
+        return $this->banReason;
+    }
+
+    public function setBanReason(?string $banReason): static
+    {
+        $this->banReason = $banReason;
+        return $this;
+    }
+
+    public function getBannedBy(): ?User
+    {
+        return $this->bannedBy;
+    }
+
+    public function setBannedBy(?User $bannedBy): static
+    {
+        $this->bannedBy = $bannedBy;
+        return $this;
+    }
+
+    public function ban(User $admin, string $reason): static
+    {
+        $this->isBanned = true;
+        $this->bannedAt = new \DateTime();
+        $this->banReason = $reason;
+        $this->bannedBy = $admin;
+        return $this;
+    }
+
+    public function unban(): static
+    {
+        $this->isBanned = false;
+        $this->bannedAt = null;
+        $this->banReason = null;
+        $this->bannedBy = null;
+        return $this;
     }
 }

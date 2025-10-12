@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\DTO\CreateAvisDTO;
 use App\Entity\User;
+use App\Repository\AvisRepository;
 use App\Service\AvisService;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -22,7 +23,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class AvisController extends AbstractController
 {
     public function __construct(
-        private readonly AvisService $avisService
+        private readonly AvisService $avisService,
+        private readonly AvisRepository $avisRepository,
     ) {}
 
     #[Route('/user/{userId}', name: 'by_user', methods: ['GET'])]
@@ -61,12 +63,15 @@ class AvisController extends AbstractController
     ): JsonResponse {
         /* @var User $user*/
         $user = $this->getUser();
+
+        $this->denyAccessUnlessGranted('AVIS_CREATE');
+
         $avis = $this->avisService->createAvis($dto, $user);
         return $this->json($avis, Response::HTTP_CREATED, [], ['groups' => ['avis:read']]);
     }
 
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
-    #[IsGranted('AVIS_EDIT', subject: 'id')]
+    #[IsGranted('ROLE_USER')]
     #[OA\Put(
         path: '/api/avis/{id}',
         summary: 'Modifier un avis',
@@ -84,12 +89,20 @@ class AvisController extends AbstractController
     #[OA\Response(response: 200, description: 'Avis modifié')]
     public function update(int $id, #[MapRequestPayload] CreateAvisDTO $dto): JsonResponse
     {
-        $avis = $this->avisService->updateAvis($id, $dto);
-        return $this->json($avis, Response::HTTP_OK, [], ['groups' => ['avis:read']]);
+        $avis = $this->avisRepository->find($id);
+
+        if (!$avis) {
+            throw $this->createNotFoundException('Avis non trouvé');
+        }
+
+        $this->denyAccessUnlessGranted('AVIS_EDIT', $avis);
+
+        $updatedAvis = $this->avisService->updateAvis($id, $dto);
+        return $this->json($updatedAvis, Response::HTTP_OK, [], ['groups' => ['avis:read']]);
     }
 
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
-    #[IsGranted('AVIS_DELETE', subject: 'id')]
+    #[IsGranted('ROLE_USER')]
     #[OA\Delete(
         path: '/api/avis/{id}',
         summary: 'Supprimer un avis',
@@ -98,7 +111,16 @@ class AvisController extends AbstractController
     #[OA\Response(response: 204, description: 'Avis supprimé')]
     public function delete(int $id): JsonResponse
     {
+        $avis = $this->avisRepository->find($id);
+
+        if (!$avis) {
+            throw $this->createNotFoundException('Avis non trouvé');
+        }
+
+        $this->denyAccessUnlessGranted('AVIS_DELETE', $avis);
+
         $this->avisService->deleteAvis($id);
         return $this->json(null, Response::HTTP_NO_CONTENT);
     }
 }
+

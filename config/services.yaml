@@ -30,6 +30,14 @@ services:
         arguments:
             $frontendUrl: '%app.frontend_url%'
 
+    # ==================== CONFIGURATION TWILIO ====================
+    App\Service\TwilioService:
+        arguments:
+            $logger: '@logger'
+            $twilioAccountSid: '%env(TWILIO_ACCOUNT_SID)%'
+            $twilioAuthToken: '%env(TWILIO_AUTH_TOKEN)%'
+            $twilioPhoneNumber: '%env(TWILIO_PHONE_NUMBER)%'
+
     # GoogleAuthService
     App\Service\OAuth\GoogleAuthService:
         arguments:
@@ -65,3 +73,7 @@ services:
             $environment: '%kernel.environment%'
         tags:
             - { name: kernel.event_listener, event: kernel.exception, priority: 10 }
+
+    App\EventListener\BannedUserListener:
+        tags:
+        - { name: kernel.event_listener, event: kernel.request, priority: 10 }

@@ -93,7 +93,7 @@ readonly class NotificationService
                 'matching_voyage',
                 'Nouveau voyage disponible',
                 sprintf(
-                    'Un voyageur propose %s → %s le %s',
+                    'Un voyageur propose %s vers %s le %s',
                     $voyage->getVilleDepart(),
                     $voyage->getVilleArrivee(),
                     $voyage->getDateDepart()->format('d/m/Y')
@@ -124,7 +124,7 @@ readonly class NotificationService
                 'matching_demande',
                 'Nouvelle demande correspondante',
                 sprintf(
-                    'Une demande %s → %s correspond à votre voyage',
+                    'Une demande %s vers %s correspond à votre voyage',
                     $demande->getVilleDepart(),
                     $demande->getVilleArrivee()
                 ),
@@ -197,5 +197,16 @@ readonly class NotificationService
 
         $this->entityManager->remove($notification);
         $this->entityManager->flush();
+    }
+
+    public function notifyUserBanned(User $user, User $admin, string $reason): void
+    {
+        $this->createNotification(
+            $user,
+            'account_banned',
+            'Compte suspendu',
+            sprintf('Votre compte a été suspendu. Raison : %s', $reason),
+            ['bannedBy' => $admin->getId()]
+        );
     }
 }
