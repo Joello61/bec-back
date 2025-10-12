@@ -198,7 +198,7 @@ class AuthController extends AbstractController
         /** @var User $user */
         $user = $this->getUser();
 
-        return $this->json([
+        $responseData = [
             'id' => $user->getId(),
             'email' => $user->getEmail(),
             'nom' => $user->getNom(),
@@ -211,15 +211,31 @@ class AuthController extends AbstractController
             'authProvider' => $user->getAuthProvider(),
             'roles' => $user->getRoles(),
             'createdAt' => $user->getCreatedAt()?->format('c'),
-            // ==================== NOUVEAU : INFOS ADRESSE ====================
-            'pays' => $user->getPays(),
-            'ville' => $user->getVille(),
-            'quartier' => $user->getQuartier(),
-            'adresseLigne1' => $user->getAdresseLigne1(),
-            'adresseLigne2' => $user->getAdresseLigne2(),
-            'codePostal' => $user->getCodePostal(),
             'isProfileComplete' => $user->isProfileComplete(),
-        ]);
+        ];
+
+        // Ajouter l'adresse si elle existe
+        if ($user->getAddress()) {
+            $address = $user->getAddress();
+            $responseData['address'] = [
+                'id' => $address->getId(),
+                'pays' => $address->getPays(),
+                'ville' => $address->getVille(),
+                'quartier' => $address->getQuartier(),
+                'adresseLigne1' => $address->getAdresseLigne1(),
+                'adresseLigne2' => $address->getAdresseLigne2(),
+                'codePostal' => $address->getCodePostal(),
+                'type' => $address->getAddressType(),
+                'canModify' => $address->canBeModified(),
+                'lastModifiedAt' => $address->getLastModifiedAt()?->format('c'),
+                'nextModificationDate' => $address->getNextModificationDate()?->format('c'),
+                'daysUntilModification' => $address->getDaysUntilModification(),
+            ];
+        } else {
+            $responseData['address'] = null;
+        }
+
+        return $this->json($responseData);
     }
 
     /**

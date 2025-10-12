@@ -32,6 +32,8 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
     public function findByEmail(string $email): ?User
     {
         return $this->createQueryBuilder('u')
+            ->leftJoin('u.address', 'a')
+            ->addSelect('a')
             ->where('u.email = :email')
             ->setParameter('email', $email)
             ->getQuery()
@@ -44,8 +46,8 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
 
         $qb = $this->createQueryBuilder('u')
             ->leftJoin('u.settings', 's')
-            ->addSelect('s')
-            // Filtrer uniquement les utilisateurs visibles dans les résultats de recherche
+            ->leftJoin('u.address', 'a')
+            ->addSelect('s', 'a')
             ->where('s.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('visible', true)
             ->orderBy('u.createdAt', 'DESC')
@@ -54,7 +56,6 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
 
         $users = $qb->getQuery()->getResult();
 
-        // Compter le total avec le même filtre
         $countQb = $this->createQueryBuilder('u')
             ->select('COUNT(u.id)')
             ->leftJoin('u.settings', 's')
@@ -74,16 +75,13 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         ];
     }
 
-    /**
-     * Recherche d'utilisateurs avec filtrage par settings
-     */
     public function search(string $query): array
     {
         return $this->createQueryBuilder('u')
             ->leftJoin('u.settings', 's')
-            ->addSelect('s')
+            ->leftJoin('u.address', 'a')
+            ->addSelect('s', 'a')
             ->where('u.nom LIKE :query OR u.prenom LIKE :query OR u.email LIKE :query')
-            // Filtrer uniquement les utilisateurs visibles dans les résultats de recherche
             ->andWhere('s.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('query', '%' . $query . '%')
             ->setParameter('visible', true)
@@ -95,6 +93,8 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
     public function findVerifiedUsers(): array
     {
         return $this->createQueryBuilder('u')
+            ->leftJoin('u.address', 'a')
+            ->addSelect('a')
             ->where('u.emailVerifie = :verified')
             ->setParameter('verified', true)
             ->getQuery()
@@ -103,7 +103,6 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
 
     public function countByRole(string $role): int
     {
-        // Récupérer tous les users et filtrer en PHP
         $qb = $this->createQueryBuilder('u')
             ->select('u.id, u.roles');
 
@@ -119,16 +118,14 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         return $count;
     }
 
-    /**
-     * Liste TOUS les utilisateurs (pour admin) sans filtre de visibilité
-     */
     public function findAllPaginatedAdmin(int $page, int $limit, array $filters = []): array
     {
         $offset = ($page - 1) * $limit;
 
         $qb = $this->createQueryBuilder('u')
             ->leftJoin('u.settings', 's')
-            ->addSelect('s')
+            ->leftJoin('u.address', 'a')
+            ->addSelect('s', 'a')
             ->orderBy('u.createdAt', 'DESC')
             ->setFirstResult($offset)
             ->setMaxResults($limit);
@@ -150,7 +147,6 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
 
         $users = $qb->getQuery()->getResult();
 
-        // Compter avec les mêmes filtres
         $countQb = $this->createQueryBuilder('u')
             ->select('COUNT(u.id)');
 
@@ -182,12 +178,11 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         ];
     }
 
-    /**
-     * Trouve les utilisateurs par rôle
-     */
     public function findByRole(string $role): array
     {
         return $this->createQueryBuilder('u')
+            ->leftJoin('u.address', 'a')
+            ->addSelect('a')
             ->where('u.roles LIKE :role')
             ->setParameter('role', '%' . $role . '%')
             ->orderBy('u.createdAt', 'DESC')
@@ -195,20 +190,16 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->getResult();
     }
 
-    /**
-     * Compte les utilisateurs bannis
-     */
     public function countBanned(): int
     {
         return $this->count(['isBanned' => true]);
     }
 
-    /**
-     * Trouve les utilisateurs bannis
-     */
     public function findBanned(): array
     {
         return $this->createQueryBuilder('u')
+            ->leftJoin('u.address', 'a')
+            ->addSelect('a')
             ->where('u.isBanned = :banned')
             ->setParameter('banned', true)
             ->orderBy('u.bannedAt', 'DESC')
@@ -216,9 +207,6 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->getResult();
     }
 
-    /**
-     * Compte les nouvelles inscriptions entre deux dates
-     */
     public function countCreatedBetween(\DateTimeInterface $start, \DateTimeInterface $end): int
     {
         return (int) $this->createQueryBuilder('u')
@@ -228,5 +216,47 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->setParameter('end', $end)
             ->getQuery()
             ->getSingleScalarResult();
+    }
+
+    /**
+     * Trouve un utilisateur avec son adresse chargée
+     */
+    public function findOneWithAddress(int $id): ?User
+    {
+        return $this->createQueryBuilder('u')
+            ->leftJoin('u.address', 'a')
+            ->addSelect('a')
+            ->where('u.id = :id')
+            ->setParameter('id', $id)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
+     * Trouve les utilisateurs par ville via leur adresse
+     */
+    public function findByVille(string $ville): array
+    {
+        return $this->createQueryBuilder('u')
+            ->leftJoin('u.address', 'a')
+            ->addSelect('a')
+            ->where('a.ville LIKE :ville')
+            ->setParameter('ville', '%' . $ville . '%')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Trouve les utilisateurs par pays via leur adresse
+     */
+    public function findByPays(string $pays): array
+    {
+        return $this->createQueryBuilder('u')
+            ->leftJoin('u.address', 'a')
+            ->addSelect('a')
+            ->where('a.pays LIKE :pays')
+            ->setParameter('pays', '%' . $pays . '%')
+            ->getQuery()
+            ->getResult();
     }
 }
