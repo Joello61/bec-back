@@ -16,10 +16,15 @@ parameters:
     app.default_currency: '%env(DEFAULT_CURRENCY)%'
     app.exchange_rate_api_key: '%env(EXCHANGE_RATE_API_KEY)%'
 
+    sms_verification.enabled: '%env(bool:SMS_VERIFICATION_ENABLED)%'
+
 services:
     _defaults:
         autowire: true
         autoconfigure: true
+        bind:
+            # Bind global pour tous les services qui ont ce paramètre
+            $smsVerificationEnabled: '%sms_verification.enabled%'
 
     App\:
         resource: '../src/'

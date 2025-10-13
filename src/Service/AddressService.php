@@ -67,6 +67,8 @@ readonly class AddressService
             'devise' => $detectedCurrency
         ]);
 
+        $user->setAddress($address);
+
         // Marquer comme créée (lastModifiedAt reste null pour première création)
         $this->entityManager->persist($address);
         $this->entityManager->flush();
