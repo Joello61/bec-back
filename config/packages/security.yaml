@@ -46,6 +46,7 @@ security:
         - { path: ^/api/auth/facebook, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/facebook/callback, roles: PUBLIC_ACCESS }
         - { path: ^/api/doc, roles: PUBLIC_ACCESS }
+        - { path: /api/contacts/send, roles: PUBLIC_ACCESS }
 
         # ==================== ROUTES ADMIN ====================
         # Toutes les routes /api/admin nécessitent ROLE_ADMIN
