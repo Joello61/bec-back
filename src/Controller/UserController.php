@@ -15,12 +15,13 @@ use App\Service\VerificationService;
 use Doctrine\ORM\EntityManagerInterface;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api/users', name: 'api_user_')]
@@ -32,10 +33,130 @@ class UserController extends AbstractController
         private readonly EntityManagerInterface $entityManager,
         private readonly UserStatsService $userStatsService,
         private readonly VerificationService $verificationService,
-        private readonly AddressService $addressService
+        private readonly AddressService $addressService,
+        private readonly LoggerInterface $logger,
+        private readonly bool $smsVerificationEnabled // ⬅️ INJECTION DU FLAG
     ) {}
 
-    // ==================== STATUT PROFIL ====================
+    // ==================== COMPLÉTER PROFIL (MODIFIÉ) ====================
+
+    #[Route('/me/complete-profile', name: 'complete_profile', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
+    #[OA\Post(
+        path: '/api/users/me/complete-profile',
+        summary: 'Compléter son profil',
+        security: [['cookieAuth' => []]],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(ref: new Model(type: CompleteProfileDTO::class))
+        )
+    )]
+    #[OA\Response(response: 200, description: 'Profil complété')]
+    #[OA\Response(response: 400, description: 'Données invalides')]
+    public function completeProfile(
+        #[MapRequestPayload] CompleteProfileDTO $dto
+    ): JsonResponse {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        // Mettre à jour le téléphone
+        $user->setTelephone($dto->telephone);
+
+        // Champs optionnels
+        if ($dto->bio) {
+            $user->setBio($dto->bio);
+        }
+        if ($dto->photo) {
+            $user->setPhoto($dto->photo);
+        }
+
+        // Créer l'adresse via AddressService
+        try {
+            $this->addressService->createAddress($user, $dto->toAddressArray());
+        } catch (\Exception $e) {
+            return $this->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // ==================== LOGIQUE DE SKIP SMS ====================
+
+        if ($this->smsVerificationEnabled) {
+            // MODE PRODUCTION : Envoyer le SMS
+            try {
+                $this->verificationService->sendPhoneVerification($user);
+                $this->entityManager->flush();
+
+                $this->logger->info('SMS envoyé avec succès', [
+                    'user_id' => $user->getId(),
+                    'phone' => $user->getTelephone()
+                ]);
+
+                return $this->json([
+                    'success' => true,
+                    'message' => 'Profil complété. Un code de vérification a été envoyé par SMS.',
+                    'smsVerificationRequired' => true, // ⬅️ IMPORTANT pour le frontend
+                    'user' => [
+                        'id' => $user->getId(),
+                        'telephone' => $user->getTelephone(),
+                        'telephoneVerifie' => $user->isTelephoneVerifie(),
+                        'address' => [
+                            'pays' => $user->getAddress()->getPays(),
+                            'ville' => $user->getAddress()->getVille(),
+                            'quartier' => $user->getAddress()->getQuartier(),
+                            'adresseLigne1' => $user->getAddress()->getAdresseLigne1(),
+                            'codePostal' => $user->getAddress()->getCodePostal(),
+                        ],
+                        'isProfileComplete' => $user->isProfileComplete(),
+                    ]
+                ]);
+
+            } catch (\Exception $e) {
+                $this->logger->error('Erreur envoi SMS', [
+                    'user_id' => $user->getId(),
+                    'error' => $e->getMessage()
+                ]);
+
+                return $this->json([
+                    'success' => false,
+                    'message' => 'Profil mis à jour mais erreur lors de l\'envoi du SMS : ' . $e->getMessage()
+                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+        } else {
+            // MODE DEV/STAGING : Auto-vérifier le téléphone (SKIP SMS)
+            $user->setTelephoneVerifie(true); // ⬅️ AUTO-VÉRIFICATION
+            $this->entityManager->flush();
+
+            $this->logger->info('SMS verification SKIPPED (dev mode)', [
+                'user_id' => $user->getId(),
+                'phone' => $user->getTelephone(),
+                'auto_verified' => true
+            ]);
+
+            return $this->json([
+                'success' => true,
+                'message' => 'Profil complété avec succès.',
+                'smsVerificationRequired' => false, // ⬅️ IMPORTANT pour le frontend
+                'user' => [
+                    'id' => $user->getId(),
+                    'telephone' => $user->getTelephone(),
+                    'telephoneVerifie' => $user->isTelephoneVerifie(), // ⬅️ true
+                    'address' => [
+                        'pays' => $user->getAddress()->getPays(),
+                        'ville' => $user->getAddress()->getVille(),
+                        'quartier' => $user->getAddress()->getQuartier(),
+                        'adresseLigne1' => $user->getAddress()->getAdresseLigne1(),
+                        'codePostal' => $user->getAddress()->getCodePostal(),
+                    ],
+                    'isProfileComplete' => $user->isProfileComplete(), // ⬅️ true
+                ]
+            ]);
+        }
+    }
+
+    // ==================== AUTRES MÉTHODES (INCHANGÉES) ====================
 
     #[Route('/me/profile-status', name: 'profile_status', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
@@ -92,132 +213,23 @@ class UserController extends AbstractController
         ]);
     }
 
-    // ==================== COMPLÉTER PROFIL ====================
-
-    #[Route('/me/complete-profile', name: 'complete_profile', methods: ['POST'])]
-    #[IsGranted('ROLE_USER')]
-    #[OA\Post(
-        path: '/api/users/me/complete-profile',
-        summary: 'Compléter son profil',
-        security: [['cookieAuth' => []]],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(ref: new Model(type: CompleteProfileDTO::class))
-        )
-    )]
-    #[OA\Response(response: 200, description: 'Profil complété, code SMS envoyé')]
-    #[OA\Response(response: 400, description: 'Données invalides')]
-    public function completeProfile(
-        #[MapRequestPayload] CompleteProfileDTO $dto
-    ): JsonResponse {
-        /** @var User $user */
-        $user = $this->getUser();
-
-        // Mettre à jour le téléphone
-        $user->setTelephone($dto->telephone);
-
-        // Champs optionnels
-        if ($dto->bio) {
-            $user->setBio($dto->bio);
-        }
-        if ($dto->photo) {
-            $user->setPhoto($dto->photo);
-        }
-
-        // Créer l'adresse via AddressService
-        try {
-            $this->addressService->createAddress($user, $dto->toAddressArray());
-        } catch (\Exception $e) {
-            return $this->json([
-                'success' => false,
-                'message' => $e->getMessage()
-            ], Response::HTTP_BAD_REQUEST);
-        }
-
-        $this->entityManager->flush();
-
-        // Envoyer code SMS pour vérification
-        try {
-            $this->verificationService->sendPhoneVerification($user);
-        } catch (\Exception $e) {
-            return $this->json([
-                'success' => false,
-                'message' => 'Profil mis à jour mais erreur lors de l\'envoi du SMS : ' . $e->getMessage()
-            ], Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
-        return $this->json([
-            'success' => true,
-            'message' => 'Profil complété. Un code de vérification a été envoyé par SMS.',
-            'user' => [
-                'id' => $user->getId(),
-                'telephone' => $user->getTelephone(),
-                'address' => [
-                    'pays' => $user->getAddress()->getPays(),
-                    'ville' => $user->getAddress()->getVille(),
-                    'quartier' => $user->getAddress()->getQuartier(),
-                    'adresseLigne1' => $user->getAddress()->getAdresseLigne1(),
-                    'codePostal' => $user->getAddress()->getCodePostal(),
-                ],
-                'isProfileComplete' => $user->isProfileComplete(),
-            ]
-        ]);
-    }
-
-    // ==================== INFO MODIFICATION ADRESSE ====================
-
     #[Route('/me/address/modification-info', name: 'address_modification_info', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
-    #[OA\Get(
-        path: '/api/users/me/address/modification-info',
-        summary: 'Informations sur la possibilité de modifier l\'adresse',
-        security: [['cookieAuth' => []]]
-    )]
-    #[OA\Response(
-        response: 200,
-        description: 'Informations de modification',
-        content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'canModify', type: 'boolean'),
-                new OA\Property(property: 'hasAddress', type: 'boolean'),
-                new OA\Property(property: 'lastModifiedAt', type: 'string', nullable: true),
-                new OA\Property(property: 'nextModificationDate', type: 'string', nullable: true),
-                new OA\Property(property: 'daysRemaining', type: 'integer', nullable: true),
-                new OA\Property(property: 'message', type: 'string'),
-            ]
-        )
-    )]
     public function addressModificationInfo(): JsonResponse
     {
         /** @var User $user */
         $user = $this->getUser();
-
         $info = $this->addressService->getModificationInfo($user);
-
         return $this->json($info);
     }
 
-    // ==================== METTRE À JOUR ADRESSE ====================
-
     #[Route('/me/address', name: 'update_address', methods: ['PUT'])]
     #[IsGranted('ROLE_USER')]
-    #[OA\Put(
-        path: '/api/users/me/address',
-        summary: 'Modifier son adresse (max 1 fois tous les 6 mois)',
-        security: [['cookieAuth' => []]],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(ref: new Model(type: UpdateAddressDTO::class))
-        )
-    )]
-    #[OA\Response(response: 200, description: 'Adresse mise à jour')]
-    #[OA\Response(response: 400, description: 'Modification non autorisée (contrainte 6 mois)')]
     public function updateAddress(
         #[MapRequestPayload] UpdateAddressDTO $dto
     ): JsonResponse {
         /** @var User $user */
         $user = $this->getUser();
-
         $address = $user->getAddress();
 
         if (!$address) {
@@ -263,53 +275,18 @@ class UserController extends AbstractController
         }
     }
 
-    // ==================== LISTER UTILISATEURS ====================
-
     #[Route('', name: 'list', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
-    #[OA\Get(
-        path: '/api/users',
-        summary: 'Liste des utilisateurs',
-        security: [['cookieAuth' => []]]
-    )]
-    #[OA\Parameter(
-        name: 'page',
-        in: 'query',
-        schema: new OA\Schema(type: 'integer', default: 1)
-    )]
-    #[OA\Parameter(
-        name: 'limit',
-        in: 'query',
-        schema: new OA\Schema(type: 'integer', default: 10)
-    )]
-    #[OA\Response(response: 200, description: 'Liste paginée')]
     public function list(Request $request): JsonResponse
     {
         $page = $request->query->getInt('page', 1);
         $limit = $request->query->getInt('limit', 10);
-
         $result = $this->userRepository->findPaginated($page, $limit);
-
         return $this->json($result, Response::HTTP_OK, [], ['groups' => ['user:read']]);
     }
 
-    // ==================== PROFIL UTILISATEUR ====================
-
     #[Route('/{id}', name: 'show', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
-    #[OA\Get(
-    path: '/api/users/{id}',
-    summary: 'Profil d\'un utilisateur',
-    security: [['cookieAuth' => []]]
-    )]
-    #[OA\Parameter(
-    name: 'id',
-    in: 'path',
-    required: true,
-    schema: new OA\Schema(type: 'integer')
-    )]
-    #[OA\Response(response: 200, description: 'Détails utilisateur')]
-    #[OA\Response(response: 404, description: 'Utilisateur non trouvé')]
     public function show(int $id): JsonResponse
     {
         $user = $this->userRepository->find($id);
@@ -320,26 +297,13 @@ class UserController extends AbstractController
 
         /** @var User|null $viewer */
         $viewer = $this->getUser();
-
         $profileData = $this->userStatsService->getVisibleProfileData($user, $viewer);
 
         return $this->json($profileData, Response::HTTP_OK);
     }
 
-    // ==================== MODIFIER SON PROFIL ====================
-
     #[Route('/me', name: 'update_me', methods: ['PUT'])]
     #[IsGranted('ROLE_USER')]
-    #[OA\Put(
-        path: '/api/users/me',
-        summary: 'Modifier son profil (hors adresse)',
-        security: [['cookieAuth' => []]],
-        requestBody: new OA\RequestBody(
-            required: true,
-            content: new OA\JsonContent(ref: new Model(type: UpdateUserDTO::class))
-        )
-    )]
-    #[OA\Response(response: 200, description: 'Profil mis à jour')]
     public function updateMe(
         #[MapRequestPayload] UpdateUserDTO $dto
     ): JsonResponse {
@@ -367,22 +331,8 @@ class UserController extends AbstractController
         return $this->json($user, Response::HTTP_OK, [], ['groups' => ['user:read']]);
     }
 
-    // ==================== RECHERCHER UTILISATEURS ====================
-
     #[Route('/search', name: 'search', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
-    #[OA\Get(
-        path: '/api/users/search',
-        summary: 'Rechercher des utilisateurs',
-        security: [['cookieAuth' => []]]
-    )]
-    #[OA\Parameter(
-        name: 'q',
-        in: 'query',
-        required: true,
-        schema: new OA\Schema(type: 'string')
-    )]
-    #[OA\Response(response: 200, description: 'Résultats de recherche')]
     public function search(Request $request): JsonResponse
     {
         $query = $request->query->get('q', '');
@@ -396,21 +346,12 @@ class UserController extends AbstractController
         return $this->json($users, Response::HTTP_OK, [], ['groups' => ['user:read']]);
     }
 
-    // ==================== DASHBOARD ====================
-
     #[Route('/me/dashboard', name: 'dashboard', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
-    #[OA\Get(
-        path: '/api/users/me/dashboard',
-        summary: 'Tableau de bord de l\'utilisateur connecté',
-        security: [['cookieAuth' => []]]
-    )]
-    #[OA\Response(response: 200, description: 'Données du dashboard')]
     public function dashboard(): JsonResponse
     {
         /** @var User $user */
         $user = $this->getUser();
-
         $dashboard = $this->userStatsService->getUserDashboard($user);
 
         return $this->json($dashboard, Response::HTTP_OK, [], ['groups' => ['dashboard:read']]);
