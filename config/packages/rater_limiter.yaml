@@ -23,3 +23,9 @@ framework:
             policy: 'sliding_window'
             limit: 5
             interval: '10 minutes'
+
+        # 5 messages de contact par heure par IP
+        contact:
+            policy: 'sliding_window'
+            limit: 5
+            interval: '1 hour'
