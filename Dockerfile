@@ -80,7 +80,7 @@ EXPOSE 3040
 
 # Vérifiez la variable RUN_MODE, sinon par défaut serveur web
 CMD if [ "$RUN_MODE" = "worker" ]; then \
-        php bin/console messenger:consume async --limit=10 --memory-limit=256M --time-limit=3600; \
+        php bin/console messenger:consume async --limit=10 --memory-limit=256M --time-limit=3600 -vv; \
     else \
         php -S 0.0.0.0:3040 -t public; \
     fi
