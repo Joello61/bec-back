@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0d0c9027ef27a0395ce01d8cf652ea9f",
+    "content-hash": "d27fddb9a3432fa42047b108f9ffffd8",
     "packages": [
         {
             "name": "composer/semver",
@@ -6986,6 +6986,145 @@
             "time": "2025-07-07T08:17:57+00:00"
         },
         {
+            "name": "symfony/remote-event",
+            "version": "v7.3.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/symfony/remote-event.git",
+                "reference": "7d11a4d8269f0e2332dc3452b847efd9112a298c"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/symfony/remote-event/zipball/7d11a4d8269f0e2332dc3452b847efd9112a298c",
+                "reference": "7d11a4d8269f0e2332dc3452b847efd9112a298c",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.2",
+                "symfony/messenger": "^6.4|^7.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Symfony\\Component\\RemoteEvent\\": ""
+                },
+                "exclude-from-classmap": [
+                    "/Tests/"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Fabien Potencier",
+                    "email": "fabien@symfony.com"
+                },
+                {
+                    "name": "Symfony Community",
+                    "homepage": "https://symfony.com/contributors"
+                }
+            ],
+            "description": "Eases handling remote events",
+            "homepage": "https://symfony.com",
+            "keywords": [
+                "event"
+            ],
+            "support": {
+                "source": "https://github.com/symfony/remote-event/tree/v7.3.0"
+            },
+            "funding": [
+                {
+                    "url": "https://symfony.com/sponsor",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/fabpot",
+                    "type": "github"
+                },
+                {
+                    "url": "https://tidelift.com/funding/github/packagist/symfony/symfony",
+                    "type": "tidelift"
+                }
+            ],
+            "time": "2024-09-25T14:21:43+00:00"
+        },
+        {
+            "name": "symfony/resend-mailer",
+            "version": "v7.3.3",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/symfony/resend-mailer.git",
+                "reference": "dffa55453571e3a6c161f1c12ee402ca19cb4dd1"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/symfony/resend-mailer/zipball/dffa55453571e3a6c161f1c12ee402ca19cb4dd1",
+                "reference": "dffa55453571e3a6c161f1c12ee402ca19cb4dd1",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.1",
+                "symfony/mailer": "^7.2"
+            },
+            "conflict": {
+                "symfony/http-foundation": "<7.1"
+            },
+            "require-dev": {
+                "symfony/http-client": "^6.4|^7.0",
+                "symfony/http-foundation": "^7.1",
+                "symfony/webhook": "^6.4|^7.0"
+            },
+            "type": "symfony-mailer-bridge",
+            "autoload": {
+                "psr-4": {
+                    "Symfony\\Component\\Mailer\\Bridge\\Resend\\": ""
+                },
+                "exclude-from-classmap": [
+                    "/Tests/"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Mathieu Santostefano",
+                    "homepage": "https://github.com/welcoMattic"
+                },
+                {
+                    "name": "Symfony Community",
+                    "homepage": "https://symfony.com/contributors"
+                }
+            ],
+            "description": "Symfony Resend Mailer Bridge",
+            "homepage": "https://symfony.com",
+            "support": {
+                "source": "https://github.com/symfony/resend-mailer/tree/v7.3.3"
+            },
+            "funding": [
+                {
+                    "url": "https://symfony.com/sponsor",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/fabpot",
+                    "type": "github"
+                },
+                {
+                    "url": "https://github.com/nicolas-grekas",
+                    "type": "github"
+                },
+                {
+                    "url": "https://tidelift.com/funding/github/packagist/symfony/symfony",
+                    "type": "tidelift"
+                }
+            ],
+            "time": "2025-08-05T11:38:12+00:00"
+        },
+        {
             "name": "symfony/routing",
             "version": "v7.3.4",
             "source": {
@@ -8920,6 +9059,78 @@
                 }
             ],
             "time": "2025-05-19T13:28:18+00:00"
+        },
+        {
+            "name": "symfony/webhook",
+            "version": "v7.3.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/symfony/webhook.git",
+                "reference": "cbf9ee7fb717a69281a35442beb3bc3b8d3aa5b5"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/symfony/webhook/zipball/cbf9ee7fb717a69281a35442beb3bc3b8d3aa5b5",
+                "reference": "cbf9ee7fb717a69281a35442beb3bc3b8d3aa5b5",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.2",
+                "symfony/http-foundation": "^6.4|^7.0",
+                "symfony/http-kernel": "^6.4|^7.0",
+                "symfony/messenger": "^6.4|^7.0",
+                "symfony/remote-event": "^6.4|^7.0"
+            },
+            "require-dev": {
+                "symfony/http-client": "^6.4|^7.0",
+                "symfony/serializer": "^6.4|^7.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Symfony\\Component\\Webhook\\": ""
+                },
+                "exclude-from-classmap": [
+                    "/Tests/"
+                ]
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Fabien Potencier",
+                    "email": "fabien@symfony.com"
+                },
+                {
+                    "name": "Symfony Community",
+                    "homepage": "https://symfony.com/contributors"
+                }
+            ],
+            "description": "Eases sending and consuming webhooks",
+            "homepage": "https://symfony.com",
+            "keywords": [
+                "webhook"
+            ],
+            "support": {
+                "source": "https://github.com/symfony/webhook/tree/v7.3.0"
+            },
+            "funding": [
+                {
+                    "url": "https://symfony.com/sponsor",
+                    "type": "custom"
+                },
+                {
+                    "url": "https://github.com/fabpot",
+                    "type": "github"
+                },
+                {
+                    "url": "https://tidelift.com/funding/github/packagist/symfony/symfony",
+                    "type": "tidelift"
+                }
+            ],
+            "time": "2024-11-25T15:21:05+00:00"
         },
         {
             "name": "symfony/yaml",
