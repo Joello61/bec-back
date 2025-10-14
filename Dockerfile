@@ -78,5 +78,9 @@ RUN mkdir -p var/cache var/log public/uploads \
 # Expose port (comme ton Express)
 EXPOSE 3040
 
-# Start PHP built-in server (comme Node.js !)
-CMD ["php", "-S", "0.0.0.0:3040", "-t", "public"]
+# Vérifiez la variable RUN_MODE, sinon par défaut serveur web
+CMD if [ "$RUN_MODE" = "worker" ]; then \
+        php bin/console messenger:consume async --limit=10 --memory-limit=256M --time-limit=3600; \
+    else \
+        php -S 0.0.0.0:3040 -t public; \
+    fi
