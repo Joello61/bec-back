@@ -70,7 +70,7 @@ readonly class EmailService
     public function sendWelcomeEmail(User $user): void
     {
         $email = (new Email())
-            ->from('noreply@bagage-express.cm')
+            ->from('noreply@cobage.joeltech.dev')
             ->to($user->getEmail())
             ->subject('Bienvenue sur Bagage Express Cameroun')
             ->html($this->getWelcomeEmailContent($user));
@@ -84,7 +84,7 @@ readonly class EmailService
     public function sendEmailVerificationCode(User $user, string $code): void
     {
         $email = (new Email())
-            ->from('noreply@bagage-express.cm')
+            ->from('noreply@cobage.joeltech.dev')
             ->to($user->getEmail())
             ->subject('Code de vérification de votre email')
             ->html($this->getEmailVerificationCodeContent($user, $code));
@@ -100,7 +100,7 @@ readonly class EmailService
         $resetUrl = sprintf('%s/auth/reset-password?token=%s', $this->frontendUrl, $token);
 
         $email = (new Email())
-            ->from('noreply@bagage-express.cm')
+            ->from('noreply@cobage.joeltech.dev')
             ->to($user->getEmail())
             ->subject('Réinitialisation de votre mot de passe')
             ->html($this->getPasswordResetEmailContent($user, $resetUrl));
@@ -114,7 +114,7 @@ readonly class EmailService
     public function sendPasswordChangedEmail(User $user): void
     {
         $email = (new Email())
-            ->from('noreply@bagage-express.cm')
+            ->from('noreply@cobage.joeltech.dev')
             ->to($user->getEmail())
             ->subject('Votre mot de passe a été modifié')
             ->html($this->getPasswordChangedContent($user));
@@ -129,7 +129,7 @@ readonly class EmailService
     public function sendNotificationEmail(User $user, string $subject, string $content): void
     {
         $email = (new Email())
-            ->from('noreply@bagage-express.cm')
+            ->from('noreply@cobage.joeltech.dev')
             ->to($user->getEmail())
             ->subject($subject)
             ->html($content);
