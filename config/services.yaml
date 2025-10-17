@@ -38,6 +38,10 @@ services:
         arguments:
             $frontendUrl: '%app.frontend_url%'
 
+    App\Command\ImportGeoDataCommand:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+
     App\Service\CurrencyService:
         arguments:
             $exchangeRateApiKey: '%app.exchange_rate_api_key%'

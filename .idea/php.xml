@@ -169,6 +169,8 @@
       <path value="$PROJECT_DIR$/vendor/symfony/resend-mailer" />
       <path value="$PROJECT_DIR$/vendor/symfony/remote-event" />
       <path value="$PROJECT_DIR$/vendor/symfony/webhook" />
+      <path value="$PROJECT_DIR$/vendor/umpirsky/country-list" />
+      <path value="$PROJECT_DIR$/vendor/beberlei/doctrineextensions" />
     </include_path>
   </component>
   <component name="PhpProjectSharedConfiguration" php_language_level="8.2">

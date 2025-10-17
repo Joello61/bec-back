@@ -158,6 +158,8 @@
       <excludeFolder url="file://$MODULE_DIR$/vendor/symfony/remote-event" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/symfony/resend-mailer" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/symfony/webhook" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/beberlei/doctrineextensions" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/umpirsky/country-list" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
