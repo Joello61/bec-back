@@ -20,26 +20,18 @@ RUN apk add --no-cache \
 # Copy composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Install PHP dependencies
+# Install PHP dependencies (no dev)
 COPY composer.json composer.lock symfony.lock* ./
 RUN composer install --no-dev --no-scripts --no-progress --prefer-dist
 
-# Copy application
+# Copy application source
 COPY . .
 
-# Generate autoloader
+# Generate optimized autoloader
 RUN composer dump-autoload --no-dev --optimize --classmap-authoritative
 
-# Generate JWT keys
-RUN mkdir -p config/jwt \
-    && php bin/console lexik:jwt:generate-keypair --skip-if-exists 2>/dev/null || true
-
-# Warm up cache
-RUN APP_ENV=prod APP_DEBUG=0 php bin/console cache:clear --no-warmup \
-    && APP_ENV=prod APP_DEBUG=0 php bin/console cache:warmup
-
 # =============================================================================
-# Stage 2: Production (SIMPLE comme Node.js)
+# Stage 2: Runtime
 # =============================================================================
 FROM php:8.2-cli-alpine
 
@@ -71,16 +63,17 @@ RUN { \
 # Copy application
 COPY --from=builder --chown=www-data:www-data /app ./
 
-# Create directories
+# Create required directories
 RUN mkdir -p var/cache var/log public/uploads \
     && chmod -R 777 var public/uploads
 
-# Expose port (comme ton Express)
+# Copy entrypoint
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 EXPOSE 3040
 
-# Vérifiez la variable RUN_MODE, sinon par défaut serveur web
-CMD if [ "$RUN_MODE" = "worker" ]; then \
-        php bin/console messenger:consume async --limit=10 --memory-limit=256M --time-limit=3600 -vv; \
-    else \
-        php -S 0.0.0.0:3040 -t public; \
-    fi
+ENTRYPOINT ["docker-entrypoint.sh"]
+
+# Default CMD = run web server
+CMD ["php", "-S", "0.0.0.0:3040", "-t", "public"]
