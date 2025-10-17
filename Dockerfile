@@ -27,6 +27,9 @@ RUN composer install --no-dev --no-scripts --no-progress --prefer-dist
 # Copy application
 COPY . .
 
+ENV APP_ENV=prod
+ENV APP_DEBUG=0
+
 # Generate autoloader
 RUN composer dump-autoload --no-dev --optimize --classmap-authoritative
 
