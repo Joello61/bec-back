@@ -1,11 +1,13 @@
 # =============================================================================
-# Stage 1: Builder
+# 🧰 STAGE 1 : BUILDER — Build de l’application et dépendances
 # =============================================================================
 FROM php:8.2-cli-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
+# -------------------------------------------------------------------------
+# 1️⃣ Install system dependencies + PHP extensions
+# -------------------------------------------------------------------------
 RUN apk add --no-cache \
     bash \
     icu-dev \
@@ -17,38 +19,56 @@ RUN apk add --no-cache \
     unzip \
     && docker-php-ext-install intl pdo pdo_pgsql opcache zip
 
-# Copy composer
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
-
-# Install PHP dependencies
+# -------------------------------------------------------------------------
+# 2️⃣ Copier uniquement les fichiers nécessaires pour Composer (cache layer)
+# -------------------------------------------------------------------------
 COPY composer.json composer.lock symfony.lock* ./
-RUN composer install --no-dev --no-scripts --no-progress --prefer-dist
 
-# Copy application
+# -------------------------------------------------------------------------
+# 3️⃣ Installer les dépendances PHP (sans dev, sans scripts)
+# -------------------------------------------------------------------------
+RUN composer install --no-dev --no-scripts --no-progress --prefer-dist --optimize-autoloader
+
+# -------------------------------------------------------------------------
+# 4️⃣ Copier le reste de l'application
+# -------------------------------------------------------------------------
 COPY . .
 
+# -------------------------------------------------------------------------
+# 5️⃣ Définir les variables d'environnement Symfony
+# -------------------------------------------------------------------------
 ENV APP_ENV=prod
 ENV APP_DEBUG=0
+ENV APP_SECRET=dummy_secret
 
-# Generate autoloader
-RUN composer dump-autoload --no-dev --optimize --classmap-authoritative
+# -------------------------------------------------------------------------
+# 6️⃣ Générer l’autoloader et la paire de clés JWT
+# -------------------------------------------------------------------------
+RUN composer dump-autoload --no-dev --optimize --classmap-authoritative \
+ && mkdir -p config/jwt \
+ && php bin/console lexik:jwt:generate-keypair --skip-if-exists 2>/dev/null || true
 
-# Generate JWT keys
-RUN mkdir -p config/jwt \
-    && php bin/console lexik:jwt:generate-keypair --skip-if-exists 2>/dev/null || true
+# -------------------------------------------------------------------------
+# 7️⃣ Préparer un .env.local temporaire pour le build
+# -------------------------------------------------------------------------
+RUN echo "APP_ENV=prod\nAPP_DEBUG=0\nAPP_SECRET=dummy_secret" > .env.local
 
-# Warm up cache
-RUN APP_ENV=prod APP_DEBUG=0 php bin/console cache:clear --no-warmup \
-    && APP_ENV=prod APP_DEBUG=0 php bin/console cache:warmup
+# -------------------------------------------------------------------------
+# 8️⃣ Précompiler le cache Symfony en prod sans .env
+# -------------------------------------------------------------------------
+RUN php bin/console cache:clear --env=prod --no-warmup \
+ && php bin/console cache:warmup --env=prod
 
 # =============================================================================
-# Stage 2: Production (SIMPLE comme Node.js)
+# 🚀 STAGE 2 : RUNTIME — Image finale ultra-légère
 # =============================================================================
 FROM php:8.2-cli-alpine
 
 WORKDIR /var/www/html
 
-# Install runtime dependencies
+# -------------------------------------------------------------------------
+# 1️⃣ Install runtime dependencies (sans dev libs)
+# -------------------------------------------------------------------------
 RUN apk add --no-cache \
     bash \
     icu-libs \
@@ -57,11 +77,15 @@ RUN apk add --no-cache \
     oniguruma \
     libzip
 
-# Copy PHP extensions
+# -------------------------------------------------------------------------
+# 2️⃣ Copier les extensions PHP et la config du builder
+# -------------------------------------------------------------------------
 COPY --from=builder /usr/local/etc/php/conf.d/docker-php-ext-*.ini /usr/local/etc/php/conf.d/
 COPY --from=builder /usr/local/lib/php/extensions /usr/local/lib/php/extensions
 
-# Configure PHP for production
+# -------------------------------------------------------------------------
+# 3️⃣ Configurer PHP pour la prod
+# -------------------------------------------------------------------------
 RUN { \
         echo 'memory_limit = 256M'; \
         echo 'max_execution_time = 60'; \
@@ -71,17 +95,24 @@ RUN { \
         echo 'opcache.validate_timestamps = 0'; \
     } > /usr/local/etc/php/conf.d/php-prod.ini
 
-# Copy application
+# -------------------------------------------------------------------------
+# 4️⃣ Copier uniquement les fichiers utiles
+# -------------------------------------------------------------------------
 COPY --from=builder --chown=www-data:www-data /app ./
 
-# Create directories
+# -------------------------------------------------------------------------
+# 5️⃣ Préparer les répertoires nécessaires
+# -------------------------------------------------------------------------
 RUN mkdir -p var/cache var/log public/uploads \
     && chmod -R 777 var public/uploads
 
-# Expose port (comme ton Express)
+# -------------------------------------------------------------------------
+# 6️⃣ Exposer le port et définir la commande par défaut
+# -------------------------------------------------------------------------
 EXPOSE 3040
 
-# Vérifiez la variable RUN_MODE, sinon par défaut serveur web
+# Mode par défaut : serveur web interne (PHP built-in)
+# Sinon, lancer un worker Messenger si RUN_MODE=worker
 CMD if [ "$RUN_MODE" = "worker" ]; then \
         php bin/console messenger:consume async --limit=10 --memory-limit=256M --time-limit=3600 -vv; \
     else \
