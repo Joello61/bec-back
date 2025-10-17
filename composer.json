@@ -63,6 +63,7 @@
             "symfony/flex": true,
             "symfony/runtime": true
         },
+        "optimize-autoloader": true,
         "bump-after-update": true,
         "sort-packages": true
     },
@@ -106,6 +107,9 @@
         "symfony": {
             "allow-contrib": false,
             "require": "7.3.*"
+        },
+        "runtime": {
+            "dotenv": false
         }
     },
     "require-dev": {
