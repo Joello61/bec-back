@@ -177,4 +177,113 @@ class GeoController extends AbstractController
 
         return $this->json($cities, Response::HTTP_OK);
     }
+
+    /**
+     * GET /api/geo/cities/top100
+     * Top 100 des villes les plus peuplées du monde
+     */
+    #[Route('/cities/top100', name: 'cities_top100', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/geo/cities/top100',
+        description: 'Retourne les 100 villes les plus peuplées du monde, tous pays confondus',
+        summary: 'Top 100 des villes mondiales'
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Liste des villes les plus peuplées',
+        content: new OA\JsonContent(
+            type: 'array',
+            items: new OA\Items(
+                properties: [
+                    new OA\Property(property: 'value', type: 'string', example: 'Tokyo'),
+                    new OA\Property(property: 'label', type: 'string', example: 'Tokyo'),
+                    new OA\Property(property: 'country', type: 'string', example: 'Japon'),
+                    new OA\Property(property: 'countryCode', type: 'string', example: 'JP'),
+                    new OA\Property(property: 'population', type: 'integer', example: 37400068),
+                    new OA\Property(property: 'admin1Name', type: 'string', example: 'Tokyo', nullable: true),
+                ],
+                type: 'object'
+            )
+        )
+    )]
+    public function getTopCitiesGlobal(): JsonResponse
+    {
+        $cities = $this->geoDataService->getTopCitiesGlobal();
+
+        return $this->json($cities, Response::HTTP_OK);
+    }
+
+    /**
+     * GET /api/geo/cities/search-global?q=paris
+     * Recherche globale de villes (tous pays confondus)
+     */
+    #[Route('/cities/search-global', name: 'cities_search_global', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/geo/cities/search-global',
+        description: 'Recherche de villes dans le monde entier, tous pays confondus (autocomplete global)',
+        summary: 'Recherche globale de villes'
+    )]
+    #[OA\Parameter(
+        name: 'q',
+        description: 'Terme de recherche (min 2 caractères)',
+        in: 'query',
+        required: true,
+        schema: new OA\Schema(type: 'string', example: 'paris')
+    )]
+    #[OA\Parameter(
+        name: 'limit',
+        description: 'Nombre maximum de résultats (défaut: 50, max: 100)',
+        in: 'query',
+        required: false,
+        schema: new OA\Schema(type: 'integer', default: 50, example: 50)
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Résultats de recherche',
+        content: new OA\JsonContent(
+            type: 'array',
+            items: new OA\Items(
+                properties: [
+                    new OA\Property(property: 'value', type: 'string', example: 'Paris'),
+                    new OA\Property(property: 'label', type: 'string', example: 'Paris'),
+                    new OA\Property(property: 'country', type: 'string', example: 'France'),
+                    new OA\Property(property: 'countryCode', type: 'string', example: 'FR'),
+                    new OA\Property(property: 'population', type: 'integer', example: 2138551),
+                    new OA\Property(property: 'admin1Name', type: 'string', example: 'Île-de-France', nullable: true),
+                ],
+                type: 'object'
+            )
+        )
+    )]
+    #[OA\Response(
+        response: 400,
+        description: 'Paramètre invalide',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Le terme de recherche doit contenir au moins 2 caractères'),
+            ],
+            type: 'object'
+        )
+    )]
+    public function searchCitiesGlobal(Request $request): JsonResponse
+    {
+        $query = $request->query->get('q', '');
+        $limit = (int) $request->query->get('limit', 50);
+
+        // Validation
+        if (strlen($query) < 2) {
+            return $this->json([
+                'error' => 'Le terme de recherche doit contenir au moins 2 caractères'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Limiter le nombre de résultats max
+        if ($limit > 100) {
+            $limit = 100;
+        }
+
+        $cities = $this->geoDataService->searchCitiesGlobal($query, $limit);
+
+        return $this->json($cities, Response::HTTP_OK);
+    }
 }
