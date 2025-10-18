@@ -122,4 +122,56 @@ readonly class GeoDataService
     {
         return $this->countryRepository->existsByNameFr($nameFr);
     }
+
+    /**
+     * Récupère les villes les plus peuplées du monde (top 100)
+     * Résultat mis en cache
+     */
+    public function getTopCitiesGlobal(int $limit = 100): array
+    {
+        $cacheKey = sprintf('geo_cities_global_top_%d', $limit);
+
+        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($limit) {
+            $item->expiresAfter(604800); // 7 jours
+
+            $cities = $this->cityRepository->findTopCitiesGlobal($limit);
+
+            return array_map(fn(City $city) => [
+                'value' => $city->getName(),
+                'label' => $city->getName(),
+                'country' => $city->getCountry()->getNameFr() ?? $city->getCountry()->getName(),
+                'countryCode' => $city->getCountry()->getCode(),
+                'population' => $city->getPopulation(),
+                'admin1Name' => $city->getAdmin1Name(),
+            ], $cities);
+        });
+    }
+
+    /**
+     * Recherche globale de villes (tous pays confondus)
+     * Résultat mis en cache
+     */
+    public function searchCitiesGlobal(string $query, int $limit = 50): array
+    {
+        if (strlen($query) < 2) {
+            return [];
+        }
+
+        $cacheKey = sprintf('geo_cities_search_global_%s', md5(strtolower($query)));
+
+        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($query, $limit) {
+            $item->expiresAfter(86400); // 1 jour
+
+            $cities = $this->cityRepository->searchGlobal($query, $limit);
+
+            return array_map(fn(City $city) => [
+                'value' => $city->getName(),
+                'label' => $city->getName(),
+                'country' => $city->getCountry()->getNameFr() ?? $city->getCountry()->getName(),
+                'countryCode' => $city->getCountry()->getCode(),
+                'population' => $city->getPopulation(),
+                'admin1Name' => $city->getAdmin1Name(),
+            ], $cities);
+        });
+    }
 }
