@@ -27,7 +27,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
-use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -122,7 +122,7 @@ class AuthController extends AbstractController
     #[OA\Response(response: 400, description: 'Données invalides')]
     public function register(
         #[MapRequestPayload] RegisterDTO $dto,
-        RateLimiterFactory $registerLimiter,
+        RateLimiterFactoryInterface $registerLimiter,
         Request $request
     ): JsonResponse {
         // Rate limiting sur l'inscription
@@ -361,7 +361,7 @@ class AuthController extends AbstractController
     #[OA\Response(response: 200, description: 'Code renvoyé avec succès')]
     public function resendVerification(
         #[MapRequestPayload] ResendVerificationDTO $dto,
-        RateLimiterFactory $verificationLimiter,
+        RateLimiterFactoryInterface $verificationLimiter,
         Request $request
     ): JsonResponse {
         // Récupérer l'email depuis le body
@@ -421,7 +421,7 @@ class AuthController extends AbstractController
     #[OA\Response(response: 200, description: 'Email de réinitialisation envoyé')]
     public function forgotPassword(
         #[MapRequestPayload] ForgotPasswordDTO $dto,
-        RateLimiterFactory $passwordResetLimiter,
+        RateLimiterFactoryInterface $passwordResetLimiter,
         Request $request
     ): JsonResponse {
         // Rate limiting par IP
