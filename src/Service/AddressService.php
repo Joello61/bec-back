@@ -25,10 +25,17 @@ readonly class AddressService
      */
     public function createAddress(User $user, array $data): Address
     {
-        // Vérifier que l'utilisateur n'a pas déjà une adresse
+        // Vérifier si l'utilisateur a déjà une adresse
         $existingAddress = $this->addressRepository->findByUser($user);
+
         if ($existingAddress) {
-            throw new BadRequestHttpException('L\'utilisateur a déjà une adresse');
+            $this->logger->info('Adresse existante trouvée, retour de l\'adresse existante', [
+                'user_id' => $user->getId(),
+                'address_id' => $existingAddress->getId()
+            ]);
+
+            // ⚡ RETOURNER L'ADRESSE EXISTANTE au lieu de lever une erreur
+            return $existingAddress;
         }
 
         // Valider les données

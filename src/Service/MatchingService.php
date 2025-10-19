@@ -23,7 +23,9 @@ readonly class MatchingService
         $voyages = $this->voyageRepository->findMatchingDemande(
             $demande->getVilleDepart(),
             $demande->getVilleArrivee(),
-            $demande->getDateLimite()
+            $demande->getDateLimite(),
+            $demande->getClient()->getId()
+
         );
 
         // ==================== UTILISATION DU VISIBILITYSERVICE ====================
@@ -35,7 +37,8 @@ readonly class MatchingService
         $demandes = $this->demandeRepository->findMatchingVoyage(
             $voyage->getVilleDepart(),
             $voyage->getVilleArrivee(),
-            $voyage->getDateDepart()
+            $voyage->getDateDepart(),
+            $voyage->getVoyageur()->getId()
         );
 
         // ==================== UTILISATION DU VISIBILITYSERVICE ====================
