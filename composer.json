@@ -12,6 +12,7 @@
         "doctrine/doctrine-bundle": "^2.16",
         "doctrine/doctrine-migrations-bundle": "^3.4",
         "doctrine/orm": "^3.5",
+        "dragonmantank/cron-expression": "^3.4",
         "league/oauth2-facebook": "^2.2",
         "league/oauth2-google": "^4.0",
         "lexik/jwt-authentication-bundle": "^3.1",
