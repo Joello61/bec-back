@@ -211,55 +211,16 @@ class CityRepository extends ServiceEntityRepository
     {
         return $this->findOneBy(['geonameId' => $geonameId]);
     }
-}
 
-/**
- * ============================================
- * EXPLICATION DE LA CORRECTION
- * ============================================
- *
- * ❌ AVANT (case-sensitive) :
- *
- * ->where('c.name LIKE :query')
- * ->setParameter('query', 'paris%')
- *
- * SQL généré :
- * WHERE c.name LIKE 'paris%'
- *
- * Résultat : Ne trouve QUE les villes commençant par 'paris' (minuscule)
- * ❌ Ne trouve PAS "Paris", "PARIS", "PaRiS"
- *
- * ============================================
- *
- * ✅ APRÈS (case-insensitive) :
- *
- * $query = strtolower($query);  // 'Paris' → 'paris'
- * ->where('LOWER(c.name) LIKE :query')
- * ->setParameter('query', 'paris%')
- *
- * SQL généré :
- * WHERE LOWER(c.name) LIKE 'paris%'
- *
- * Résultat : Trouve TOUTES les variantes
- * ✅ Trouve "Paris", "paris", "PARIS", "PaRiS", etc.
- *
- * ============================================
- *
- * IMPORTANT :
- * - strtolower($query) côté PHP pour normaliser l'entrée utilisateur
- * - LOWER(c.name) côté SQL pour normaliser les données en base
- * - Les deux sont nécessaires pour une recherche insensible à la casse
- *
- * ============================================
- *
- * PERFORMANCE :
- * LOWER() peut empêcher l'utilisation d'index sur la colonne name.
- *
- * Solutions pour optimiser :
- * 1. Créer un index fonctionnel : CREATE INDEX idx_city_name_lower ON city (LOWER(name));
- * 2. Ajouter une colonne name_normalized (minuscule) avec index
- * 3. Utiliser PostgreSQL ILIKE au lieu de LOWER() + LIKE (spécifique PostgreSQL)
- *
- * Pour l'instant, cette solution fonctionne bien jusqu'à ~100k villes.
- * ============================================
- */
+    public function findTimeZoneByCity($city): ?string
+    {
+        $result = $this->createQueryBuilder('c')
+            ->select('c.timezone')
+            ->where('c.name = :city')
+            ->setParameter('city', $city)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $result['timezone'] ?? null;
+    }
+}

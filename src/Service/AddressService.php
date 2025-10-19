@@ -17,7 +17,8 @@ readonly class AddressService
         private EntityManagerInterface $entityManager,
         private AddressRepository $addressRepository,
         private CurrencyService $currencyService,
-        private LoggerInterface $logger
+        private LoggerInterface $logger,
+        private GeoDataService $geoDataService
     ) {}
 
     /**
@@ -63,10 +64,14 @@ readonly class AddressService
         }
 
         // ==================== DÉTECTION AUTOMATIQUE DE LA DEVISE ====================
-        $detectedCurrency = $this->currencyService->getCurrencyByCountry($data['pays']);
+        $detectedCurrency = $this->currencyService->getCurrencyAndLangByCountry($data['pays'])['currency'];
+        $detectedLang = $this->currencyService->getCurrencyAndLangByCountry($data['pays'])['languages'];
+        $detectedTimeZone = $this->geoDataService->getTimeZoneByCity($data['ville']);
 
         // Mettre à jour la devise de l'utilisateur dans ses settings
         $user->getSettings()?->setDevise($detectedCurrency);
+        $user->getSettings()?->setLangue($detectedLang);
+        $user->getSettings()?->setTimeZone($detectedTimeZone);
 
         $this->logger->info('Devise détectée automatiquement', [
             'user_id' => $user->getId(),
@@ -141,15 +146,18 @@ readonly class AddressService
 
         // ==================== MISE À JOUR DE LA DEVISE SI LE PAYS A CHANGÉ ====================
         if ($oldCountry !== $newCountry) {
-            $newCurrency = $this->currencyService->getCurrencyByCountry($newCountry);
+            $newCurrency = $this->currencyService->getCurrencyAndLangByCountry($newCountry)['currency'];
+            $newLang = $this->currencyService->getCurrencyAndLangByCountry($newCountry)['lang'];
 
             $address->getUser()->getSettings()?->setDevise($newCurrency);
+            $address->getUser()->getSettings()?->setLangue($newLang);
 
             $this->logger->info('Devise mise à jour suite au changement de pays', [
                 'user_id' => $address->getUser()->getId(),
                 'old_country' => $oldCountry,
                 'new_country' => $newCountry,
-                'new_currency' => $newCurrency
+                'new_currency' => $newCurrency,
+                'new_lang' => $newLang,
             ]);
         }
 

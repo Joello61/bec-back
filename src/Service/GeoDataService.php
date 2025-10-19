@@ -174,4 +174,15 @@ readonly class GeoDataService
             ], $cities);
         });
     }
+
+    public function getContinentByPays(string $pays): ?string
+    {
+        return $this->countryRepository->findContinentByPays($pays);
+    }
+
+    public function getTimeZoneByCity(string $city): ?string
+    {
+        return $this->cityRepository->findTimeZoneByCity($city);
+
+    }
 }

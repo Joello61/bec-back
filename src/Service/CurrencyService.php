@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Entity\Currency;
+use App\Repository\CountryRepository;
 use App\Repository\CurrencyRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
@@ -49,26 +50,30 @@ readonly class CurrencyService
         private CacheInterface $cache,
         private LoggerInterface $logger,
         private string $exchangeRateApiKey,
-        private string $defaultCurrency = 'EUR'
+        private CountryRepository $countryRepository,
+        private string $defaultCurrency = 'EUR',
+        private string $defaultLanguages = 'fr-FR'
     ) {}
 
     /**
      * Détecte automatiquement la devise selon le pays
      */
-    public function getCurrencyByCountry(string $countryName): string
+    public function getCurrencyAndLangByCountry(string $countryName): array
     {
         // Essayer de trouver le code pays (simpliste, peut être amélioré)
-        $countryCode = $this->getCountryCode($countryName);
+        $countryCodeAndLang = $this->getCountryCodeAndLanguages($countryName);
+        $countryCode = $countryCodeAndLang['code'] ?? null;
+        $countryLang = $countryCodeAndLang['languages'] ?? null;
 
         if ($countryCode && isset(self::COUNTRY_CURRENCY_MAP[$countryCode])) {
-            return self::COUNTRY_CURRENCY_MAP[$countryCode];
+            return ['currency' => self::COUNTRY_CURRENCY_MAP[$countryCode], 'languages' => $countryLang];
         }
 
         // Recherche en base de données
         $currency = $this->currencyRepository->findByCountry($countryCode ?? $countryName);
 
         if ($currency) {
-            return $currency->getCode();
+            return ['currency'=>$currency->getCode(), 'languages' => $countryLang];
         }
 
         // Par défaut : EUR (devise de référence)
@@ -77,7 +82,7 @@ readonly class CurrencyService
             'countryCode' => $countryCode
         ]);
 
-        return $this->defaultCurrency;
+        return ['currency' => $this->defaultCurrency, 'languages' => $this->defaultLanguages];
     }
 
     /**
@@ -246,6 +251,11 @@ readonly class CurrencyService
     public function getCurrency(string $code): ?Currency
     {
         return $this->currencyRepository->findByCode($code);
+    }
+
+    public function getCountryCodeAndLanguages(string $countryName): ?array
+    {
+        return $this->countryRepository->findCodeAndLangByPays($countryName);
     }
 
     /**
