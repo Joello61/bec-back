@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\DTO\CreateDemandeDTO;
 use App\DTO\UpdateDemandeDTO;
 use App\Entity\User;
+use App\Entity\Voyage;
 use App\Repository\DemandeRepository;
 use App\Service\CurrencyService;
 use App\Service\DemandeService;
@@ -19,6 +20,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
 use Symfony\Component\Serializer\SerializerInterface;
 
 #[Route('/api/demandes', name: 'api_demande_')]
@@ -120,58 +122,81 @@ class DemandeController extends AbstractController
         $viewerCurrency = $currentUser->getSettings()?->getDevise()
             ?? $this->currencyService->getDefaultCurrency();
 
+        // ==================== 1. RÉCUPÉRER LES DONNÉES MÉTIER ====================
         $matchingVoyages = $this->demandeService->findMatchingVoyages($id, $currentUser);
 
-        // ==================== CONVERSION AUTOMATIQUE ====================
-        $matchingVoyagesWithConversion = array_map(function ($match) use ($viewerCurrency) {
-            if (isset($match['voyage']) && $match['voyage']->getCurrency() !== $viewerCurrency) {
-                $voyageData = json_decode(
-                    $this->serializer->serialize($match['voyage'], 'json', ['groups' => ['voyage:list']]),
-                    true
+        // ==================== 2. SÉRIALISER ET ENRICHIR ====================
+        $result = array_map(function ($match) use ($viewerCurrency) {
+            // Sérialiser le voyage avec gestion des références circulaires
+            $voyageData = json_decode(
+                $this->serializer->serialize(
+                    $match['voyage'],
+                    'json',
+                    [
+                        'groups' => ['voyage:list'],
+                        AbstractNormalizer::CIRCULAR_REFERENCE_HANDLER => function ($object) {
+                            return method_exists($object, 'getId') ? $object->getId() : null;
+                        },
+                    ]
+                ),
+                true
+            );
+
+            // ==================== CONVERSION DE DEVISE ====================
+            if ($match['voyage']->getCurrency() !== $viewerCurrency) {
+                $voyageData['converted'] = $this->convertVoyagePrices(
+                    $match['voyage'],
+                    $viewerCurrency
                 );
-
-                // Conversion des montants
-                if ($match['voyage']->getPrixParKilo() || $match['voyage']->getCommissionProposeePourUnBagage()) {
-                    $converted = [
-                        'originalCurrency' => $match['voyage']->getCurrency(),
-                        'targetCurrency' => $viewerCurrency,
-                    ];
-
-                    if ($match['voyage']->getPrixParKilo()) {
-                        $converted['prixParKilo'] = $this->currencyService->convert(
-                            (float) $match['voyage']->getPrixParKilo(),
-                            $match['voyage']->getCurrency(),
-                            $viewerCurrency
-                        );
-                        $converted['prixParKiloFormatted'] = $this->currencyService->formatAmount(
-                            $converted['prixParKilo'],
-                            $viewerCurrency
-                        );
-                    }
-
-                    if ($match['voyage']->getCommissionProposeePourUnBagage()) {
-                        $converted['commission'] = $this->currencyService->convert(
-                            (float) $match['voyage']->getCommissionProposeePourUnBagage(),
-                            $match['voyage']->getCurrency(),
-                            $viewerCurrency
-                        );
-                        $converted['commissionFormatted'] = $this->currencyService->formatAmount(
-                            $converted['commission'],
-                            $viewerCurrency
-                        );
-                    }
-
-                    $voyageData['converted'] = $converted;
-                }
-
-                $voyageData['viewerCurrency'] = $viewerCurrency;
-                $match['voyage'] = $voyageData;
             }
 
-            return $match;
+            $voyageData['viewerCurrency'] = $viewerCurrency;
+
+            return [
+                'voyage' => $voyageData,
+                'score' => $match['score']
+            ];
         }, $matchingVoyages);
 
-        return $this->json($matchingVoyagesWithConversion, Response::HTTP_OK);
+        return $this->json($result, Response::HTTP_OK);
+    }
+
+    /**
+     * Convertit les prix d'un voyage dans une devise cible
+     * Méthode privée pour éviter la duplication de code
+     */
+    private function convertVoyagePrices(Voyage $voyage, string $targetCurrency): array
+    {
+        $converted = [
+            'originalCurrency' => $voyage->getCurrency(),
+            'targetCurrency' => $targetCurrency,
+        ];
+
+        if ($voyage->getPrixParKilo()) {
+            $converted['prixParKilo'] = $this->currencyService->convert(
+                (float) $voyage->getPrixParKilo(),
+                $voyage->getCurrency(),
+                $targetCurrency
+            );
+            $converted['prixParKiloFormatted'] = $this->currencyService->formatAmount(
+                $converted['prixParKilo'],
+                $targetCurrency
+            );
+        }
+
+        if ($voyage->getCommissionProposeePourUnBagage()) {
+            $converted['commission'] = $this->currencyService->convert(
+                (float) $voyage->getCommissionProposeePourUnBagage(),
+                $voyage->getCurrency(),
+                $targetCurrency
+            );
+            $converted['commissionFormatted'] = $this->currencyService->formatAmount(
+                $converted['commission'],
+                $targetCurrency
+            );
+        }
+
+        return $converted;
     }
 
     #[Route('', name: 'create', methods: ['POST'])]

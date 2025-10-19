@@ -69,6 +69,10 @@ readonly class PropositionService
             throw new BadRequestHttpException('Vous avez déjà fait une proposition pour ce voyage');
         }
 
+        if (($voyage->getPoidsDisponible() - $demande->getPoidsEstime()) <= 0) {
+            throw new BadRequestHttpException('Le voyage n\'a plus de place disponible');
+        }
+
         // ==================== DEVISE DE LA DEMANDE ====================
         // La proposition utilise TOUJOURS la devise de la demande du client
         $currency = $demande->getCurrency();
@@ -114,6 +118,7 @@ readonly class PropositionService
      */
     public function respondToProposition(int $propositionId, RespondPropositionDTO $dto, User $voyageur): Proposition
     {
+        /* @var Proposition $proposition */
         $proposition = $this->propositionRepository->find($propositionId);
 
         if (!$proposition) {
@@ -133,6 +138,12 @@ readonly class PropositionService
         if ($dto->action === 'accepter') {
             $proposition->setStatut('acceptee');
             $proposition->setReponduAt(new \DateTime());
+            $newVoyagePoids = $proposition->getVoyage()->getPoidsDisponible() - $proposition->getDemande()->getPoidsEstime();
+            $proposition->getVoyage()->setPoidsDisponible($newVoyagePoids);
+            if ($newVoyagePoids == 0) {
+                $proposition->getVoyage()->setStatut('complete');
+            }
+            $proposition->getDemande()->setStatut('voyageur_trouve');
 
             // Notifier le client
             $this->notificationService->createNotification(
@@ -259,42 +270,59 @@ readonly class PropositionService
      */
     public function getPropositionSummaryWithConversion(Proposition $proposition, User $viewer): array
     {
-        $viewerCurrency = $viewer->getSettings()?->getDevise() ?? $this->currencyService->getDefaultCurrency();
+        $viewerCurrency = $viewer->getSettings()?->getDevise()
+            ?? $this->currencyService->getDefaultCurrency();
 
         $summary = [
             'id' => $proposition->getId(),
             'statut' => $proposition->getStatut(),
             'message' => $proposition->getMessage(),
+            'messageRefus' => $proposition->getMessageRefus(),
             'createdAt' => $proposition->getCreatedAt(),
+
+            // ==================== CLIENT ====================
             'client' => [
                 'id' => $proposition->getClient()->getId(),
                 'nom' => $proposition->getClient()->getNom(),
                 'prenom' => $proposition->getClient()->getPrenom(),
             ],
+
+            // ==================== VOYAGEUR ====================
+            'voyageur' => [
+                'id' => $proposition->getVoyage()->getVoyageur()->getId(),
+                'nom' => $proposition->getVoyage()->getVoyageur()->getNom(),
+                'prenom' => $proposition->getVoyage()->getVoyageur()->getPrenom(),
+            ],
+
+            // ==================== DEMANDE ====================
             'demande' => [
                 'id' => $proposition->getDemande()->getId(),
                 'villeDepart' => $proposition->getDemande()->getVilleDepart(),
                 'villeArrivee' => $proposition->getDemande()->getVilleArrivee(),
+                'poidsEstime' => $proposition->getDemande()->getPoidsEstime()
             ],
+
+            // ==================== VOYAGE ====================
             'voyage' => [
                 'id' => $proposition->getVoyage()->getId(),
                 'villeDepart' => $proposition->getVoyage()->getVilleDepart(),
                 'villeArrivee' => $proposition->getVoyage()->getVilleArrivee(),
+                'dateDepart' => $proposition->getVoyage()->getDateDepart(),
             ],
-            'montants' => [
-                'original' => [
-                    'currency' => $proposition->getCurrency(),
-                    'prixParKilo' => (float) $proposition->getPrixParKilo(),
-                    'commission' => (float) $proposition->getCommissionProposeePourUnBagage(),
-                ],
-            ],
+
+            // ==================== MONTANTS À PLAT (compatible CurrencyDisplay) ====================
+            'prixParKilo' => (float) $proposition->getPrixParKilo(),
+            'commissionProposeePourUnBagage' => (float) $proposition->getCommissionProposeePourUnBagage(),
+            'currency' => $proposition->getCurrency(),
+            'viewerCurrency' => $viewerCurrency,
         ];
 
-        // Ajouter la conversion si la devise du viewer est différente
+        // ==================== CONVERSION SI NÉCESSAIRE ====================
         if ($proposition->getCurrency() !== $viewerCurrency) {
             $converted = $this->convertPropositionAmounts($proposition, $viewerCurrency);
-            $summary['montants']['converted'] = [
-                'currency' => $viewerCurrency,
+            $summary['converted'] = [
+                'originalCurrency' => $proposition->getCurrency(),
+                'targetCurrency' => $viewerCurrency,
                 'prixParKilo' => $converted['prixParKilo'],
                 'prixParKiloFormatted' => $converted['prixParKiloFormatted'],
                 'commission' => $converted['commission'],

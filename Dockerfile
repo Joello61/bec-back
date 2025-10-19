@@ -42,7 +42,7 @@ RUN APP_ENV=prod APP_DEBUG=0 php bin/console cache:clear --no-warmup \
     && APP_ENV=prod APP_DEBUG=0 php bin/console cache:warmup
 
 # =============================================================================
-# Stage 2: Production (SIMPLE comme Node.js)
+# Stage 2: Production
 # =============================================================================
 FROM php:8.2-cli-alpine
 
@@ -78,12 +78,21 @@ COPY --from=builder --chown=www-data:www-data /app ./
 RUN mkdir -p var/cache var/log public/uploads \
     && chmod -R 777 var public/uploads
 
-# Expose port (comme ton Express)
+# Expose port
 EXPOSE 3040
 
-# Vérifiez la variable RUN_MODE, sinon par défaut serveur web
+# ==================== CMD avec support multi-modes ====================
+# RUN_MODE:
+#   - "web" (défaut) : Serveur web PHP built-in
+#   - "worker" : Worker Messenger pour les tâches async
+#   - "scheduler" : Worker Scheduler pour les tâches planifiées (cron)
 CMD if [ "$RUN_MODE" = "worker" ]; then \
-        php bin/console messenger:consume async --limit=10 --memory-limit=256M --time-limit=3600 -vv; \
+        echo "🔄 Démarrage du Worker Messenger (async)..."; \
+        php bin/console messenger:consume async --limit=100 --memory-limit=256M --time-limit=3600 -vv; \
+    elif [ "$RUN_MODE" = "scheduler" ]; then \
+        echo "⏰ Démarrage du Worker Scheduler (expiration)..."; \
+        php bin/console messenger:consume scheduler_expiration --limit=50 --memory-limit=128M --time-limit=7200 -vv; \
     else \
+        echo "🌐 Démarrage du serveur web sur le port 3040..."; \
         php -S 0.0.0.0:3040 -t public; \
     fi

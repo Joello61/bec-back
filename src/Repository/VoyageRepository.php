@@ -124,7 +124,7 @@ class VoyageRepository extends ServiceEntityRepository
             ->getResult();
     }
 
-    public function findMatchingDemande(string $villeDepart, string $villeArrivee, ?\DateTimeInterface $dateDepart = null): array
+    public function findMatchingDemande(string $villeDepart, string $villeArrivee, ?\DateTimeInterface $dateDepart = null, ?int $excludeUserId = null): array
     {
         $qb = $this->createQueryBuilder('v')
             ->leftJoin('v.voyageur', 'u')
@@ -139,6 +139,11 @@ class VoyageRepository extends ServiceEntityRepository
             ->setParameter('villeDepart', '%' . $villeDepart . '%')
             ->setParameter('villeArrivee', '%' . $villeArrivee . '%')
             ->setParameter('visible', true);
+
+        if ($excludeUserId !== null) {
+            $qb->andWhere('u.id != :excludeUserId')
+                ->setParameter('excludeUserId', $excludeUserId);
+        }
 
         if ($dateDepart) {
             $qb->andWhere('v.dateDepart >= :dateDepart')
@@ -243,5 +248,16 @@ class VoyageRepository extends ServiceEntityRepository
             ->setParameter('end', $end)
             ->getQuery()
             ->getSingleScalarResult();
+    }
+
+    public function findExpiredVoyages(\DateTimeInterface $today): array
+    {
+        return $this->createQueryBuilder('v')
+            ->where('v.dateDepart < :today')
+            ->andWhere('v.statut = :statut')
+            ->setParameter('today', $today)
+            ->setParameter('statut', 'actif')
+            ->getQuery()
+            ->getResult();
     }
 }
