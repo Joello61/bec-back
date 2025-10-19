@@ -171,7 +171,7 @@ class CurrencyController extends AbstractController
         }
 
         $country = $data['country'];
-        $currencyCode = $this->currencyService->getCurrencyByCountry($country);
+        $currencyCode = $this->currencyService->getCurrencyAndLangByCountry($country)['currency'];
         $currency = $this->currencyService->getCurrency($currencyCode);
 
         return $this->json([

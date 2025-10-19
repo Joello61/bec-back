@@ -6,6 +6,7 @@ namespace App\Service\OAuth;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\SettingsService;
 use Doctrine\ORM\EntityManagerInterface;
 use League\OAuth2\Client\Provider\Google;
 use League\OAuth2\Client\Provider\GoogleUser;
@@ -20,6 +21,7 @@ readonly class GoogleAuthService
         private EntityManagerInterface $entityManager,
         private UserRepository $userRepository,
         private LoggerInterface $logger,
+        private SettingsService $settingsService,
         string $googleClientId,
         string $googleClientSecret,
         string $googleRedirectUri
@@ -125,6 +127,8 @@ readonly class GoogleAuthService
 
             $this->entityManager->persist($user);
             $this->entityManager->flush();
+
+            $this->settingsService->createDefaultSettings($user);
 
             $this->logger->info('Nouvel utilisateur créé via Google', [
                 'user_id' => $user->getId(),

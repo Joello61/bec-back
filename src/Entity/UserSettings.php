@@ -90,7 +90,7 @@ class UserSettings
 
     // ==================== PRÉFÉRENCES ====================
 
-    #[ORM\Column(type: Types::STRING, length: 5)]
+    #[ORM\Column(type: Types::STRING, length: 20)]
     #[Groups(['settings:read', 'settings:write'])]
     private string $langue = 'fr'; // 'fr', 'en'
 

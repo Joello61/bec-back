@@ -160,6 +160,7 @@
       <excludeFolder url="file://$MODULE_DIR$/vendor/symfony/webhook" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/beberlei/doctrineextensions" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/umpirsky/country-list" />
+      <excludeFolder url="file://$MODULE_DIR$/vendor/dragonmantank/cron-expression" />
       <excludeFolder url="file://$MODULE_DIR$/vendor/symfony/scheduler" />
     </content>
     <orderEntry type="inheritedJdk" />

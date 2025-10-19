@@ -286,4 +286,56 @@ class GeoController extends AbstractController
 
         return $this->json($cities, Response::HTTP_OK);
     }
+
+    /**
+     * GET /api/geo/continent/{pays}
+     * Retourne le continent d’un pays donné
+     */
+    #[Route('/continent/{pays}', name: 'continent', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/geo/continent/{pays}',
+        description: 'Retourne le continent associé à un pays donné (en fonction de son nom français exact)',
+        summary: 'Continent par pays'
+    )]
+    #[OA\Parameter(
+        name: 'pays',
+        description: 'Nom français du pays (ex: France, Cameroun, Japon)',
+        in: 'path',
+        required: true,
+        schema: new OA\Schema(type: 'string', example: 'France')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Continent trouvé',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'continent', type: 'string', example: 'Europe')
+            ],
+            type: 'object'
+        )
+    )]
+    #[OA\Response(
+        response: 404,
+        description: 'Aucun continent trouvé pour ce pays',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Aucun continent pour ce pays')
+            ],
+            type: 'object'
+        )
+    )]
+    public function getContinentByPays(string $pays): JsonResponse
+    {
+        $continent = $this->geoDataService->getContinentByPays($pays);
+
+        if (!$continent) {
+            return $this->json([
+                'error' => 'Aucun continent pour ce pays'
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json([
+            'continent' => $continent
+        ], Response::HTTP_OK);
+    }
 }

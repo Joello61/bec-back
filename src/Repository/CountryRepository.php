@@ -82,6 +82,19 @@ class CountryRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    public function findCodeAndLangByPays(string $pays): ?array
+    {
+        $result = $this->createQueryBuilder('c')
+            ->select('c.code')
+            ->addSelect('c.languages')
+            ->where('c.nameFr = :pays')
+            ->setParameter('pays', $pays)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $result ?? null;
+    }
+
     /**
      * Récupère les pays africains
      */
@@ -126,4 +139,17 @@ class CountryRepository extends ServiceEntityRepository
             ->getQuery()
             ->getSingleScalarResult();
     }
+
+    public function findContinentByPays(string $pays): ?string
+    {
+        $result = $this->createQueryBuilder('c')
+            ->select('c.continent')
+            ->where('c.nameFr = :pays')
+            ->setParameter('pays', $pays)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $result['continent'] ?? null;
+    }
+
 }
