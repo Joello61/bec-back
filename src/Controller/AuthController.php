@@ -126,13 +126,13 @@ class AuthController extends AbstractController
         Request $request
     ): JsonResponse {
         // Rate limiting sur l'inscription
-        $limiter = $registerLimiter->create($request->getClientIp());
+        /*$limiter = $registerLimiter->create($request->getClientIp());
         if (false === $limiter->consume(1)->isAccepted()) {
             return $this->json([
                 'success' => false,
                 'message' => 'Trop de tentatives d\'inscription. Veuillez réessayer plus tard.'
             ], Response::HTTP_TOO_MANY_REQUESTS);
-        }
+        }*/
 
         $user = $this->authService->register($dto);
 
