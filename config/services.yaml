@@ -17,6 +17,7 @@ parameters:
     app.exchange_rate_api_key: '%env(EXCHANGE_RATE_API_KEY)%'
 
     sms_verification.enabled: '%env(bool:SMS_VERIFICATION_ENABLED)%'
+    email_verification_enabled: '%env(bool:EMAIL_VERIFICATION_ENABLED)%'
 
 services:
     _defaults:
@@ -41,6 +42,10 @@ services:
     App\Command\ImportGeoDataCommand:
         arguments:
             $projectDir: '%kernel.project_dir%'
+
+    App\Service\AuthService:
+        arguments:
+            $emailVerificationEnabled: '%email_verification_enabled%'
 
     App\Service\CurrencyService:
         arguments:

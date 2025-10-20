@@ -22,12 +22,12 @@ readonly class AuthService
         private EmailService $emailService,
         private VerificationService $verificationService,
         private SettingsService $settingsService,
-        private LoggerInterface $logger
+        private LoggerInterface $logger,
+        private bool $emailVerificationEnabled,
     ) {}
 
     public function register(RegisterDTO $dto): User
     {
-        // Vérifier si l'email existe déjà
         $existingUser = $this->userRepository->findByEmail($dto->email);
         if ($existingUser) {
             throw new BadRequestHttpException('Cet email est déjà utilisé');
@@ -45,19 +45,37 @@ readonly class AuthService
             $this->entityManager->persist($user);
             $this->entityManager->flush();
 
-            // Créer les settings par défaut
+            // Créer les paramètres par défaut
             $this->settingsService->createDefaultSettings($user);
 
-            // Envoyer le code de vérification email IMMÉDIATEMENT
-            try {
-                $this->verificationService->sendEmailVerification($user);
-                $this->emailService->sendWelcomeEmail($user);
-            } catch (Exception $e) {
-                $this->logger->error('Erreur lors de l\'envoi des emails', [
+            // ==================== LOGIQUE DE SKIP EMAIL ====================
+            if ($this->emailVerificationEnabled) {
+                try {
+                    $this->verificationService->sendEmailVerification($user);
+                    $this->emailService->sendWelcomeEmail($user);
+
+                    $this->logger->info('Email de vérification envoyé', [
+                        'user_id' => $user->getId(),
+                        'email' => $user->getEmail()
+                    ]);
+                } catch (Exception $e) {
+                    $this->logger->error('Erreur lors de l\'envoi des emails', [
+                        'user_id' => $user->getId(),
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            } else {
+                // Mode Dev / Panne : auto-vérification
+                $user->setEmailVerifie(true);
+                $this->entityManager->flush();
+
+                $this->logger->info('Email verification SKIPPED (dev/panne mode)', [
                     'user_id' => $user->getId(),
-                    'error' => $e->getMessage()
+                    'email' => $user->getEmail(),
+                    'auto_verified' => true
                 ]);
             }
+            // ===============================================================
 
             $this->logger->info('Nouvel utilisateur inscrit', [
                 'user_id' => $user->getId(),

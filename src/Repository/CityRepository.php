@@ -212,12 +212,14 @@ class CityRepository extends ServiceEntityRepository
         return $this->findOneBy(['geonameId' => $geonameId]);
     }
 
-    public function findTimeZoneByCity($city): ?string
+    public function findTimeZoneByCityAndPays($city, $pays): ?string
     {
         $result = $this->createQueryBuilder('c')
             ->select('c.timezone')
             ->where('c.name = :city')
+            ->andWhere('c.country = :pays')
             ->setParameter('city', $city)
+            ->setParameter('pays', $pays)
             ->getQuery()
             ->getOneOrNullResult();
 

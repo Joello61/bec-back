@@ -7,6 +7,7 @@ namespace App\Service;
 use App\Entity\Address;
 use App\Entity\User;
 use App\Repository\AddressRepository;
+use App\Repository\CountryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Psr\Log\LoggerInterface;
@@ -18,7 +19,8 @@ readonly class AddressService
         private AddressRepository $addressRepository,
         private CurrencyService $currencyService,
         private LoggerInterface $logger,
-        private GeoDataService $geoDataService
+        private GeoDataService $geoDataService,
+        private CountryRepository $countryRepository,
     ) {}
 
     /**
@@ -64,9 +66,10 @@ readonly class AddressService
         }
 
         // ==================== DÉTECTION AUTOMATIQUE DE LA DEVISE ====================
+        $pays = $this->countryRepository->findOneBy(['nameFr' => $data['pays']]);
         $detectedCurrency = $this->currencyService->getCurrencyAndLangByCountry($data['pays'])['currency'];
         $detectedLang = $this->currencyService->getCurrencyAndLangByCountry($data['pays'])['languages'];
-        $detectedTimeZone = $this->geoDataService->getTimeZoneByCity($data['ville']);
+        $detectedTimeZone = $this->geoDataService->getTimeZoneByCityAndPays($data['ville'], $pays->getId());
 
         // Mettre à jour la devise de l'utilisateur dans ses settings
         $user->getSettings()?->setDevise($detectedCurrency);
