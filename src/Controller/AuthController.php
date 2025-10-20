@@ -141,6 +141,7 @@ class AuthController extends AbstractController
         return $this->json([
             'success' => true,
             'message' => 'Inscription réussie. Un code de vérification a été envoyé à votre email.',
+            'emailVerificationEnabled'=>$this->getParameter('email_verification_enabled'),
             'user' => [
                 'id' => $user->getId(),
                 'email' => $user->getEmail(),

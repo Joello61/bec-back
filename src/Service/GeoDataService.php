@@ -180,9 +180,9 @@ readonly class GeoDataService
         return $this->countryRepository->findContinentByPays($pays);
     }
 
-    public function getTimeZoneByCity(string $city): ?string
+    public function getTimeZoneByCityAndPays(string $city, int $pays): ?string
     {
-        return $this->cityRepository->findTimeZoneByCity($city);
+        return $this->cityRepository->findTimeZoneByCityAndPays($city, $pays);
 
     }
 }
