@@ -38,7 +38,7 @@ RUN mkdir -p config/jwt \
     && php bin/console lexik:jwt:generate-keypair --skip-if-exists 2>/dev/null || true
 
 # Warm up cache
-RUN APP_ENV=prod APP_DEBUG=0 php bin/console cache:clear --no-warmup \
+RUN APP_ENV=prod APP_DEBUG=0 php bin/console cache:clear --no-warmup \ TRUSTED_PROXIES=127.0.0.1 \
     && APP_ENV=prod APP_DEBUG=0 php bin/console cache:warmup
 
 # =============================================================================
