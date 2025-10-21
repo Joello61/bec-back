@@ -19,6 +19,9 @@ security:
             stateless: true
             provider: app_user_provider
 
+            login_throttling:
+                limiter: login
+
             # Gestion du login via JSON
             json_login:
                 check_path: /api/login
@@ -26,9 +29,6 @@ security:
                 password_path: password
                 success_handler: lexik_jwt_authentication.handler.authentication_success
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure
-
-                login_throttling:
-                    limiter: login
 
             # Authentification JWT (cookie + header)
             jwt: ~
