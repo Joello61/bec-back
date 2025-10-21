@@ -20,7 +20,7 @@ security:
             provider: app_user_provider
 
             login_throttling:
-                limiter: login
+                limiter: rate_limiter.login
 
             # Gestion du login via JSON
             json_login:
