@@ -91,6 +91,9 @@ RUN mkdir -p /run/php /run/nginx var/cache var/log public/uploads \
 # Expose HTTP port (CapRover expects 80)
 EXPOSE 80
 
+# Healthcheck (vérifie la route Symfony /health)
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://127.0.0.1/health || exit 1
+
 # ==================== CMD avec support multi-modes ====================
 # RUN_MODE:
 #   - "web" (défaut) : Serveur web Nginx + PHP-FPM
