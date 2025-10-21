@@ -1,7 +1,7 @@
 # =============================================================================
 # Stage 1: Builder
 # =============================================================================
-FROM php:8.2-cli-alpine AS builder
+FROM php:8.2-fpm-alpine AS builder
 
 WORKDIR /app
 
@@ -48,13 +48,15 @@ RUN APP_SECRET=dummysecretforthebuild \
 # =============================================================================
 # Stage 2: Production
 # =============================================================================
-FROM php:8.2-cli-alpine
+FROM php:8.2-fpm-alpine
 
 WORKDIR /var/www/html
 
-# Install runtime dependencies
+# Install runtime dependencies: nginx + supervisor + runtime libs
 RUN apk add --no-cache \
     bash \
+    nginx \
+    supervisor \
     icu-libs \
     postgresql-libs \
     libxml2 \
@@ -78,20 +80,20 @@ RUN { \
 # Copy application files from builder with correct owner
 COPY --from=builder --chown=www-data:www-data /app ./
 
-# CORRECTION : Créer les répertoires nécessaires AVANT d'essayer de changer leur propriétaire.
-# On combine mkdir et chown en une seule commande pour optimiser les couches Docker.
-RUN mkdir -p var/cache var/log public/uploads \
-    && chown -R www-data:www-data var public/uploads
+# Nginx & Supervisor configs
+COPY docker/nginx/default.conf /etc/nginx/http.d/default.conf
+COPY docker/supervisord.conf /etc/supervisord.conf
 
-# Switch to non-root user for security
-USER www-data
+# Create required directories
+RUN mkdir -p /run/php /run/nginx var/cache var/log public/uploads \
+    && chown -R www-data:www-data var public/uploads /run/php /run/nginx
 
-# Expose port
-EXPOSE 3040
+# Expose HTTP port (CapRover expects 80)
+EXPOSE 80
 
 # ==================== CMD avec support multi-modes ====================
 # RUN_MODE:
-#   - "web" (défaut) : Serveur web PHP built-in
+#   - "web" (défaut) : Serveur web Nginx + PHP-FPM
 #   - "worker" : Worker Messenger pour les tâches async
 #   - "scheduler" : Worker Scheduler pour les tâches planifiées (cron)
 CMD if [ "$RUN_MODE" = "worker" ]; then \
@@ -101,7 +103,6 @@ CMD if [ "$RUN_MODE" = "worker" ]; then \
         echo "⏰ Démarrage du Worker Scheduler (expiration)..."; \
         php bin/console messenger:consume scheduler_expiration --limit=50 --memory-limit=128M --time-limit=7200 -vv; \
     else \
-        echo "🌐 Démarrage du serveur web sur le port 3040..."; \
-        php -S 0.0.0.0:3040 -t public; \
+        echo "🌐 Démarrage de Nginx + PHP-FPM..."; \
+        /usr/bin/supervisord -c /etc/supervisord.conf; \
     fi
-
