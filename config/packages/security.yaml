@@ -19,9 +19,6 @@ security:
             stateless: true
             provider: app_user_provider
 
-            login_throttling:
-                limiter: limiter.login
-
             # Gestion du login via JSON
             json_login:
                 check_path: /api/login
