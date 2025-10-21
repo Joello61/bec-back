@@ -20,7 +20,7 @@ RUN apk add --no-cache \
 # Copy composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Install PHP dependencies
+# Install PHP dependencies (leverage cache)
 COPY composer.json composer.lock symfony.lock* ./
 RUN composer install --no-dev --no-scripts --no-progress --prefer-dist
 
@@ -30,15 +30,18 @@ COPY . .
 # Generate autoloader
 RUN composer dump-autoload --no-dev --optimize --classmap-authoritative
 
-# ✅ Copie un .env.dist minimal en .env si le fichier n'existe pas
+# Copy .env.dist to .env if it doesn't exist, so commands don't fail
 RUN cp .env.dist .env || true
 
 # Generate JWT keys
 RUN mkdir -p config/jwt \
     && php bin/console lexik:jwt:generate-keypair --skip-if-exists 2>/dev/null || true
 
-# Warm up cache
-RUN APP_ENV=prod APP_DEBUG=0 php bin/console cache:clear --no-warmup \ TRUSTED_PROXIES=127.0.0.1 \
+# Warm up cache with dummy env vars for build time
+# CORRECTION SYNTAXIQUE ET AJOUT DE APP_SECRET
+RUN APP_SECRET=dummysecretforthebuild \
+    TRUSTED_PROXIES=127.0.0.1 \
+    APP_ENV=prod APP_DEBUG=0 php bin/console cache:clear \
     && APP_ENV=prod APP_DEBUG=0 php bin/console cache:warmup
 
 # =============================================================================
@@ -57,7 +60,7 @@ RUN apk add --no-cache \
     oniguruma \
     libzip
 
-# Copy PHP extensions
+# Copy PHP extensions from builder
 COPY --from=builder /usr/local/etc/php/conf.d/docker-php-ext-*.ini /usr/local/etc/php/conf.d/
 COPY --from=builder /usr/local/lib/php/extensions /usr/local/lib/php/extensions
 
@@ -71,12 +74,15 @@ RUN { \
         echo 'opcache.validate_timestamps = 0'; \
     } > /usr/local/etc/php/conf.d/php-prod.ini
 
-# Copy application
+# Copy application files from builder with correct owner
 COPY --from=builder --chown=www-data:www-data /app ./
 
-# Create directories
-RUN mkdir -p var/cache var/log public/uploads \
-    && chmod -R 777 var public/uploads
+# AMÉLIORATION SÉCURITÉ : On s'assure que www-data peut écrire, sans utiliser 777
+# Les répertoires sont déjà créés dans l'étape précédente, on ajuste juste les permissions
+RUN chown -R www-data:www-data var public/uploads
+
+# Switch to non-root user for security
+USER www-data
 
 # Expose port
 EXPOSE 3040
