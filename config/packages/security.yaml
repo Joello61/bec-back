@@ -19,6 +19,8 @@ security:
             stateless: true
             provider: app_user_provider
 
+            rate_limiter: login
+
             # Gestion du login via JSON
             json_login:
                 check_path: /api/login
@@ -45,7 +47,7 @@ security:
         - { path: ^/api/auth/google/callback, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/facebook, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/facebook/callback, roles: PUBLIC_ACCESS }
-        - { path: ^/api/doc, roles: PUBLIC_ACCESS }
+        - { path: ^/api/doc, roles: ROLE_ADMIN }
         - { path: /api/contacts/send, roles: PUBLIC_ACCESS }
 
         # ==================== ROUTES ADMIN ====================
