@@ -38,7 +38,6 @@ RUN mkdir -p config/jwt \
     && php bin/console lexik:jwt:generate-keypair --skip-if-exists 2>/dev/null || true
 
 # Warm up cache with dummy env vars for build time
-# CORRECTION : Les variables doivent être définies pour CHAQUE commande de la chaîne
 RUN APP_SECRET=dummysecretforthebuild \
     TRUSTED_PROXIES=127.0.0.1 \
     APP_ENV=prod APP_DEBUG=0 php bin/console cache:clear \
@@ -79,9 +78,10 @@ RUN { \
 # Copy application files from builder with correct owner
 COPY --from=builder --chown=www-data:www-data /app ./
 
-# AMÉLIORATION SÉCURITÉ : On s'assure que www-data peut écrire, sans utiliser 777
-# Les répertoires sont déjà créés dans l'étape précédente, on ajuste juste les permissions
-RUN chown -R www-data:www-data var public/uploads
+# CORRECTION : Créer les répertoires nécessaires AVANT d'essayer de changer leur propriétaire.
+# On combine mkdir et chown en une seule commande pour optimiser les couches Docker.
+RUN mkdir -p var/cache var/log public/uploads \
+    && chown -R www-data:www-data var public/uploads
 
 # Switch to non-root user for security
 USER www-data
