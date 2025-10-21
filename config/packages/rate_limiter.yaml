@@ -3,8 +3,8 @@ framework:
         # Limiter pour le login - 5 tentatives par IP toutes les 15 minutes
         login:
             policy: 'sliding_window'
-            limit: 5
-            interval: '15 minutes'
+            limit: 10
+            interval: '2 minutes'
 
         # Limiter pour le register - 3 inscriptions par IP par heure
         register:
