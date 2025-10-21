@@ -38,11 +38,13 @@ RUN mkdir -p config/jwt \
     && php bin/console lexik:jwt:generate-keypair --skip-if-exists 2>/dev/null || true
 
 # Warm up cache with dummy env vars for build time
-# CORRECTION SYNTAXIQUE ET AJOUT DE APP_SECRET
+# CORRECTION : Les variables doivent être définies pour CHAQUE commande de la chaîne
 RUN APP_SECRET=dummysecretforthebuild \
     TRUSTED_PROXIES=127.0.0.1 \
     APP_ENV=prod APP_DEBUG=0 php bin/console cache:clear \
-    && APP_ENV=prod APP_DEBUG=0 php bin/console cache:warmup
+    && APP_SECRET=dummysecretforthebuild \
+       TRUSTED_PROXIES=127.0.0.1 \
+       APP_ENV=prod APP_DEBUG=0 php bin/console cache:warmup
 
 # =============================================================================
 # Stage 2: Production
@@ -102,3 +104,4 @@ CMD if [ "$RUN_MODE" = "worker" ]; then \
         echo "🌐 Démarrage du serveur web sur le port 3040..."; \
         php -S 0.0.0.0:3040 -t public; \
     fi
+
