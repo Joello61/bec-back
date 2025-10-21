@@ -75,7 +75,7 @@ RUN { \
         echo 'opcache.enable = 1'; \
         echo 'opcache.memory_consumption = 256'; \
         echo 'opcache.validate_timestamps = 0'; \
-        echo 'opcache.preload = /var/www/html/config/preload.php'; \
+        echo 'opcache.preload = /var/www/html/preload.php'; \
         echo 'realpath_cache_size = 4096k'; \
         echo 'realpath_cache_ttl = 600'; \
     } > /usr/local/etc/php/conf.d/php-prod.ini
