@@ -125,7 +125,7 @@ readonly class PropositionService
             throw new NotFoundHttpException('Proposition non trouvée');
         }
 
-        // Vérifier que c'est bien le voyageur qui répond
+        // Vérifier que c'est bien le voyageur concerné
         if ($proposition->getVoyageur() !== $voyageur) {
             throw new BadRequestHttpException('Vous n\'êtes pas autorisé à répondre à cette proposition');
         }
@@ -135,61 +135,95 @@ readonly class PropositionService
             throw new BadRequestHttpException('Cette proposition a déjà reçu une réponse');
         }
 
+        $voyage = $proposition->getVoyage();
+        $demande = $proposition->getDemande();
+
         if ($dto->action === 'accepter') {
+            // ✅ 1. Accepter la proposition actuelle
             $proposition->setStatut('acceptee');
-            $proposition->setReponduAt(new \DateTime());
+            $proposition->setReponduAt(new \DateTimeImmutable());
 
-            //Conversion sécurisée (Doctrine renvoie des strings pour DECIMAL)
-            $poidsDisponible = (float) $proposition->getVoyage()->getPoidsDisponible();
-            $poidsDemande = (float) $proposition->getDemande()->getPoidsEstime();
+            // ⚙️ Conversion DECIMAL → float
+            $poidsDisponible = (float) $voyage->getPoidsDisponibleRestant();
+            $poidsDemande = (float) $demande->getPoidsEstime();
 
-            //Calcul et protection contre les valeurs négatives
+            // 💡 Calcul et prévention des valeurs négatives
             $newVoyagePoids = max(0, $poidsDisponible - $poidsDemande);
+            $voyage->setPoidsDisponibleRestant(number_format($newVoyagePoids, 2, '.', ''));
 
-            //Conversion en string pour Doctrine (DECIMAL)
-            $proposition->getVoyage()->setPoidsDisponible(number_format($newVoyagePoids, 2, '.', ''));
-
+            // 🧩 Marquer le voyage comme complet si plus de place
             if ($newVoyagePoids == 0.0) {
-                $proposition->getVoyage()->setStatut('complete');
+                $voyage->setStatut('complete');
             }
 
-            $proposition->getDemande()->setStatut('voyageur_trouve');
+            // ✅ 2. Marquer la demande comme satisfaite
+            $demande->setStatut('voyageur_trouve');
 
+            // 🔁 3. Annuler toutes les autres propositions de cette même demande
+            foreach ($demande->getPropositions() as $autreProposition) {
+                if ($autreProposition->getId() !== $proposition->getId() && $autreProposition->getStatut() === 'en_attente') {
+                    $autreProposition->setStatut('annulee');
+                    $autreProposition->setReponduAt(new \DateTimeImmutable());
+
+                    // 🔔 Notifier le voyageur concerné
+                    $this->notificationService->createNotification(
+                        $autreProposition->getVoyageur(),
+                        'proposition_annulee',
+                        'Proposition annulée',
+                        sprintf(
+                            'La demande de %s %s a déjà trouvé un voyageur pour le voyage %s vers %s. Votre proposition a été automatiquement annulée.',
+                            $demande->getClient()->getPrenom(),
+                            $demande->getClient()->getNom(),
+                            $autreProposition->getVoyage()->getVilleDepart(),
+                            $autreProposition->getVoyage()->getVilleArrivee()
+                        ),
+                        [
+                            'propositionId' => $autreProposition->getId(),
+                            'demandeId' => $demande->getId(),
+                        ]
+                    );
+                }
+            }
+
+            // 🔔 4. Notifier le client dont la proposition a été acceptée
             $this->notificationService->createNotification(
                 $proposition->getClient(),
                 'proposition_acceptee',
                 'Proposition acceptée',
                 sprintf(
-                    '%s %s a accepté votre proposition pour le voyage %s vers %s',
+                    '%s %s a accepté votre proposition pour le voyage %s vers %s.',
                     $voyageur->getPrenom(),
                     $voyageur->getNom(),
-                    $proposition->getVoyage()->getVilleDepart(),
-                    $proposition->getVoyage()->getVilleArrivee()
+                    $voyage->getVilleDepart(),
+                    $voyage->getVilleArrivee()
                 ),
                 [
                     'propositionId' => $proposition->getId(),
-                    'voyageId' => $proposition->getVoyage()->getId(),
+                    'voyageId' => $voyage->getId(),
                 ]
             );
+
         } else {
+            // ❌ Refus
             $proposition->setStatut('refusee');
             $proposition->setMessageRefus($dto->messageRefus);
-            $proposition->setReponduAt(new \DateTime());
+            $proposition->setReponduAt(new \DateTimeImmutable());
 
+            // 🔔 Notifier le client
             $this->notificationService->createNotification(
                 $proposition->getClient(),
                 'proposition_refusee',
                 'Proposition refusée',
                 sprintf(
-                    '%s %s a refusé votre proposition pour le voyage %s vers %s',
+                    '%s %s a refusé votre proposition pour le voyage %s vers %s.',
                     $voyageur->getPrenom(),
                     $voyageur->getNom(),
-                    $proposition->getVoyage()->getVilleDepart(),
-                    $proposition->getVoyage()->getVilleArrivee()
+                    $voyage->getVilleDepart(),
+                    $voyage->getVilleArrivee()
                 ),
                 [
                     'propositionId' => $proposition->getId(),
-                    'voyageId' => $proposition->getVoyage()->getId(),
+                    'voyageId' => $voyage->getId(),
                 ]
             );
         }
