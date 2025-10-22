@@ -57,6 +57,7 @@ readonly class VoyageService
             ->setDateDepart($dto->dateDepart)
             ->setDateArrivee($dto->dateArrivee)
             ->setPoidsDisponible((string) $dto->poidsDisponible)
+            ->setPoidsDisponibleRestant((string) $dto->poidsDisponible)
             ->setPrixParKilo($dto->prixParKilo ? (string) $dto->prixParKilo : null)
             ->setCommissionProposeePourUnBagage($dto->commissionProposeePourUnBagage ? (string) $dto->commissionProposeePourUnBagage : null)
             ->setCurrency($currency)
@@ -76,6 +77,7 @@ readonly class VoyageService
     {
         $voyage = $this->getVoyage($id);
 
+        // === Mise à jour des champs simples ===
         if ($dto->villeDepart !== null) {
             $voyage->setVilleDepart($dto->villeDepart);
         }
@@ -88,9 +90,6 @@ readonly class VoyageService
         if ($dto->dateArrivee !== null) {
             $voyage->setDateArrivee($dto->dateArrivee);
         }
-        if ($dto->poidsDisponible !== null) {
-            $voyage->setPoidsDisponible((string) $dto->poidsDisponible);
-        }
         if ($dto->prixParKilo !== null) {
             $voyage->setPrixParKilo((string) $dto->prixParKilo);
         }
@@ -101,6 +100,33 @@ readonly class VoyageService
             $voyage->setDescription($dto->description);
         }
 
+        // === Gestion du poids disponible ===
+        if ($dto->poidsDisponible !== null) {
+            $nouveauPoidsTotal = (float) $dto->poidsDisponible;
+
+            // Calcul du poids déjà réservé (propositions acceptées)
+            $poidsDejaReserve = array_sum(array_map(
+                fn($p) => (float) $p->getDemande()->getPoidsEstime(),
+                $voyage->getPropositions()
+                    ->filter(fn($p) => $p->getStatut() === 'acceptee')
+                    ->toArray()
+            ));
+
+            // Vérification logique
+            if ($nouveauPoidsTotal < $poidsDejaReserve) {
+                throw new BadRequestHttpException(sprintf(
+                    "Impossible de définir un poids disponible de %.2f kg : %.2f kg sont déjà réservés par des propositions acceptées.",
+                    $nouveauPoidsTotal,
+                    $poidsDejaReserve
+                ));
+            }
+
+            // Mise à jour cohérente
+            $voyage->setPoidsDisponible((string) $nouveauPoidsTotal);
+            $voyage->setPoidsDisponibleRestant((string) ($nouveauPoidsTotal - $poidsDejaReserve));
+        }
+
+        // === Sauvegarde ===
         $this->entityManager->flush();
 
         return $voyage;
@@ -118,7 +144,52 @@ readonly class VoyageService
     public function deleteVoyage(int $id): void
     {
         $voyage = $this->getVoyage($id);
+
+        // Ne rien faire si déjà annulé ou expiré
+        if (in_array($voyage->getStatut(), ['annule', 'expire'], true)) {
+            return;
+        }
+
+        // Mettre à jour le statut principal
         $voyage->setStatut('annule');
+        $voyage->setUpdatedAt();
+
+        // Parcourir toutes les propositions liées à ce voyage
+        foreach ($voyage->getPropositions() as $proposition) {
+            $demande = $proposition->getDemande();
+
+            // Annuler la proposition si elle ne l'est pas déjà
+            if ($proposition->getStatut() !== 'annulee') {
+                $proposition->setStatut('annulee');
+                $proposition->setReponduAt(new \DateTimeImmutable());
+            }
+
+            // Si la demande est encore active, on la remet en recherche
+            if ($demande && !in_array($demande->getStatut(), ['annulee', 'expiree'], true)) {
+                $demande->setStatut('en_recherche');
+                $demande->setUpdatedAt(new \DateTimeImmutable());
+
+                // Notifier le client concerné
+                $this->notificationService->createNotification(
+                    $demande->getClient(),
+                    'voyage_annule',
+                    'Voyage annulé',
+                    sprintf(
+                        "Le voyage %s vers %s auquel vous aviez soumis une proposition a été annulé.
+Votre demande est de nouveau en recherche d’un voyageur.",
+                        $voyage->getVilleDepart(),
+                        $voyage->getVilleArrivee()
+                    ),
+                    [
+                        'voyageId' => $voyage->getId(),
+                        'demandeId' => $demande->getId(),
+                        'propositionId' => $proposition->getId(),
+                    ]
+                );
+            }
+        }
+
+        // 4️⃣ Persister les changements
         $this->entityManager->flush();
     }
 

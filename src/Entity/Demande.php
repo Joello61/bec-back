@@ -84,10 +84,14 @@ class Demande
     #[ORM\OneToMany(targetEntity: Signalement::class, mappedBy: 'demande', cascade: ['remove'])]
     private Collection $signalements;
 
+    #[ORM\OneToMany(targetEntity: Proposition::class, mappedBy: 'demande', cascade: ['persist', 'remove'])]
+    private Collection $propositions;
+
     public function __construct()
     {
         $this->favoris = new ArrayCollection();
         $this->signalements = new ArrayCollection();
+        $this->propositions = new ArrayCollection();
     }
 
     #[ORM\PrePersist]
@@ -232,6 +236,12 @@ class Demande
         return $this->updatedAt;
     }
 
+    public function setUpdatedAt(): static
+    {
+        $this->updatedAt = new \DateTime();
+        return $this;
+    }
+
     public function getFavoris(): Collection
     {
         return $this->favoris;
@@ -240,5 +250,10 @@ class Demande
     public function getSignalements(): Collection
     {
         return $this->signalements;
+    }
+
+    public function getPropositions(): Collection
+    {
+        return $this->propositions;
     }
 }

@@ -116,7 +116,67 @@ readonly class DemandeService
     public function deleteDemande(int $id): void
     {
         $demande = $this->getDemande($id);
+
+        // Éviter de retraiter une demande déjà annulée ou expirée
+        if (in_array($demande->getStatut(), ['annulee', 'expiree'], true)) {
+            return;
+        }
+
+        // Mettre à jour le statut principal
         $demande->setStatut('annulee');
+        $demande->setUpdatedAt();
+
+        // 3️⃣ Parcourir toutes les propositions liées
+        foreach ($demande->getPropositions() as $proposition) {
+            $voyage = $proposition->getVoyage();
+            $statut = $proposition->getStatut();
+
+            // Si la proposition était acceptée → libérer le poids du voyage
+            if ($statut === 'acceptee' && $voyage) {
+                $poidsDisponible = (float) $voyage->getPoidsDisponibleRestant();
+                $poidsDemande = (float) $demande->getPoidsEstime();
+                $nouveauPoidsRestant = max(0, $poidsDisponible + $poidsDemande);
+
+                // Doctrine attend une string pour DECIMAL
+                $voyage->setPoidsDisponibleRestant(number_format($nouveauPoidsRestant, 2, '.', ''));
+
+                // Si le voyage était complet mais a maintenant de la place
+                if ($voyage->getStatut() === 'complete' && $nouveauPoidsRestant > 0) {
+                    $voyage->setStatut('actif');
+                }
+            }
+
+            // Annuler la proposition si elle ne l'est pas déjà
+            if ($statut !== 'annulee') {
+                $proposition->setStatut('annulee');
+                $proposition->setReponduAt(new \DateTimeImmutable());
+            }
+
+            // Notifier les voyageurs concernés (en attente ou acceptée)
+            if (in_array($statut, ['en_attente', 'acceptee'], true) && $voyage) {
+                $voyageur = $voyage->getVoyageur();
+
+                $this->notificationService->createNotification(
+                    $voyageur,
+                    'demande_annulee',
+                    'Demande annulée',
+                    sprintf(
+                        "La demande de %s %s pour le voyage %s vers %s a été annulée.",
+                        $demande->getClient()->getPrenom(),
+                        $demande->getClient()->getNom(),
+                        $voyage->getVilleDepart(),
+                        $voyage->getVilleArrivee()
+                    ),
+                    [
+                        'demandeId' => $demande->getId(),
+                        'voyageId' => $voyage->getId(),
+                        'propositionId' => $proposition->getId(),
+                    ]
+                );
+            }
+        }
+
+        // Sauvegarder toutes les modifications
         $this->entityManager->flush();
     }
 

@@ -47,6 +47,10 @@ class Voyage
     #[Groups(['voyage:read', 'voyage:list', 'voyage:write', 'favori:list'])]
     private ?string $poidsDisponible = null;
 
+    #[ORM\Column(type: Types::DECIMAL, precision: 5, scale: 2, options: ['default' => 0])]
+    #[Groups(['voyage:read', 'voyage:list', 'voyage:write', 'favori:list'])]
+    private ?string $poidsDisponibleRestant = null;
+
     // ==================== NOUVEAUX CHAMPS PRIX/COMMISSION ====================
 
     #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
@@ -91,11 +95,15 @@ class Voyage
     #[ORM\OneToMany(targetEntity: Signalement::class, mappedBy: 'voyage', cascade: ['remove'])]
     private Collection $signalements;
 
+    #[ORM\OneToMany(targetEntity: Proposition::class, mappedBy: 'voyage', cascade: ['persist', 'remove'])]
+    private Collection $propositions;
+
     public function __construct()
     {
         $this->avis = new ArrayCollection();
         $this->favoris = new ArrayCollection();
         $this->signalements = new ArrayCollection();
+        $this->propositions = new ArrayCollection();
     }
 
     #[ORM\PrePersist]
@@ -182,6 +190,17 @@ class Voyage
         return $this;
     }
 
+    public function getPoidsDisponibleRestant(): ?string
+    {
+        return $this->poidsDisponibleRestant;
+    }
+
+    public function setPoidsDisponibleRestant(?string $poidsDisponibleRestant): static
+    {
+        $this->poidsDisponibleRestant = $poidsDisponibleRestant;
+        return $this;
+    }
+
     // ==================== GETTERS/SETTERS PRIX/COMMISSION ====================
 
     public function getPrixParKilo(): ?string
@@ -251,6 +270,12 @@ class Voyage
         return $this->updatedAt;
     }
 
+    public function setUpdatedAt(): static
+    {
+        $this->updatedAt = new \DateTime();
+        return $this;
+    }
+
     public function getAvis(): Collection
     {
         return $this->avis;
@@ -264,5 +289,10 @@ class Voyage
     public function getSignalements(): Collection
     {
         return $this->signalements;
+    }
+
+    public function getPropositions(): Collection
+    {
+        return $this->propositions;
     }
 }
