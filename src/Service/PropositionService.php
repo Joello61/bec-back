@@ -118,7 +118,7 @@ readonly class PropositionService
      */
     public function respondToProposition(int $propositionId, RespondPropositionDTO $dto, User $voyageur): Proposition
     {
-        /* @var Proposition $proposition */
+        /** @var Proposition|null $proposition */
         $proposition = $this->propositionRepository->find($propositionId);
 
         if (!$proposition) {
@@ -138,14 +138,23 @@ readonly class PropositionService
         if ($dto->action === 'accepter') {
             $proposition->setStatut('acceptee');
             $proposition->setReponduAt(new \DateTime());
-            $newVoyagePoids = $proposition->getVoyage()->getPoidsDisponible() - $proposition->getDemande()->getPoidsEstime();
-            $proposition->getVoyage()->setPoidsDisponible($newVoyagePoids);
-            if ($newVoyagePoids == 0) {
+
+            //Conversion sécurisée (Doctrine renvoie des strings pour DECIMAL)
+            $poidsDisponible = (float) $proposition->getVoyage()->getPoidsDisponible();
+            $poidsDemande = (float) $proposition->getDemande()->getPoidsEstime();
+
+            //Calcul et protection contre les valeurs négatives
+            $newVoyagePoids = max(0, $poidsDisponible - $poidsDemande);
+
+            //Conversion en string pour Doctrine (DECIMAL)
+            $proposition->getVoyage()->setPoidsDisponible(number_format($newVoyagePoids, 2, '.', ''));
+
+            if ($newVoyagePoids == 0.0) {
                 $proposition->getVoyage()->setStatut('complete');
             }
+
             $proposition->getDemande()->setStatut('voyageur_trouve');
 
-            // Notifier le client
             $this->notificationService->createNotification(
                 $proposition->getClient(),
                 'proposition_acceptee',
@@ -159,7 +168,7 @@ readonly class PropositionService
                 ),
                 [
                     'propositionId' => $proposition->getId(),
-                    'voyageId' => $proposition->getVoyage()->getId()
+                    'voyageId' => $proposition->getVoyage()->getId(),
                 ]
             );
         } else {
@@ -167,7 +176,6 @@ readonly class PropositionService
             $proposition->setMessageRefus($dto->messageRefus);
             $proposition->setReponduAt(new \DateTime());
 
-            // Notifier le client
             $this->notificationService->createNotification(
                 $proposition->getClient(),
                 'proposition_refusee',
@@ -181,7 +189,7 @@ readonly class PropositionService
                 ),
                 [
                     'propositionId' => $proposition->getId(),
-                    'voyageId' => $proposition->getVoyage()->getId()
+                    'voyageId' => $proposition->getVoyage()->getId(),
                 ]
             );
         }
