@@ -92,7 +92,12 @@ RUN mkdir -p /run/php /run/nginx var/cache var/log public/uploads \
 EXPOSE 80
 
 # Healthcheck (vérifie la route Symfony /health)
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://127.0.0.1/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD \
+  if [ "$RUN_MODE" = "web" ] || [ -z "$RUN_MODE" ]; then \
+    wget -qO- http://127.0.0.1/health || exit 1; \
+  else \
+    echo "Skipping healthcheck for non-web mode"; \
+  fi
 
 # ==================== CMD avec support multi-modes ====================
 # RUN_MODE:
