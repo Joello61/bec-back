@@ -5,18 +5,30 @@ declare(strict_types=1);
 namespace App\EventListener;
 
 use App\Entity\User;
+use App\Service\CookieManager;
+use App\Service\MercureTokenService;
+use App\Service\RefreshTokenManager;
 use Lexik\Bundle\JWTAuthenticationBundle\Event\AuthenticationSuccessEvent;
 use Lexik\Bundle\JWTAuthenticationBundle\Event\JWTCreatedEvent;
 use Lexik\Bundle\JWTAuthenticationBundle\Event\AuthenticationFailureEvent;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
+use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
 
-class JWTListener
+readonly class JWTListener
 {
+    public function __construct(
+        private MercureTokenService $mercureTokenService,
+        private RefreshTokenManager $refreshTokenManager,
+        private CookieManager $cookieManager,
+        private LoggerInterface $logger,
+    ) {}
+
     /**
-     * Appelé après une tentative d'authentification réussie
-     * Vérifie que l'email est vérifié avant d'autoriser la connexion
+     * Appelé après une authentification réussie
      */
     public function onAuthenticationSuccess(AuthenticationSuccessEvent $event): void
     {
@@ -32,7 +44,31 @@ class JWTListener
             );
         }
 
-        // Enrichir la réponse avec les données utilisateur
+        try {
+            // Générer les tokens
+            $mercureToken = $this->mercureTokenService->generate($user);
+            $refreshToken = $this->refreshTokenManager->createAndSaveRefreshToken($user);
+
+            // Créer les cookies avec le CookieManager
+            $mercureCookie = $this->cookieManager->createMercureCookie($mercureToken);
+            $refreshCookie = $this->cookieManager->createRefreshTokenCookie($refreshToken);
+
+            // Attacher les cookies à la réponse
+            $response = $event->getResponse();
+            if ($response) {
+                $this->cookieManager->attachCookies($response, [
+                    $mercureCookie,
+                    $refreshCookie
+                ]);
+            }
+
+        } catch (\Exception $e) {
+            $this->logger->error('Erreur lors de la création des cookies d\'authentification', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage()
+            ]);
+        }
+
         $data['success'] = true;
         $data['message'] = 'Connexion réussie';
         $data['user'] = [
@@ -46,17 +82,12 @@ class JWTListener
             'photo' => $user->getPhoto(),
             'authProvider' => $user->getAuthProvider(),
         ];
-
-        // Retirer le token de la réponse JSON pour plus de sécurité
-        // (il sera dans le cookie HttpOnly)
         unset($data['token']);
 
         $event->setData($data);
     }
-
     /**
-     * Appelé lors de la création du token JWT
-     * Permet d'ajouter des claims personnalisés
+     * Appelé lors de la création du token JWT principal
      */
     public function onJWTCreated(JWTCreatedEvent $event): void
     {
@@ -76,36 +107,16 @@ class JWTListener
 
     /**
      * Appelé en cas d'échec de l'authentification
-     * Personnalise le message d'erreur
      */
-    /*public function onAuthenticationFailure(AuthenticationFailureEvent $event): void
-    {
-        $exception = $event->getException();
-
-        // Personnaliser le message selon le type d'erreur
-        $message = match (true) {
-            str_contains($exception->getMessage(), 'email') => $exception->getMessage(),
-            default => 'Email ou mot de passe incorrect',
-        };
-
-        $response = new JsonResponse([
-            'success' => false,
-            'message' => $message,
-        ], Response::HTTP_UNAUTHORIZED);
-
-        $event->setResponse($response);
-    }*/
-
     public function onAuthenticationFailure(AuthenticationFailureEvent $event): void
     {
         $exception = $event->getException();
 
-        // TEMPORAIREMENT : Afficher l'erreur complète
         $response = new JsonResponse([
             'success' => false,
-            'message' => $exception->getMessage(),  // ← Message réel !
-            'type' => get_class($exception),         // ← Type d'exception
-            'trace' => $exception->getTraceAsString() // ← Stack trace
+            'message' => $exception->getMessage(),
+            'type' => get_class($exception),
+            'trace' => $exception->getTraceAsString(),
         ], Response::HTTP_UNAUTHORIZED);
 
         $event->setResponse($response);

@@ -25,3 +25,6 @@
 ###< lexik/jwt-authentication-bundle ###
 
 /.idea
+/public/uploads/avatars
+/compose.yaml
+/compose.override.yaml.disabled

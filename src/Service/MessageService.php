@@ -13,6 +13,8 @@ use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use App\Constant\EventType;
+use Psr\Log\LoggerInterface;
 
 readonly class MessageService
 {
@@ -21,7 +23,9 @@ readonly class MessageService
         private MessageRepository $messageRepository,
         private UserRepository $userRepository,
         private ConversationRepository $conversationRepository,
-        private NotificationService $notificationService
+        private NotificationService $notificationService,
+        private RealtimeNotifier $notifier,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -63,6 +67,44 @@ readonly class MessageService
         // Notifier le destinataire (si ses préférences le permettent)
         $this->notificationService->notifyNewMessage($message);
 
+        try {
+            // Données communes
+            $payload = [
+                'title' => 'Nouveau message reçu',
+                'message' => sprintf(
+                    'Vous avez reçu un nouveau message de %s %s.',
+                    $expediteur->getNom(),
+                    $expediteur->getPrenom()
+                ),
+                'messageId' => $message->getId(),
+                'contenu' => $message->getContenu(),
+                'expediteurId' => $expediteur->getId(),
+                'destinataireId' => $destinataire->getId(),
+                'conversationId' => $conversation->getId(),
+                'createdAt' => $message->getCreatedAt()->format('c'),
+            ];
+
+            // Notifier le destinataire (le vrai “récepteur”)
+            $this->notifier->publishToUser(
+                $destinataire,
+                $payload,
+                EventType::MESSAGE_SENT
+            );
+
+            // Notifier aussi l’expéditeur (pour synchro UI sur ses autres appareils)
+            $this->notifier->publishToUser(
+                $expediteur,
+                $payload,
+                EventType::MESSAGE_SENT
+            );
+
+        } catch (\JsonException $e) {
+            $this->logger->error('Échec de la publication de MESSAGE_SENT', [
+                'conversation_id' => $conversation->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         return $message;
     }
 
@@ -84,7 +126,36 @@ readonly class MessageService
             throw new BadRequestHttpException('Vous ne pouvez pas supprimer ce message');
         }
 
+        $conversation = $message->getConversation(); // Récupérer avant la suppression
+        $messageId = $message->getId();
+
         $this->entityManager->remove($message);
         $this->entityManager->flush();
+
+        try {
+            $payload = [
+                'title' => 'Message supprimé',
+                'message' => 'Ce message a été supprimée par un participant ou un administrateur.',
+                'messageId' => $messageId,
+            ];
+
+            // On récupère les participants concernés (2 ou +)
+            $participants = [$conversation->getParticipant1(), $conversation->getParticipant2()];;
+
+            foreach ($participants as $participant) {
+                $this->notifier->publishToUser(
+                    $participant,
+                    $payload,
+                    EventType::MESSAGE_DELETED
+                );
+            }
+
+        } catch (\JsonException $e) {
+            $this->logger->error('Échec de la publication de MESSAGE_DELETED', [
+                'message_id' => $messageId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
     }
 }

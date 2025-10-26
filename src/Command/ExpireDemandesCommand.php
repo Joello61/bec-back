@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Command;
 
+use App\Constant\EventType;
 use App\Repository\DemandeRepository;
+use App\Service\RealtimeNotifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -25,7 +27,8 @@ class ExpireDemandesCommand extends Command
     public function __construct(
         private readonly DemandeRepository $demandeRepository,
         private readonly EntityManagerInterface $entityManager,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly RealtimeNotifier $notifier,
     ) {
         parent::__construct();
     }
@@ -90,6 +93,37 @@ class ExpireDemandesCommand extends Command
 
                 // Flush après chaque lot
                 $this->entityManager->flush();
+
+                foreach ( $batch as $demande ) {
+                    $this->notifier->publishDemandes(
+                        [
+                            'title' => 'Demande expirée',
+                            'message' => sprintf(
+                                'La demande N°%d est arrivée à échéance et a été automatiquement marquée comme expirée.',
+                                $demande->getId()
+                            ),
+                            'demandeId' => $demande->getId(),
+                            'statut' => 'expiree',
+                        ],
+                        EventType::DEMANDE_EXPIRED
+                    );
+
+                    // 2️⃣ Notifie le propriétaire de la demande
+                    $this->notifier->publishToUser(
+                        $demande->getClient(),
+                        [
+                            'title' => 'Votre demande a expiré',
+                            'message' => sprintf(
+                                'Votre demande N°%d est arrivée à échéance et a été clôturée automatiquement.',
+                                $demande->getId()
+                            ),
+                            'demandeId' => $demande->getId(),
+                            'statut' => 'expiree',
+                        ],
+                        EventType::DEMANDE_EXPIRED
+                    );
+                }
+
                 $this->entityManager->clear(); // Libérer la mémoire
 
                 $this->logger->info("Lot {$batchIndex} traité", [
@@ -100,6 +134,23 @@ class ExpireDemandesCommand extends Command
 
             $io->progressFinish();
             $io->newLine();
+
+            if ($processed > 0) {
+                try {
+                    $this->notifier->publishToGroup(
+                        'admin',
+                        [
+                            'titre' => 'Statistiques mis à jour',
+                            'message' => "{$processed} demandes expirées, rafraîchir les stats",
+                        ],
+                        EventType::ADMIN_STATS_UPDATED
+                    );
+                } catch (\JsonException $e) {
+                    $this->logger->error('Erreur lors de la notification Mercure (admin stats)', [
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
 
             // Résumé
             $io->success([

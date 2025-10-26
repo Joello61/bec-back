@@ -12,6 +12,8 @@ use App\Repository\VoyageRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use App\Constant\EventType;
+use Psr\Log\LoggerInterface;
 
 readonly class VoyageService
 {
@@ -20,12 +22,14 @@ readonly class VoyageService
         private VoyageRepository $voyageRepository,
         private NotificationService $notificationService,
         private MatchingService $matchingService,
-        private CurrencyService $currencyService
+        private CurrencyService $currencyService,
+        private LoggerInterface $logger,
+        private RealtimeNotifier $notifier,
     ) {}
 
-    public function getPaginatedVoyages(int $page, int $limit, array $filters = []): array
+    public function getPaginatedVoyages(int $page, int $limit, array $filters = [], ?User $excludeUser = null): array
     {
-        return $this->voyageRepository->findPaginated($page, $limit, $filters);
+        return $this->voyageRepository->findPaginated($page, $limit, $filters, $excludeUser);
     }
 
     public function getVoyage(int $id): Voyage
@@ -66,6 +70,59 @@ readonly class VoyageService
 
         $this->entityManager->persist($voyage);
         $this->entityManager->flush();
+
+        try {
+            // 1. Notifie le public (par exemple pour un fil d’actualités ou une carte en temps réel)
+            $this->notifier->publishPublic(
+                [
+                    'title' => 'Nouveau voyage publié',
+                    'message' => sprintf(
+                        'Un nouveau voyage a été ajouté de %s à %s (départ prévu le %s).',
+                        $voyage->getVilleDepart(),
+                        $voyage->getVilleArrivee(),
+                        $voyage->getDateDepart()?->format('Y-m-d') ?? 'date non précisée'
+                    ),
+                    'voyageId' => $voyage->getId(),
+                    'villeDepart' => $voyage->getVilleDepart(),
+                    'villeArrivee' => $voyage->getVilleArrivee(),
+                    'dateDepart' => $voyage->getDateDepart()?->format('Y-m-d'),
+                    'createdBy' => $user->getId(),
+                ],
+                EventType::VOYAGE_CREATED
+            );
+
+            // 2. Notifie les administrateurs (création d’un nouveau voyage)
+            $this->notifier->publishToGroup(
+                'admin',
+                [
+                    'title' => 'Nouveau voyage créé',
+                    'message' => sprintf(
+                        'Un nouveau voyage (ID: N°%d) a été créé par le voyageur N°%d.',
+                        $voyage->getId(),
+                        $user->getId()
+                    ),
+                    'voyageId' => $voyage->getId(),
+                    'voyageurId' => $user->getId(),
+                ],
+                EventType::VOYAGE_CREATED
+            );
+
+            // 3. Notifie les administrateurs de mettre à jour les statistiques
+            $this->notifier->publishToGroup(
+                'admin',
+                [
+                    'title' => 'Mise à jour des statistiques',
+                    'message' => 'Un nouveau voyage a été publié. Les statistiques doivent être actualisées.',
+                ],
+                EventType::ADMIN_STATS_UPDATED
+            );
+        } catch (\JsonException $e) {
+            $this->logger->error('Échec de la publication de VOYAGE_CREATED', [
+                'voyage_id' => $voyage->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
+
 
         // Notifier les demandes matchées
         $this->notificationService->notifyMatchingDemandes($voyage);
@@ -129,6 +186,61 @@ readonly class VoyageService
         // === Sauvegarde ===
         $this->entityManager->flush();
 
+        try {
+            // Notifie le topic du voyage
+            $this->notifier->publishVoyages(
+                [
+                    'title' => 'Voyage mis à jour',
+                    'message' => sprintf(
+                        'Les détails du voyage N°%d ont été mis à jour. Poids disponible : %s kg, poids restant : %s kg.',
+                        $voyage->getId(),
+                        $voyage->getPoidsDisponible(),
+                        $voyage->getPoidsDisponibleRestant()
+                    ),
+                    'voyageId' => $voyage->getId(),
+                    'poidsDisponible' => $voyage->getPoidsDisponible(),
+                    'poidsDisponibleRestant' => $voyage->getPoidsDisponibleRestant(),
+                ],
+                EventType::VOYAGE_UPDATED
+            );
+
+            // 2️⃣ Notification directe au voyageur (propriétaire du voyage)
+            $this->notifier->publishToUser(
+                $voyage->getVoyageur(),
+                [
+                    'title' => 'Votre voyage a été mis à jour',
+                    'message' => sprintf(
+                        'Le voyage N°%d a bien été modifié. Poids restant : %s kg.',
+                        $voyage->getId(),
+                        $voyage->getPoidsDisponibleRestant()
+                    ),
+                    'voyageId' => $voyage->getId(),
+                    'poidsDisponibleRestant' => $voyage->getPoidsDisponibleRestant(),
+                ],
+                EventType::VOYAGE_UPDATED
+            );
+
+            // 3️⃣ Optionnel : notification aux admins (pour stats/dashboard)
+            $this->notifier->publishToGroup(
+                'admin',
+                [
+                    'title' => 'Mise à jour de voyage',
+                    'message' => sprintf(
+                        'Le voyage N°%d a été modifié par %s %s.',
+                        $voyage->getId(),
+                        $voyage->getVoyageur()->getNom(),
+                        $voyage->getVoyageur()->getPrenom()
+                    ),
+                ],
+                EventType::ADMIN_STATS_UPDATED
+            );
+        } catch (\JsonException $e) {
+            $this->logger->error('Échec de la publication de VOYAGE_UPDATED', [
+                'voyage_id' => $voyage->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         return $voyage;
     }
 
@@ -137,6 +249,101 @@ readonly class VoyageService
         $voyage = $this->getVoyage($id);
         $voyage->setStatut($statut);
         $this->entityManager->flush();
+
+        $eventType = match ($statut) {
+            'complet' => EventType::VOYAGE_COMPLETED,
+            'annule'  => EventType::VOYAGE_CANCELLED,
+            'expire'  => EventType::VOYAGE_EXPIRED,
+            default   => EventType::VOYAGE_UPDATED,
+        };
+
+        try {
+            $title = '';
+            $message = '';
+
+            switch ($statut) {
+                case 'complet':
+                    $title = 'Voyage complété';
+                    $message = sprintf(
+                        'Le voyage N°%d a été marqué comme complété.',
+                        $voyage->getId()
+                    );
+                    break;
+
+                case 'annule':
+                    $title = 'Voyage annulé';
+                    $message = sprintf(
+                        'Le voyage N°%d a été annulé par le voyageur ou un administrateur.',
+                        $voyage->getId()
+                    );
+                    break;
+
+                case 'expire':
+                    $title = 'Voyage expiré';
+                    $message = sprintf(
+                        'Le voyage N°%d est arrivé à expiration et a été automatiquement clôturé.',
+                        $voyage->getId()
+                    );
+                    break;
+
+                default:
+                    $title = 'Voyage mis à jour';
+                    $message = sprintf(
+                        'Le statut du voyage N°%d a été mis à jour : %s.',
+                        $voyage->getId(),
+                        ucfirst($statut)
+                    );
+                    break;
+            }
+
+            // 1️⃣ Publication globale (flux voyages)
+            $this->notifier->publishVoyages(
+                [
+                    'title' => $title,
+                    'message' => $message,
+                    'voyageId' => $voyage->getId(),
+                    'statut' => $statut,
+                ],
+                $eventType
+            );
+
+            // 2️⃣ Notification directe au voyageur
+            $this->notifier->publishToUser(
+                $voyage->getVoyageur(),
+                [
+                    'title' => $title,
+                    'message' => $message,
+                    'voyageId' => $voyage->getId(),
+                    'statut' => $statut,
+                ],
+                $eventType
+            );
+
+            // 3️⃣ Notification groupe admin (pour rafraîchir stats ou logs)
+            $this->notifier->publishToGroup(
+                'admin',
+                [
+                    'title' => 'Mise à jour du statut d’un voyage',
+                    'message' => sprintf(
+                        'Le voyage #%d a changé de statut : %s.',
+                        $voyage->getId(),
+                        $statut
+                    ),
+                    'voyageId' => $voyage->getId(),
+                    'statut' => $statut,
+                ],
+                EventType::ADMIN_STATS_UPDATED
+            );
+
+        } catch (\JsonException $e) {
+            $this->logger->error('Échec de la publication de la mise à jour du statut du voyage', [
+                'voyage_id' => $voyage->getId(),
+                'statut' => $statut,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+
 
         return $voyage;
     }
@@ -168,6 +375,7 @@ readonly class VoyageService
             if ($demande && !in_array($demande->getStatut(), ['annulee', 'expiree'], true)) {
                 $demande->setStatut('en_recherche');
                 $demande->setUpdatedAt(new \DateTimeImmutable());
+                $client = $demande->getClient();
 
                 // Notifier le client concerné
                 $this->notificationService->createNotification(
@@ -186,11 +394,120 @@ Votre demande est de nouveau en recherche d’un voyageur.",
                         'propositionId' => $proposition->getId(),
                     ]
                 );
+
+                try {
+                    // 1️⃣ Notifie le client que sa proposition est annulée
+                    $this->notifier->publishToUser(
+                        $client,
+                        [
+                            'title' => 'Proposition annulée',
+                            'message' => sprintf(
+                                'Votre proposition N°%d liée au voyage N°%d a été annulée suite à la suppression du voyage.',
+                                $proposition->getId(),
+                                $voyage->getId()
+                            ),
+                            'propositionId' => $proposition->getId(),
+                            'voyageId' => $voyage->getId(),
+                        ],
+                        EventType::PROPOSITION_CANCELLED
+                    );
+
+                    // 2️⃣ Notifie le flux global des demandes (topic public `/topics/demandes`)
+                    $this->notifier->publishDemandes(
+                        [
+                            'title' => 'Demande mise à jour',
+                            'message' => sprintf(
+                                'Le statut de la demande N°%d a été réinitialisé à "en recherche" suite à l’annulation du voyage.',
+                                $demande->getId()
+                            ),
+                            'demandeId' => $demande->getId(),
+                            'statut' => 'en_recherche',
+                        ],
+                        EventType::DEMANDE_STATUT_UPDATED
+                    );
+
+                    // 3️⃣ (Optionnel) Notifie les administrateurs pour les stats
+                    $this->notifier->publishToGroup(
+                        'admin',
+                        [
+                            'title' => 'Proposition annulée suite à suppression de voyage',
+                            'message' => sprintf(
+                                'La proposition #%d et la demande #%d ont été impactées par la suppression du voyage #%d.',
+                                $proposition->getId(),
+                                $demande->getId(),
+                                $voyage->getId()
+                            ),
+                        ],
+                        EventType::ADMIN_STATS_UPDATED
+                    );
+
+                } catch (\JsonException $e) {
+                    $this->logger->error('Échec de la publication de l’annulation côté client lors de la suppression du voyage', [
+                        'demande_id' => $demande->getId(),
+                        'voyage_id' => $voyage->getId(),
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+
+
             }
         }
 
-        // 4️⃣ Persister les changements
+        // Persister les changements
         $this->entityManager->flush();
+
+        try {
+            // 1️⃣ Notifie le flux global des voyages (topic public)
+            $this->notifier->publishVoyages(
+                [
+                    'title' => 'Voyage annulé',
+                    'message' => sprintf(
+                        'Le voyage N°%d a été annulé par le voyageur ou un administrateur.',
+                        $voyage->getId()
+                    ),
+                    'voyageId' => $voyage->getId(),
+                    'statut' => 'annule',
+                ],
+                EventType::VOYAGE_CANCELLED
+            );
+
+            // 2️⃣ Notifie le voyageur concerné
+            $this->notifier->publishToUser(
+                $voyage->getVoyageur(),
+                [
+                    'title' => 'Votre voyage a été annulé',
+                    'message' => sprintf(
+                        'Votre voyage N°%d a été marqué comme annulé.',
+                        $voyage->getId()
+                    ),
+                    'voyageId' => $voyage->getId(),
+                    'statut' => 'annule',
+                ],
+                EventType::VOYAGE_CANCELLED
+            );
+
+            // 3️⃣ Notifie les administrateurs pour rafraîchir les statistiques
+            $this->notifier->publishToGroup(
+                'admin',
+                [
+                    'title' => 'Mise à jour des statistiques',
+                    'message' => sprintf(
+                        'Le voyage N°%d a été annulé. Les statistiques doivent être actualisées.',
+                        $voyage->getId()
+                    ),
+                    'voyageId' => $voyage->getId(),
+                    'statut' => 'annule',
+                ],
+                EventType::ADMIN_STATS_UPDATED
+            );
+
+        } catch (\JsonException $e) {
+            $this->logger->error('Échec de la publication de VOYAGE_CANCELLED (global)', [
+                'voyage_id' => $voyage->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
+
     }
 
     public function getVoyagesByUser(int $userId): array

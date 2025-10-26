@@ -144,6 +144,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: Signalement::class, mappedBy: 'utilisateurSignale')]
     private Collection $signalementsRecus;
 
+    #[ORM\OneToMany(targetEntity: RefreshToken::class, mappedBy: 'user', orphanRemoval: true)]
+    private Collection $refreshTokens;
+
     public function __construct()
     {
         $this->voyages = new ArrayCollection();
@@ -159,6 +162,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->conversationsAsParticipant2 = new ArrayCollection();
         $this->authProvider = 'local';
         $this->signalementsRecus = new ArrayCollection();
+        $this->refreshTokens = new ArrayCollection();
     }
 
     #[ORM\PrePersist]
@@ -548,6 +552,32 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->bannedAt = null;
         $this->banReason = null;
         $this->bannedBy = null;
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, RefreshToken>
+     */
+    public function getRefreshTokens(): Collection
+    {
+        return $this->refreshTokens;
+    }
+
+    public function addRefreshToken(RefreshToken $refreshToken): static
+    {
+        if (!$this->refreshTokens->contains($refreshToken)) {
+            $this->refreshTokens->add($refreshToken);
+            $refreshToken->setUser($this);
+        }
+        return $this;
+    }
+
+    public function removeRefreshToken(RefreshToken $refreshToken): static
+    {
+        // set the owning side to null (unless already changed)
+        if ($this->refreshTokens->removeElement($refreshToken) && $refreshToken->getUser() === $this) {
+            $refreshToken->setUser(null);
+        }
         return $this;
     }
 }

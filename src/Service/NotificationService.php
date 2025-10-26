@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Constant\EventType;
 use App\Entity\Demande;
 use App\Entity\Message;
 use App\Entity\Notification;
@@ -11,8 +12,10 @@ use App\Entity\User;
 use App\Entity\Voyage;
 use App\Repository\DemandeRepository;
 use App\Repository\NotificationRepository;
+use App\Repository\UserRepository;
 use App\Repository\VoyageRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 readonly class NotificationService
@@ -21,7 +24,10 @@ readonly class NotificationService
         private EntityManagerInterface $entityManager,
         private NotificationRepository $notificationRepository,
         private VoyageRepository $voyageRepository,
-        private DemandeRepository $demandeRepository
+        private DemandeRepository $demandeRepository,
+        private UserRepository $userRepository, // <-- AJOUT
+        private RealtimeNotifier $notifier,     // <-- AJOUT
+        private LoggerInterface $logger
     ) {}
 
     /**
@@ -68,6 +74,35 @@ readonly class NotificationService
 
         $this->entityManager->persist($notification);
         $this->entityManager->flush();
+
+        try {
+            // On recalcule le total pour que le client ait le bon chiffre
+            $unreadCount = $this->countUnread($user->getId());
+
+            $this->notifier->publishToUser(
+                $user,
+                [
+                    // On envoie la notification complète
+                    'notification' => [
+                        'id' => $notification->getId(),
+                        'type' => $notification->getType(),
+                        'titre' => $notification->getTitre(),
+                        'message' => $notification->getMessage(),
+                        'data' => $notification->getData(),
+                        'lue' => $notification->isLue(),
+                        'createdAt' => $notification->getCreatedAt()->format('c'),
+                    ],
+                    'newUnreadCount' => $unreadCount,
+                ],
+                EventType::NOTIFICATION_NEW
+            );
+        } catch (\JsonException $e) {
+            $this->logger->error('Failed to publish NOTIFICATION_NEW', [
+                'user_id' => $user->getId(),
+                'notification_id' => $notification->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return $notification;
     }
@@ -178,13 +213,66 @@ readonly class NotificationService
             throw new NotFoundHttpException('Notification non trouvée');
         }
 
+        $user = $notification->getUser(); // <-- Récupérer l'utilisateur
+        if (!$user) {
+            $this->logger->error('Notification has no user', ['notification_id' => $id]);
+            return;
+        }
+
         $notification->setLue(true);
         $this->entityManager->flush();
+
+        try {
+            $unreadCount = $this->countUnread($user->getId());
+
+            $this->notifier->publishToUser(
+                $user,
+                [
+                    'title' => 'Notification lue',
+                    'message' => sprintf(
+                        'La notification #%d a été marquée comme lue. Vous avez désormais %d notification(s) non lue(s).',
+                        $id,
+                        $unreadCount
+                    ),
+                    'notificationId' => $id,
+                    'newUnreadCount' => $unreadCount,
+                ],
+                EventType::NOTIFICATION_READ
+            );
+        } catch (\JsonException $e) {
+            $this->logger->error('Échec de la publication de NOTIFICATION_READ', [
+                'user_id' => $user->getId(),
+                'notification_id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
     }
 
     public function markAllAsRead(int $userId): void
     {
         $this->notificationRepository->markAllAsRead($userId);
+        $user = $this->userRepository->find($userId);
+        if ($user) {
+            try {
+                $this->notifier->publishToUser(
+                    $user,
+                    [
+                        'title' => 'Toutes les notifications lues',
+                        'message' => 'Toutes vos notifications ont été marquées comme lues. Vous n’avez plus aucune notification non lue.',
+                        'allRead' => true,
+                        'newUnreadCount' => 0,
+                    ],
+                    EventType::NOTIFICATION_READ
+                );
+            } catch (\JsonException $e) {
+                $this->logger->error('Échec de la publication de NOTIFICATION_READ (all)', [
+                    'user_id' => $userId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+        }
     }
 
     public function deleteNotification(int $id): void
@@ -195,8 +283,39 @@ readonly class NotificationService
             throw new NotFoundHttpException('Notification non trouvée');
         }
 
+        $user = $notification->getUser(); // <-- Récupérer l'utilisateur
+
         $this->entityManager->remove($notification);
         $this->entityManager->flush();
+
+        if ($user) {
+            try {
+                // On notifie le client que le compteur de notifications a changé
+                $unreadCount = $this->countUnread($user->getId());
+
+                $this->notifier->publishToUser(
+                    $user,
+                    [
+                        'title' => 'Notification supprimée',
+                        'message' => sprintf(
+                            'La notification N°%d a été supprimée. Vous avez désormais %d notification(s) non lue(s).',
+                            $id,
+                            $unreadCount
+                        ),
+                        'deletedNotificationId' => $id,
+                        'newUnreadCount' => $unreadCount,
+                    ],
+                    EventType::NOTIFICATION_DELETED
+                );
+            } catch (\JsonException $e) {
+                $this->logger->error('Échec de la publication de NOTIFICATION_DELETED', [
+                    'user_id' => $user->getId(),
+                    'notification_id' => $id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+        }
     }
 
     public function notifyUserBanned(User $user, User $admin, string $reason): void

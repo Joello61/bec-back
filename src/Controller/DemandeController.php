@@ -56,9 +56,10 @@ class DemandeController extends AbstractController
             'villeDepart' => $request->query->get('villeDepart'),
             'villeArrivee' => $request->query->get('villeArrivee'),
             'statut' => $request->query->get('statut'),
+            'dateLimite' => $request->query->get('dateLimite'),
         ];
 
-        $result = $this->demandeService->getPaginatedDemandes($page, $limit, $filters);
+        $result = $this->demandeService->getPaginatedDemandes($page, $limit, $filters, $currentUser);
 
         // ==================== CONVERSION AUTOMATIQUE ====================
         $demandesWithConversion = array_map(function ($demande) use ($viewerCurrency) {

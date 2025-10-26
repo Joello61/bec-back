@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\DTO;
 
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
@@ -73,14 +74,19 @@ class CompleteProfileDTO
 
     // ==================== CHAMPS OPTIONNELS ====================
 
+    #[Assert\File(
+        maxSize: '5M',
+        mimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+        mimeTypesMessage: 'Formats acceptés : JPEG, PNG, WebP uniquement'
+    )]
+    public ?UploadedFile $photo = null;
+
+
     #[Assert\Length(
         max: 500,
         maxMessage: 'La bio ne peut pas dépasser {{ limit }} caractères'
     )]
     public ?string $bio = null;
-
-    #[Assert\Url(message: 'L\'URL de la photo n\'est pas valide')]
-    public ?string $photo = null;
 
     /**
      * Validation personnalisée : au moins un format d'adresse doit être complet

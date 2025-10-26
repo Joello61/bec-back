@@ -7,7 +7,7 @@ lexik_jwt_authentication:
     set_cookies:
         bagage_token:
             lifetime: '%env(int:JWT_TTL)%'
-            samesite: "lax" # "lax", "strict" ou "none"
+            samesite: "none"
             path: /
             domain: '%env(JWT_COOKIE_DOMAIN)%'
             secure: '%env(bool:JWT_COOKIE_SECURE)%'

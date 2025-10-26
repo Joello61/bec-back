@@ -12,6 +12,7 @@ use App\Repository\MessageRepository;
 use App\Repository\SignalementRepository;
 use App\Repository\UserRepository;
 use App\Repository\VoyageRepository;
+use App\Service\SignalementService;
 use Doctrine\ORM\EntityManagerInterface;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -20,6 +21,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -28,12 +30,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class SignalementController extends AbstractController
 {
     public function __construct(
-        private readonly EntityManagerInterface $entityManager,
-        private readonly SignalementRepository $signalementRepository,
-        private readonly VoyageRepository $voyageRepository,
-        private readonly DemandeRepository $demandeRepository,
-        private readonly MessageRepository $messageRepository,
-        private readonly UserRepository $userRepository,
+        private readonly SignalementService $signalementService,
     ) {}
 
     #[Route('/me', name: 'me', methods: ['GET'])]
@@ -56,7 +53,7 @@ class SignalementController extends AbstractController
         /* @var User $currentUser*/
         $currentUser = $this->getUser();
 
-        $result = $this->signalementRepository->findUserSignalementPaginated($currentUser, $page, $limit, $statut);
+        $result = $this->signalementService->getUserSignalements($currentUser, $page, $limit, $statut);
 
         return $this->json($result, Response::HTTP_OK, [], ['groups' => ['signalement:list']]);
     }
@@ -78,7 +75,7 @@ class SignalementController extends AbstractController
         $limit = $request->query->getInt('limit', 10);
         $statut = $request->query->get('statut');
 
-        $result = $this->signalementRepository->findPaginated($page, $limit, $statut);
+        $result = $this->signalementService->getAllSignalements($page, $limit, $statut);
 
         return $this->json($result, Response::HTTP_OK, [], ['groups' => ['signalement:list']]);
     }
@@ -110,53 +107,7 @@ class SignalementController extends AbstractController
 
         $this->denyAccessUnlessGranted('SIGNALEMENT_CREATE');
 
-        $voyage = null;
-        $demande = null;
-        $message = null;
-        $user = null;
-
-        if ($dto->voyageId) {
-            $voyage = $this->voyageRepository->find($dto->voyageId);
-            if (!$voyage) {
-                return $this->json(['message' => 'Voyage non trouvé'], Response::HTTP_NOT_FOUND);
-            }
-        }
-
-        if ($dto->demandeId) {
-            $demande = $this->demandeRepository->find($dto->demandeId);
-            if (!$demande) {
-                return $this->json(['message' => 'Demande non trouvée'], Response::HTTP_NOT_FOUND);
-            }
-        }
-
-        if ($dto->messageId) {
-            $message = $this->messageRepository->find($dto->messageId);
-            if (!$message) {
-                return $this->json(['message' => 'Message non trouvé'], Response::HTTP_NOT_FOUND);
-            }
-        }
-
-        if ($dto->utilisateurSignaleId) {
-            $user = $this->userRepository->find($dto->utilisateurSignaleId);
-            if (!$user) {
-                return $this->json(['message' => 'Utilisateur non trouvé'], Response::HTTP_NOT_FOUND);
-            } else if ($user->getId() === $currentUser->getId()) {
-                return $this->json(['message' => 'Vous ne pouvez pas vous signaler vous même'], Response::HTTP_BAD_REQUEST);
-            }
-        }
-
-        $signalement = new Signalement();
-        $signalement->setSignaleur($this->getUser())
-            ->setVoyage($voyage)
-            ->setDemande($demande)
-            ->setMessage($message)
-            ->setUtilisateurSignale($user)
-            ->setMotif($dto->motif)
-            ->setDescription($dto->description)
-            ->setStatut('en_attente');
-
-        $this->entityManager->persist($signalement);
-        $this->entityManager->flush();
+        $signalement = $this->signalementService->createSignalement($dto, $currentUser);
 
         return $this->json($signalement, Response::HTTP_CREATED, [], ['groups' => ['signalement:read']]);
     }
@@ -180,25 +131,23 @@ class SignalementController extends AbstractController
     #[OA\Response(response: 200, description: 'Signalement traité')]
     public function process(int $id, Request $request): JsonResponse
     {
-        $signalement = $this->signalementRepository->find($id);
-        if (!$signalement) {
-            return $this->json(['message' => 'Signalement non trouvé'], Response::HTTP_NOT_FOUND);
-        }
-
         $data = json_decode($request->getContent(), true);
+
         $statut = $data['statut'] ?? null;
         $reponseAdmin = $data['reponseAdmin'] ?? null;
 
-        if (!in_array($statut, ['traite', 'rejete'])) {
-            return $this->json(['message' => 'Statut invalide'], Response::HTTP_BAD_REQUEST);
+        if (!$statut || !in_array($statut, ['traite', 'rejete'], true)) {
+            throw new BadRequestHttpException('Statut invalide. Valeurs possibles : traite ou rejete.');
         }
 
-        $signalement->setStatut($statut)
-            ->setReponseAdmin($reponseAdmin);
+        $signalement = $this->signalementService->processSignalement($id, $statut, $reponseAdmin);
 
-        $this->entityManager->flush();
-
-        return $this->json($signalement, Response::HTTP_OK, [], ['groups' => ['signalement:read']]);
+        return $this->json(
+            $signalement,
+            Response::HTTP_OK,
+            [],
+            ['groups' => ['signalement:read']]
+        );
     }
 
     #[Route('/pending-count', name: 'pending_count', methods: ['GET'])]
@@ -219,7 +168,7 @@ class SignalementController extends AbstractController
     )]
     public function pendingCount(): JsonResponse
     {
-        $count = $this->signalementRepository->countEnAttente();
+        $count = $this->signalementService->countPending();
 
         return $this->json(['count' => $count]);
     }

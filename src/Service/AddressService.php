@@ -11,6 +11,8 @@ use App\Repository\CountryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Psr\Log\LoggerInterface;
+use App\Constant\EventType;
+use App\Service\RealtimeNotifier;
 
 readonly class AddressService
 {
@@ -21,6 +23,7 @@ readonly class AddressService
         private LoggerInterface $logger,
         private GeoDataService $geoDataService,
         private CountryRepository $countryRepository,
+        private RealtimeNotifier $notifier,
     ) {}
 
     /**
@@ -92,6 +95,24 @@ readonly class AddressService
             'user_id' => $user->getId(),
             'address_id' => $address->getId()
         ]);
+
+        try {
+            // On notifie les admins que le profil/settings de cet user a changé
+            $this->notifier->publishToGroup(
+                'admin',
+                [
+                    'titre' => "Mise à jour de l'adresse de l'utilisateur",
+                    'message' => "L'utilisateur {$user->getNom()} N°{$user->getId()} a enregistré une adresse.",
+                    'userId' => $user->getId(),
+                ],
+                EventType::USER_SETTINGS_UPDATED
+            );
+        } catch (\JsonException $e) {
+            $this->logger->error('Failed to publish ADMIN USER_SETTINGS_UPDATED on address create', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return $address;
     }
@@ -173,6 +194,25 @@ readonly class AddressService
             'user_id' => $address->getUser()->getId(),
             'address_id' => $address->getId()
         ]);
+
+        try {
+            $this->notifier->publishToGroup(
+                'admin',
+                [
+                    'titre' => "Mise à jour de l'adresse de l'utilisateur",
+                    'message' => "L'utilisateur {$address->getUser()->getNom()} N°{$address->getUser()->getId()} a modifié son adresse.",
+                    'userId' => $address->getUser()->getId(),
+                    'devise' => $address->getUser()->getSettings()->getDevise(),
+                    'langue' => $address->getUser()->getSettings()->getLangue(),
+                ],
+                EventType::USER_SETTINGS_UPDATED
+            );
+        } catch (\JsonException $e) {
+            $this->logger->error('Failed to publish ADMIN USER_SETTINGS_UPDATED on address update', [
+                'user_id' => $address->getUser()->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return $address;
     }
@@ -273,5 +313,23 @@ readonly class AddressService
             'user_id' => $userId,
             'address_id' => $address->getId()
         ]);
+
+        try {
+            $this->notifier->publishToGroup(
+                'admin',
+                [
+                    'titre' => "Mise à jour de l'adresse de l'utilisateur",
+                    'message' => "L'utilisateur {$address->getUser()->getNom()} N°{$address->getUser()->getId()} a supprimé son adresse.",
+                    'userId' => $userId,
+                    'addressDeleted' => true
+                ],
+                EventType::USER_PROFILE_UPDATED
+            );
+        } catch (\JsonException $e) {
+            $this->logger->error('Failed to publish ADMIN USER_PROFILE_UPDATED on address delete', [
+                'user_id' => $userId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

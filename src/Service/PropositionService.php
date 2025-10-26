@@ -12,6 +12,8 @@ use App\Repository\DemandeRepository;
 use App\Repository\PropositionRepository;
 use App\Repository\VoyageRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use App\Constant\EventType;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -24,6 +26,8 @@ readonly class PropositionService
         private DemandeRepository $demandeRepository,
         private NotificationService $notificationService,
         private CurrencyService $currencyService,
+        private LoggerInterface $logger,
+        private RealtimeNotifier $notifier,
     ) {}
 
     /**
@@ -110,6 +114,73 @@ readonly class PropositionService
             ]
         );
 
+        try {
+            // 1. Notifie le voyageur (mise à jour de l’interface)
+            $this->notifier->publishToUser(
+                $voyage->getVoyageur(),
+                [
+                    'title' => 'Nouvelle proposition reçue',
+                    'message' => sprintf(
+                        'Vous avez reçu une nouvelle proposition pour votre voyage N°%d.',
+                        $voyageId
+                    ),
+                    'propositionId' => $proposition->getId(),
+                    'voyageId' => $voyageId,
+                ],
+                EventType::PROPOSITION_CREATED
+            );
+
+            // 2. Notifie le client (synchronisation multi-appareils)
+            $this->notifier->publishToUser(
+                $client,
+                [
+                    'title' => 'Proposition envoyée',
+                    'message' => sprintf(
+                        'Votre proposition pour le voyage N°%d a été envoyée avec succès.',
+                        $voyageId
+                    ),
+                    'propositionId' => $proposition->getId(),
+                    'voyageId' => $voyageId,
+                ],
+                EventType::PROPOSITION_CREATED
+            );
+
+            // 3. Notifie les administrateurs (nouvelle proposition)
+            $this->notifier->publishToGroup(
+                'admin',
+                [
+                    'title' => 'Nouvelle proposition créée',
+                    'message' => sprintf(
+                        'Une nouvelle proposition (ID: %d) a été créée par l’utilisateur N°%d pour le voyageur N°%d.',
+                        $proposition->getId(),
+                        $client->getId(),
+                        $voyage->getVoyageur()->getId()
+                    ),
+                    'propositionId' => $proposition->getId(),
+                    'clientId' => $client->getId(),
+                    'voyageurId' => $voyage->getVoyageur()->getId(),
+                ],
+                EventType::PROPOSITION_CREATED
+            );
+
+            // 4. Notifie les administrateurs de mettre à jour les statistiques
+            $this->notifier->publishToGroup(
+                'admin',
+                [
+                    'title' => 'Mise à jour des statistiques',
+                    'message' => 'Une nouvelle proposition a été créée. Les statistiques doivent être actualisées.',
+                ],
+                EventType::ADMIN_STATS_UPDATED
+            );
+
+        } catch (\JsonException $e) {
+            $this->logger->error('Échec de la publication de PROPOSITION_CREATED', [
+                'proposition_id' => $proposition->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+
         return $proposition;
     }
 
@@ -137,35 +208,36 @@ readonly class PropositionService
 
         $voyage = $proposition->getVoyage();
         $demande = $proposition->getDemande();
+        $client = $proposition->getClient();
 
         if ($dto->action === 'accepter') {
-            // ✅ 1. Accepter la proposition actuelle
+            // Accepter la proposition actuelle
             $proposition->setStatut('acceptee');
             $proposition->setReponduAt(new \DateTimeImmutable());
 
-            // ⚙️ Conversion DECIMAL → float
+            // Conversion DECIMAL → float
             $poidsDisponible = (float) $voyage->getPoidsDisponibleRestant();
             $poidsDemande = (float) $demande->getPoidsEstime();
 
-            // 💡 Calcul et prévention des valeurs négatives
+            // Calcul et prévention des valeurs négatives
             $newVoyagePoids = max(0, $poidsDisponible - $poidsDemande);
             $voyage->setPoidsDisponibleRestant(number_format($newVoyagePoids, 2, '.', ''));
 
-            // 🧩 Marquer le voyage comme complet si plus de place
+            // Marquer le voyage comme complet si plus de place
             if ($newVoyagePoids == 0.0) {
                 $voyage->setStatut('complete');
             }
 
-            // ✅ 2. Marquer la demande comme satisfaite
+            // Marquer la demande comme satisfaite
             $demande->setStatut('voyageur_trouve');
 
-            // 🔁 3. Annuler toutes les autres propositions de cette même demande
+            // Annuler toutes les autres propositions de cette même demande
             foreach ($demande->getPropositions() as $autreProposition) {
                 if ($autreProposition->getId() !== $proposition->getId() && $autreProposition->getStatut() === 'en_attente') {
                     $autreProposition->setStatut('annulee');
                     $autreProposition->setReponduAt(new \DateTimeImmutable());
 
-                    // 🔔 Notifier le voyageur concerné
+                    // Notifier le voyageur concerné
                     $this->notificationService->createNotification(
                         $autreProposition->getVoyageur(),
                         'proposition_annulee',
@@ -182,10 +254,33 @@ readonly class PropositionService
                             'demandeId' => $demande->getId(),
                         ]
                     );
+
+                    try {
+                        $this->notifier->publishToUser(
+                            $autreProposition->getVoyageur(),
+                            [
+                                'title' => 'Proposition annulée',
+                                'message' => sprintf(
+                                    'Votre proposition N°%d liée à la demande N°%d a été annulée.',
+                                    $autreProposition->getId(),
+                                    $demande->getId()
+                                ),
+                                'propositionId' => $autreProposition->getId(),
+                                'demandeId' => $demande->getId(),
+                            ],
+                            EventType::PROPOSITION_CANCELLED
+                        );
+                    } catch (\JsonException $e) {
+                        $this->logger->error('Échec de la publication de PROPOSITION_CANCELLED', [
+                            'proposition_id' => $autreProposition->getId(),
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+
                 }
             }
 
-            // 🔔 4. Notifier le client dont la proposition a été acceptée
+            // Notifier le client dont la proposition a été acceptée
             $this->notificationService->createNotification(
                 $proposition->getClient(),
                 'proposition_acceptee',
@@ -203,13 +298,94 @@ readonly class PropositionService
                 ]
             );
 
+            try {
+                // 1. Notifie le client (mise à jour de l’interface)
+                $this->notifier->publishToUser(
+                    $client,
+                    [
+                        'title' => 'Proposition acceptée',
+                        'message' => sprintf(
+                            'Votre proposition N°%d a été acceptée par le voyageur.',
+                            $propositionId
+                        ),
+                        'propositionId' => $propositionId,
+                        'statut' => 'acceptee',
+                    ],
+                    EventType::PROPOSITION_ACCEPTED
+                );
+
+                // 2. Notifie le voyageur (synchronisation de l’interface)
+                $this->notifier->publishToUser(
+                    $voyageur,
+                    [
+                        'title' => 'Proposition acceptée',
+                        'message' => sprintf(
+                            'Vous avez accepté la proposition N°%d.',
+                            $propositionId
+                        ),
+                        'propositionId' => $propositionId,
+                        'statut' => 'acceptee',
+                    ],
+                    EventType::PROPOSITION_ACCEPTED
+                );
+
+                // 3. Notifie les administrateurs (mise à jour des statistiques)
+                $this->notifier->publishToGroup(
+                    'admin',
+                    [
+                        'title' => 'Proposition acceptée',
+                        'message' => sprintf(
+                            'La proposition N°%d a été acceptée. Les statistiques doivent être actualisées.',
+                            $propositionId
+                        ),
+                    ],
+                    EventType::ADMIN_STATS_UPDATED
+                );
+
+                // 4. Notifie le topic du Voyage (mise à jour du poids/statut)
+                $this->notifier->publishVoyages(
+                    [
+                        'title' => 'Voyage mis à jour',
+                        'message' => sprintf(
+                            'Le voyage N°%d a été mis à jour suite à l’acceptation d’une proposition.',
+                            $voyage->getId()
+                        ),
+                        'voyageId' => $voyage->getId(),
+                        'poidsRestant' => $voyage->getPoidsDisponibleRestant(),
+                        'statut' => $voyage->getStatut(),
+                    ],
+                    EventType::VOYAGE_UPDATED
+                );
+
+                // 2️⃣ Notifie le flux global des demandes (par cohérence des statuts)
+                $this->notifier->publishDemandes(
+                    [
+                        'title' => 'Demande mise à jour',
+                        'message' => sprintf(
+                            'Le statut de la demande N°%d a changé suite à l’acceptation d’une proposition.',
+                            $demande->getId()
+                        ),
+                        'demandeId' => $demande->getId(),
+                        'statut' => $demande->getStatut(),
+                    ],
+                    EventType::DEMANDE_STATUT_UPDATED
+                );
+
+            } catch (\JsonException $e) {
+                $this->logger->error('Échec de la publication de PROPOSITION_ACCEPTED (batch)', [
+                    'proposition_id' => $propositionId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+
         } else {
-            // ❌ Refus
+            // Refus
             $proposition->setStatut('refusee');
             $proposition->setMessageRefus($dto->messageRefus);
             $proposition->setReponduAt(new \DateTimeImmutable());
 
-            // 🔔 Notifier le client
+            // Notifier le client
             $this->notificationService->createNotification(
                 $proposition->getClient(),
                 'proposition_refusee',
@@ -226,6 +402,39 @@ readonly class PropositionService
                     'voyageId' => $voyage->getId(),
                 ]
             );
+
+            try {
+                // Notifier le client (Mise à jour UI)
+                $this->notifier->publishToUser(
+                    $client,
+                    [
+                        'message' => 'Votre proposition a été refusée',
+                        'propositionId' => $propositionId,
+                        'statut' => 'refusee'
+                    ],
+                    EventType::PROPOSITION_REJECTED
+                );
+
+                // Notifier l'acteur (le voyageur) pour synchro UI
+                $this->notifier->publishToUser(
+                    $voyageur,
+                    [
+                        'title' => 'Proposition refusée',
+                        'message' => sprintf(
+                            'Vous avez refusé la proposition N°%d.',
+                            $propositionId
+                        ),
+                        'propositionId' => $propositionId,
+                        'statut' => 'refusee',
+                    ],
+                    EventType::PROPOSITION_REJECTED
+                );
+            } catch (\JsonException $e) {
+                $this->logger->error('Failed to publish PROPOSITION_REJECTED', [
+                    'proposition_id' => $propositionId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         $this->entityManager->flush();
