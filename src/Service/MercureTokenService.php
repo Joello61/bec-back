@@ -15,7 +15,7 @@ readonly class MercureTokenService
     private const SPECIAL_GROUPS = ['admin', 'moderator'];
 
     public function __construct(
-        private string $mercureJwtSecret,
+        private string $mercureSubscriberKey,
         private TopicBuilder $topicBuilder,
     ) {}
 
@@ -61,7 +61,7 @@ readonly class MercureTokenService
         ];
 
         try {
-            return JWT::encode($payload, $this->mercureJwtSecret, 'HS256');
+            return JWT::encode($payload, $this->mercureSubscriberKey, 'HS256');
         } catch (\Throwable $e) {
             throw new \RuntimeException('Erreur lors de la génération du token Mercure : ' . $e->getMessage());
         }
