@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Constant\EventType;
 use App\DTO\SendMessageDTO;
 use App\Entity\Conversation;
 use App\Entity\Message;
@@ -12,6 +13,7 @@ use App\Repository\ConversationRepository;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -23,7 +25,9 @@ readonly class ConversationService
         private ConversationRepository $conversationRepository,
         private MessageRepository $messageRepository,
         private UserRepository $userRepository,
-        private NotificationService $notificationService
+        private NotificationService $notificationService,
+        private RealtimeNotifier $notifier,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -66,6 +70,44 @@ readonly class ConversationService
 
         // Notifier le destinataire
         $this->notificationService->notifyNewMessage($message);
+
+        try {
+            // Données communes
+            $payload = [
+                'title' => 'Nouveau message reçu',
+                'message' => sprintf(
+                    'Vous avez reçu un nouveau message de %s %s.',
+                    $expediteur->getNom(),
+                    $expediteur->getPrenom()
+                ),
+                'messageId' => $message->getId(),
+                'contenu' => $message->getContenu(),
+                'expediteurId' => $expediteur->getId(),
+                'destinataireId' => $destinataire->getId(),
+                'conversationId' => $conversation->getId(),
+                'createdAt' => $message->getCreatedAt()->format('c'),
+            ];
+
+            // Notifier le destinataire (le vrai “récepteur”)
+            $this->notifier->publishToUser(
+                $destinataire,
+                $payload,
+                EventType::MESSAGE_SENT
+            );
+
+            // Notifier aussi l’expéditeur (pour synchro UI sur ses autres appareils)
+            $this->notifier->publishToUser(
+                $expediteur,
+                $payload,
+                EventType::MESSAGE_SENT
+            );
+
+        } catch (\JsonException $e) {
+            $this->logger->error('Échec de la publication de MESSAGE_SENT', [
+                'conversation_id' => $conversation->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return $message;
     }
@@ -119,6 +161,7 @@ readonly class ConversationService
      */
     public function markConversationAsRead(int $conversationId, User $user): int
     {
+        /** @var Conversation $conversation */
         $conversation = $this->conversationRepository->find($conversationId);
 
         if (!$conversation) {
@@ -129,7 +172,41 @@ readonly class ConversationService
             throw new AccessDeniedHttpException('Vous n\'avez pas accès à cette conversation');
         }
 
-        return $this->messageRepository->markConversationAsRead($conversation, $user);
+        $exec = $this->messageRepository->markConversationAsRead($conversation, $user);
+
+        try {
+            $payload = [
+                'title' => 'Message lu',
+                'message' => sprintf(
+                    '%s %s a lu les derniers messages de votre conversation.',
+                    $user->getNom(),
+                    $user->getPrenom()
+                ),
+                'readerId' => $user->getId(),
+                'conversationId' => $conversation->getId(),
+            ];
+
+            // On identifie les deux participants
+            $participants = [$conversation->getParticipant1(), $conversation->getParticipant2()];
+
+            foreach ($participants as $participant) {
+                $this->notifier->publishToUser(
+                    $participant,
+                    $payload,
+                    EventType::MESSAGE_READ
+                );
+            }
+
+        } catch (\JsonException $e) {
+            $this->logger->error('Échec de la publication de MESSAGE_READ', [
+                'conversation_id' => $conversation->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+
+
+        return $exec;
     }
 
     /**
@@ -145,6 +222,7 @@ readonly class ConversationService
      */
     public function deleteConversation(int $conversationId, User $user): void
     {
+        /** @var Conversation $conversation */
         $conversation = $this->conversationRepository->find($conversationId);
 
         if (!$conversation) {
@@ -155,7 +233,35 @@ readonly class ConversationService
             throw new AccessDeniedHttpException('Vous n\'avez pas accès à cette conversation');
         }
 
+        $conversationId = $conversation->getId();
+
         $this->entityManager->remove($conversation);
         $this->entityManager->flush();
+
+        try {
+            $payload = [
+                'title' => 'Conversation supprimée',
+                'message' => 'Cette conversation a été supprimée par un participant ou un administrateur.',
+                'conversationId' => $conversationId,
+            ];
+
+            // On récupère les participants concernés (2 ou +)
+            $participants = [$conversation->getParticipant1(), $conversation->getParticipant2()];;
+
+            foreach ($participants as $participant) {
+                $this->notifier->publishToUser(
+                    $participant,
+                    $payload,
+                    EventType::CONVERSATION_DELETED
+                );
+            }
+
+        } catch (\JsonException $e) {
+            $this->logger->error('Échec de la publication de CONVERSATION_DELETED', [
+                'conversation_id' => $conversationId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
     }
 }

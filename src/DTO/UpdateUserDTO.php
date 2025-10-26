@@ -35,9 +35,4 @@ class UpdateUserDTO
         maxMessage: 'La bio ne peut pas dépasser {{ limit }} caractères'
     )]
     public ?string $bio = null;
-
-    #[Assert\Url(
-        message: 'L\'URL de la photo n\'est pas valide'
-    )]
-    public ?string $photo = null;
 }

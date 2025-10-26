@@ -2,6 +2,11 @@ security:
     password_hashers:
         Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
 
+        common: # Nom qu'on a utilisé dans le service
+            algorithm: auto # Un algo rapide comme sha256 suffit
+            encode_as_base64: false
+            iterations: 1
+
     providers:
         app_user_provider:
             entity:

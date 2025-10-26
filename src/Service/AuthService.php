@@ -12,6 +12,8 @@ use Exception;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Psr\Log\LoggerInterface;
+use App\Service\RealtimeNotifier;
+use App\Constant\EventType;
 
 readonly class AuthService
 {
@@ -24,6 +26,7 @@ readonly class AuthService
         private SettingsService $settingsService,
         private LoggerInterface $logger,
         private bool $emailVerificationEnabled,
+        private RealtimeNotifier $notifier,
     ) {}
 
     public function register(RegisterDTO $dto): User
@@ -44,6 +47,29 @@ readonly class AuthService
 
             $this->entityManager->persist($user);
             $this->entityManager->flush();
+
+            try {
+                // 1. Notifie les admins qu'un nouvel utilisateur s'est inscrit
+                $this->notifier->publishToGroup('admin', [
+                    'title' => 'Nouvel utilisateur inscrit',
+                    'message' => sprintf('%s (%s) vient de créer un compte.', $user->getNom(), $user->getEmail()),
+                    'id' => $user->getId(),
+                    'email' => $user->getEmail(),
+                    'nom' => $user->getNom(),
+                ], EventType::USER_REGISTERED);
+
+                // 2. Notifie les admins de rafraîchir les statistiques
+                $this->notifier->publishToGroup('admin', [
+                    'title' => 'Mise à jour des statistiques',
+                    'message' => 'Un nouvel utilisateur vient de s’inscrire. Les statistiques doivent être actualisées.',
+                ], EventType::ADMIN_STATS_UPDATED);
+            } catch (\JsonException $e) {
+                $this->logger->error('Échec de la publication des événements USER_REGISTERED ou ADMIN_STATS_UPDATED', [
+                    'user_id' => $user->getId(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
 
             // Créer les paramètres par défaut
             $this->settingsService->createDefaultSettings($user);
@@ -111,6 +137,23 @@ readonly class AuthService
             $user->setPassword($this->passwordHasher->hashPassword($user, $newPassword));
             $this->entityManager->flush();
 
+            try {
+                $this->notifier->publishToUser(
+                    $user,
+                    [
+                        'title' => 'Changement de mot de passe',
+                        'message' => 'Votre mot de passe a été modifié depuis une autre session. Si ce n’était pas vous, veuillez réinitialiser votre mot de passe immédiatement.'
+                    ],
+                    EventType::USER_PASSWORD_RESET
+                );
+            } catch (\JsonException $e) {
+                $this->logger->error('Échec de la publication de USER_PASSWORD_RESET', [
+                    'user_id' => $user->getId(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+
             // Envoyer un email de confirmation
             try {
                 $this->emailService->sendPasswordChangedEmail($user);
@@ -149,6 +192,23 @@ readonly class AuthService
             $this->verificationService->markTokenAsUsed($resetToken);
 
             $this->entityManager->flush();
+
+            try {
+                $this->notifier->publishToUser(
+                    $user,
+                    [
+                        'title' => 'Réinitialisation du mot de passe',
+                        'message' => 'Votre mot de passe a été réinitialisé avec succès. Si vous n’êtes pas à l’origine de cette action, veuillez contacter le support immédiatement.'
+                    ],
+                    EventType::USER_PASSWORD_RESET
+                );
+            } catch (\JsonException $e) {
+                $this->logger->error('Échec de la publication de USER_PASSWORD_RESET', [
+                    'user_id' => $user->getId(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
 
             // Envoyer un email de confirmation
             try {
@@ -200,6 +260,23 @@ readonly class AuthService
             ]);
             throw new BadRequestHttpException($e->getMessage());
         }
+
+        try {
+            $this->notifier->publishToUser(
+                $user,
+                [
+                    'title' => 'Demande de réinitialisation du mot de passe',
+                    'message' => 'Une demande de réinitialisation de mot de passe a été effectuée pour votre compte. Si vous n’êtes pas à l’origine de cette demande, ignorez ce message ou contactez le support.'
+                ],
+                EventType::USER_PASSWORD_FORGOT
+            );
+        } catch (\JsonException $e) {
+            $this->logger->error('Échec de la publication de USER_PASSWORD_FORGOT', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
+
     }
 
     /**
@@ -210,6 +287,35 @@ readonly class AuthService
         try {
             $this->verificationService->verifyEmailCode($user, $code);
             $this->logger->info('Email vérifié', ['user_id' => $user->getId()]);
+
+            try {
+                // 1. Notifie les autres sessions de l'utilisateur
+                $this->notifier->publishToUser(
+                    $user,
+                    [
+                        'title' => 'Adresse e-mail vérifiée',
+                        'message' => 'Votre adresse e-mail a été vérifiée avec succès.',
+                        'isEmailVerified' => true
+                    ],
+                    EventType::USER_PROFILE_UPDATED // USER_VERIFIED_EMAIL n'existe pas, on utilise le générique
+                );
+
+                // 2. Notifie les administrateurs de mettre à jour les statistiques
+                $this->notifier->publishToGroup(
+                    'admin',
+                    [
+                        'title' => 'Mise à jour des statistiques',
+                        'message' => sprintf('L’utilisateur %s (%s) a vérifié son adresse e-mail. Les statistiques doivent être actualisées.', $user->getNom(), $user->getEmail())
+                    ],
+                    EventType::ADMIN_STATS_UPDATED
+                );
+            } catch (\JsonException $e) {
+                $this->logger->error('Échec de la publication de la mise à jour de vérification d’e-mail', [
+                    'user_id' => $user->getId(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
         } catch (Exception $e) {
             $this->logger->error('Erreur lors de la vérification de l\'email', [
                 'user_id' => $user->getId(),
@@ -227,6 +333,35 @@ readonly class AuthService
         try {
             $this->verificationService->verifyPhoneCode($user, $code);
             $this->logger->info('Téléphone vérifié', ['user_id' => $user->getId()]);
+
+            try {
+                // 1. Notifie les autres sessions de l'utilisateur
+                $this->notifier->publishToUser(
+                    $user,
+                    [
+                        'title' => 'Numéro de téléphone vérifié',
+                        'message' => 'Votre numéro de téléphone a été vérifié avec succès.',
+                        'isPhoneVerified' => true
+                    ],
+                    EventType::USER_VERIFIED_PHONE
+                );
+
+                // 2. Notifie les administrateurs de mettre à jour les statistiques
+                $this->notifier->publishToGroup(
+                    'admin',
+                    [
+                        'title' => 'Mise à jour des statistiques',
+                        'message' => sprintf('L’utilisateur %s (%s) a vérifié son numéro de téléphone. Les statistiques doivent être actualisées.', $user->getNom(), $user->getEmail())
+                    ],
+                    EventType::ADMIN_STATS_UPDATED
+                );
+            } catch (\JsonException $e) {
+                $this->logger->error('Échec de la publication de la mise à jour de vérification du téléphone', [
+                    'user_id' => $user->getId(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
         } catch (Exception $e) {
             $this->logger->error('Erreur lors de la vérification du téléphone', [
                 'user_id' => $user->getId(),

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Command;
 
+use App\Constant\EventType;
 use App\Repository\VoyageRepository;
+use App\Service\RealtimeNotifier;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -25,7 +27,8 @@ class ExpireVoyagesCommand extends Command
     public function __construct(
         private readonly VoyageRepository $voyageRepository,
         private readonly EntityManagerInterface $entityManager,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly RealtimeNotifier $notifier,
     ) {
         parent::__construct();
     }
@@ -90,6 +93,44 @@ class ExpireVoyagesCommand extends Command
 
                 // Flush après chaque lot
                 $this->entityManager->flush();
+
+                foreach ($batch as $voyage) {
+                    try {
+                        $this->notifier->publishVoyages(
+                            [
+                                'title' => 'Voyage expiré',
+                                'message' => sprintf(
+                                    'La voyage N°%d est arrivé à échéance et a été automatiquement marqué comme expiré.',
+                                    $voyage->getId()
+                                ),
+                                'voyageId' => $voyage->getId(),
+                                'statut' => 'expire',
+                            ],
+                            EventType::VOYAGE_EXPIRED
+                        );
+
+                        $this->notifier->publishToUser(
+                            $voyage->getVoyageur(),
+                            [
+                                'title' => 'Votre demande a expiré',
+                                'message' => sprintf(
+                                    'Votre voyage N°%d est arrivé à échéance et a été marqué comme expiré.',
+                                    $voyage->getId()
+                                ),
+                                'voyageId' => $voyage->getId(),
+                                'statut' => 'expiree',
+                            ],
+                            EventType::VOYAGE_EXPIRED
+                        );
+                    } catch (\JsonException $e) {
+                        $errors++;
+                        $this->logger->error('Erreur lors de la notification Mercure (expire voyage)', [
+                            'voyage_id' => $voyage->getId(),
+                            'error' => $e->getMessage()
+                        ]);
+                    }
+                }
+
                 $this->entityManager->clear(); // Libérer la mémoire
 
                 $this->logger->info("Lot {$batchIndex} traité", [
@@ -100,6 +141,23 @@ class ExpireVoyagesCommand extends Command
 
             $io->progressFinish();
             $io->newLine();
+
+            if ($processed > 0) {
+                try {
+                    $this->notifier->publishToGroup(
+                        'admin',
+                        [
+                            'titre'=> "Statistiques mis à jour",
+                            'message' => "{$processed} voyages expirés, rafraîchir les stats"
+                        ],
+                        EventType::ADMIN_STATS_UPDATED
+                    );
+                } catch (\JsonException $e) {
+                    $this->logger->error('Erreur lors de la notification Mercure (admin stats voyage)', [
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
 
             // Résumé
             $io->success([

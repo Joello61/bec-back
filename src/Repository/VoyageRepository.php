@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
+use App\Entity\User;
 use App\Entity\Voyage;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -15,7 +16,7 @@ class VoyageRepository extends ServiceEntityRepository
         parent::__construct($registry, Voyage::class);
     }
 
-    public function findPaginated(int $page = 1, int $limit = 10, array $filters = []): array
+    public function findPaginated(int $page = 1, int $limit = 10, array $filters = [], ?User $excludeUser = null): array
     {
         $offset = ($page - 1) * $limit;
 
@@ -29,6 +30,11 @@ class VoyageRepository extends ServiceEntityRepository
             ->orderBy('v.createdAt', 'DESC')
             ->setFirstResult($offset)
             ->setMaxResults($limit);
+
+        if ($excludeUser && !in_array('ROLE_ADMIN', $excludeUser->getRoles(), true)) {
+            $qb->andWhere('v.voyageur != :excludedUser')
+                ->setParameter('excludedUser', $excludeUser);
+        }
 
         if (!empty($filters['villeDepart'])) {
             $qb->andWhere('v.villeDepart LIKE :villeDepart')
@@ -62,6 +68,11 @@ class VoyageRepository extends ServiceEntityRepository
             // ==================== MÊME FILTRE POUR LE COUNT ====================
             ->where('s.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('visible', true);
+
+        if ($excludeUser && !in_array('ROLE_ADMIN', $excludeUser->getRoles(), true)) {
+            $countQb->andWhere('v.voyageur != :excludedUser')
+                ->setParameter('excludedUser', $excludeUser);
+        }
 
         if (!empty($filters['villeDepart'])) {
             $countQb->andWhere('v.villeDepart LIKE :villeDepart')

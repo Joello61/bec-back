@@ -1,5 +1,6 @@
 parameters:
-    app.uploads_dir: '%env(UPLOADS_DIR)%'
+    app.upload_public_path: '/uploads/avatars'
+    app.uploads_directory: '%kernel.project_dir%/public/%env(UPLOADS_DIR)%'
     app.max_file_size: '%env(int:MAX_FILE_SIZE)%'
     app.frontend_url: '%env(FRONTEND_URL)%'
 
@@ -18,6 +19,13 @@ parameters:
 
     sms_verification.enabled: '%env(bool:SMS_VERIFICATION_ENABLED)%'
     email_verification_enabled: '%env(bool:EMAIL_VERIFICATION_ENABLED)%'
+
+    app.jwt_cookie_name: '%env(JWT_COOKIE_NAME)%'
+    app.jwt_cookie_domain: '%env(JWT_COOKIE_DOMAIN)%'
+    app.jwt_cookie_secure: '%env(bool:JWT_COOKIE_SECURE)%'
+    app.jwt_cookie_same_site: '%env(JWT_COOKIE_SAMESITE)%'
+    app.jwt_ttl: '%env(int:JWT_TTL)%'
+    app.refresh_token_ttl: '%env(int:REFRESH_TOKEN_TTL)%'
 
 services:
     _defaults:
@@ -73,6 +81,24 @@ services:
             $facebookAppId: '%facebook.app_id%'
             $facebookAppSecret: '%facebook.app_secret%'
             $facebookRedirectUri: '%facebook.redirect_uri%'
+
+    App\Service\TopicBuilder:
+        arguments:
+            $baseDomain: '%env(APP_BASE_DOMAIN)%'
+
+    App\Service\MercureTokenService:
+        arguments:
+            $mercureJwtSecret: '%env(resolve:MERCURE_JWT_SECRET)%'
+
+    App\Service\RefreshTokenManager:
+        arguments:
+            $refreshTokenTtl: '%app.refresh_token_ttl%'
+
+    App\Service\AvatarService:
+        arguments:
+            $uploadDirectory: '%app.uploads_directory%'
+            $uploadPublicPath: '%app.upload_public_path%'
+            $maxFileSize: '%app.max_file_size%'
 
     App\Controller\:
         resource: '../src/Controller/'

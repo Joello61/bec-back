@@ -15,13 +15,18 @@ use App\DTO\VerifyPhoneDTO;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\AuthService;
+use App\Service\CookieManager;
+use App\Service\MercureTokenService;
 use App\Service\OAuth\FacebookAuthService;
 use App\Service\OAuth\GoogleAuthService;
+use App\Service\RefreshTokenManager;
 use Exception;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 use Symfony\Component\HttpFoundation\Cookie;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -42,6 +47,10 @@ class AuthController extends AbstractController
         private readonly FacebookAuthService $facebookAuthService,
         private readonly JWTTokenManagerInterface $jwtManager,
         private readonly UserRepository $userRepository,
+        private readonly MercureTokenService $mercureTokenService,
+        private readonly LoggerInterface $logger,
+        private readonly RefreshTokenManager $refreshTokenManager,
+        private readonly CookieManager $cookieManager,
     ) {}
 
     /**
@@ -136,7 +145,6 @@ class AuthController extends AbstractController
 
         $user = $this->authService->register($dto);
 
-        // ==================== PAS DE JWT ICI ====================
         // L'utilisateur doit d'abord vérifier son email
         return $this->json([
             'success' => true,
@@ -151,41 +159,6 @@ class AuthController extends AbstractController
         ], Response::HTTP_CREATED);
     }
 
-    #[Route('/logout', name: 'logout', methods: ['POST'])]
-    #[IsGranted('ROLE_USER')]
-    #[OA\Post(
-        path: '/api/logout',
-        summary: 'Déconnexion',
-        security: [['cookieAuth' => []]]
-    )]
-    #[OA\Response(
-        response: 200,
-        description: 'Déconnexion réussie'
-    )]
-    public function logout(): JsonResponse
-    {
-        $response = $this->json([
-            'success' => true,
-            'message' => 'Déconnexion réussie'
-        ]);
-
-        // Supprimer le cookie JWT
-        $cookieName = $_ENV['JWT_COOKIE_NAME'] ?? 'bagage_token';
-
-        $cookie = Cookie::create($cookieName)
-            ->withValue('')
-            ->withExpires(time() - 3600)
-            ->withPath('/')
-            ->withDomain($_ENV['JWT_COOKIE_DOMAIN'] ?? null)
-            ->withSecure((bool)($_ENV['JWT_COOKIE_SECURE'] ?? false))
-            ->withHttpOnly(true)
-            ->withSameSite($_ENV['JWT_COOKIE_SAMESITE'] ?? 'lax');
-
-        $response->headers->setCookie($cookie);
-
-        return $response;
-    }
-
     #[Route('/me', name: 'me', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
     #[OA\Get(
@@ -194,7 +167,7 @@ class AuthController extends AbstractController
         security: [['cookieAuth' => []]]
     )]
     #[OA\Response(response: 200, description: 'Informations utilisateur')]
-    public function me(): JsonResponse
+    public function me(Request $request): JsonResponse
     {
         /** @var User $user */
         $user = $this->getUser();
@@ -236,7 +209,37 @@ class AuthController extends AbstractController
             $responseData['address'] = null;
         }
 
-        return $this->json($responseData);
+        $response = $this->json($responseData);
+
+        if (!$request->cookies->has($this->cookieManager->getRefreshTokenCookieName())) {
+            try {
+                $rawRefreshToken = $this->refreshTokenManager->createAndSaveRefreshToken($user);
+                $refreshCookie = $this->cookieManager->createRefreshTokenCookie($rawRefreshToken);
+                $this->cookieManager->attachCookie($response, $refreshCookie);
+
+                $this->logger->info('Cookie Refresh Token créé (via /me) pour user ' . $user->getId());
+            } catch (\Exception $e) {
+                $this->logger->error('Impossible de créer le cookie Refresh Token (via /me)', [
+                    'user_id' => $user->getId(),
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
+        if (!$request->cookies->has($this->cookieManager->getMercureCookieName())) {
+            try {
+                $mercureToken = $this->mercureTokenService->generate($user);
+                $mercureCookie = $this->cookieManager->createMercureCookie($mercureToken);
+                $this->cookieManager->attachCookie($response, $mercureCookie);
+            } catch (\Exception $e) {
+                $this->logger->error('Impossible de créer le cookie Mercure', [
+                    'user_id' => $user->getId(),
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
+
+        return $response;
     }
 
     /**
@@ -287,19 +290,6 @@ class AuthController extends AbstractController
         // ==================== GÉNÉRER JWT APRÈS VÉRIFICATION ====================
         $token = $this->jwtManager->create($user);
 
-        // Créer le cookie JWT
-        $cookieName = $_ENV['JWT_COOKIE_NAME'] ?? 'bagage_token';
-        $cookieTtl = (int)($_ENV['JWT_TTL'] ?? 86400);
-
-        $cookie = Cookie::create($cookieName)
-            ->withValue($token)
-            ->withExpires(time() + $cookieTtl)
-            ->withPath('/')
-            ->withDomain($_ENV['JWT_COOKIE_DOMAIN'] ?? null)
-            ->withSecure((bool)($_ENV['JWT_COOKIE_SECURE'] ?? false))
-            ->withHttpOnly((bool)($_ENV['JWT_COOKIE_HTTPONLY'] ?? true))
-            ->withSameSite($_ENV['JWT_COOKIE_SAMESITE'] ?? 'lax');
-
         $response = $this->json([
             'success' => true,
             'message' => 'Email vérifié avec succès',
@@ -313,7 +303,8 @@ class AuthController extends AbstractController
             ]
         ]);
 
-        $response->headers->setCookie($cookie);
+        $jwtCookie = $this->cookieManager->createJwtCookie($token);
+        $this->cookieManager->attachCookie($response, $jwtCookie);
 
         return $response;
     }
@@ -543,40 +534,38 @@ class AuthController extends AbstractController
 
         if (!$state || $state !== $storedState) {
             return new RedirectResponse(
-                $_ENV['FRONTEND_URL'] . '/auth/login?error=csrf_failed'
+                $this->getParameter('app.frontend_url') . '/auth/login?error=csrf_failed'
             );
         }
 
         if (!$code) {
             return new RedirectResponse(
-                $_ENV['FRONTEND_URL'] . '/auth/login?error=no_code'
+                $this->getParameter('app.frontend_url') . '/auth/login?error=no_code'
             );
         }
 
         try {
             $user = $this->googleAuthService->authenticate($code);
-            $token = $this->jwtManager->create($user);
+            $jwtToken = $this->jwtManager->create($user);
+            $refreshToken = $this->refreshTokenManager->createAndSaveRefreshToken($user);
+            $mercureToken = $this->mercureTokenService->generate($user);
 
-            $cookieName = $_ENV['JWT_COOKIE_NAME'] ?? 'bagage_token';
-            $cookieTtl = (int)($_ENV['JWT_TTL'] ?? 86400);
+            // Création de la réponse avec redirection
+            $response = new RedirectResponse($this->getParameter('app.frontend_url') . '/auth/oauth-callback');
 
-            $cookie = Cookie::create($cookieName)
-                ->withValue($token)
-                ->withExpires(time() + $cookieTtl)
-                ->withPath('/')
-                ->withDomain($_ENV['JWT_COOKIE_DOMAIN'] ?? null)
-                ->withSecure((bool)($_ENV['JWT_COOKIE_SECURE'] ?? false))
-                ->withHttpOnly((bool)($_ENV['JWT_COOKIE_HTTPONLY'] ?? true))
-                ->withSameSite($_ENV['JWT_COOKIE_SAMESITE'] ?? 'lax');
-
-            $response = new RedirectResponse($_ENV['FRONTEND_URL'] . '/auth/oauth-callback');
-            $response->headers->setCookie($cookie);
+            // Attacher TOUS les cookies d'auth en une seule ligne !
+            $this->cookieManager->attachAuthCookies(
+                $response,
+                $jwtToken,
+                $refreshToken,
+                $mercureToken
+            );
 
             return $response;
 
         } catch (\Exception $e) {
             return new RedirectResponse(
-                $_ENV['FRONTEND_URL'] . '/auth/login?error=' . urlencode($e->getMessage())
+                $this->getParameter('app.frontend_url') . '/auth/login?error=' . urlencode($e->getMessage())
             );
         }
     }
@@ -624,41 +613,67 @@ class AuthController extends AbstractController
 
         if (!$state || $state !== $storedState) {
             return new RedirectResponse(
-                $_ENV['FRONTEND_URL'] . '/auth/login?error=csrf_failed'
+                $this->getParameter('app.frontend_url') . '/auth/login?error=csrf_failed'
             );
         }
 
         if (!$code) {
             return new RedirectResponse(
-                $_ENV['FRONTEND_URL'] . '/auth/login?error=no_code'
+                $this->getParameter('app.frontend_url') . '/auth/login?error=no_code'
             );
         }
 
         try {
             $user = $this->facebookAuthService->authenticate($code);
-            $token = $this->jwtManager->create($user);
+            $jwtToken = $this->jwtManager->create($user);
+            $refreshToken = $this->refreshTokenManager->createAndSaveRefreshToken($user);
+            $mercureToken = $this->mercureTokenService->generate($user);
 
-            $cookieName = $_ENV['JWT_COOKIE_NAME'] ?? 'bagage_token';
-            $cookieTtl = (int)($_ENV['JWT_TTL'] ?? 86400);
+            // Création de la réponse avec redirection
+            $response = new RedirectResponse($this->getParameter('app.frontend_url') . '/auth/oauth-callback');
 
-            $cookie = Cookie::create($cookieName)
-                ->withValue($token)
-                ->withExpires(time() + $cookieTtl)
-                ->withPath('/')
-                ->withDomain($_ENV['JWT_COOKIE_DOMAIN'] ?? null)
-                ->withSecure((bool)($_ENV['JWT_COOKIE_SECURE'] ?? false))
-                ->withHttpOnly((bool)($_ENV['JWT_COOKIE_HTTPONLY'] ?? true))
-                ->withSameSite($_ENV['JWT_COOKIE_SAMESITE'] ?? 'lax');
-
-            $response = new RedirectResponse($_ENV['FRONTEND_URL'] . '/auth/oauth-callback');
-            $response->headers->setCookie($cookie);
+            // Attacher TOUS les cookies d'auth en une seule ligne !
+            $this->cookieManager->attachAuthCookies(
+                $response,
+                $jwtToken,
+                $refreshToken,
+                $mercureToken
+            );
 
             return $response;
 
         } catch (\Exception $e) {
             return new RedirectResponse(
-                $_ENV['FRONTEND_URL'] . '/auth/login?error=' . urlencode($e->getMessage())
+                $this->getParameter('app.frontend_url') . '/auth/login?error=' . urlencode($e->getMessage())
             );
         }
+    }
+
+    #[Route('/logout', name: 'api_logout', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
+    #[OA\Post(
+        path: '/api/logout',
+        summary: 'Déconnexion',
+        security: [['cookieAuth' => []]]
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Déconnexion réussie'
+    )]
+    public function logout(Request $request): JsonResponse
+    {
+        $response = $this->json([
+            'success' => true,
+            'message' => 'Déconnexion réussie',
+        ]);
+
+        $rawRefreshToken = $request->cookies->get('bagage_refresh_token');
+        if ($rawRefreshToken) {
+            $this->refreshTokenManager->invalidateToken($rawRefreshToken); // Supprime de la BDD
+        }
+
+        $this->cookieManager->clearAuthCookies($response);
+
+        return $response;
     }
 }

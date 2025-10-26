@@ -10,6 +10,7 @@ use App\DTO\UpdateUserDTO;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\AddressService;
+use App\Service\AvatarService;
 use App\Service\UserStatsService;
 use App\Service\VerificationService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -23,6 +24,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[Route('/api/users', name: 'api_user_')]
 #[OA\Tag(name: 'Utilisateurs')]
@@ -35,7 +37,9 @@ class UserController extends AbstractController
         private readonly VerificationService $verificationService,
         private readonly AddressService $addressService,
         private readonly LoggerInterface $logger,
-        private readonly bool $smsVerificationEnabled // ⬅️ INJECTION DU FLAG
+        private readonly bool $smsVerificationEnabled,
+        private readonly ValidatorInterface $validator,
+        private readonly AvatarService $avatarService,
     ) {}
 
     // ==================== COMPLÉTER PROFIL (MODIFIÉ) ====================
@@ -53,21 +57,52 @@ class UserController extends AbstractController
     )]
     #[OA\Response(response: 200, description: 'Profil complété')]
     #[OA\Response(response: 400, description: 'Données invalides')]
-    public function completeProfile(
-        #[MapRequestPayload] CompleteProfileDTO $dto
-    ): JsonResponse {
+    public function completeProfile(Request $request): JsonResponse {
         /** @var User $user */
         $user = $this->getUser();
+
+        $dto = new CompleteProfileDTO();
+        $dto->telephone = $request->request->get('telephone');
+        $dto->pays = $request->request->get('pays');
+        $dto->ville = $request->request->get('ville');
+        $dto->quartier = $request->request->get('quartier');
+        $dto->adresseLigne1 = $request->request->get('adresseLigne1');
+        $dto->adresseLigne2 = $request->request->get('adresseLigne2');
+        $dto->codePostal = $request->request->get('codePostal');
+        $dto->bio = $request->request->get('bio');
+        $dto->photo = $request->files->get('photo');
+
+        // Valider le DTO
+        $errors = $this->validator->validate($dto);
+        if (count($errors) > 0) {
+            $errorMessages = [];
+            foreach ($errors as $error) {
+                $errorMessages[$error->getPropertyPath()] = $error->getMessage();
+            }
+            return $this->json([
+                'success' => false,
+                'errors' => $errorMessages
+            ], Response::HTTP_BAD_REQUEST);
+        }
 
         // Mettre à jour le téléphone
         $user->setTelephone($dto->telephone);
 
+        if ($dto->photo) {
+            try {
+                $photoUrl = $this->avatarService->uploadAvatar($dto->photo, $user->getId());
+                $user->setPhoto($photoUrl);
+            } catch (\Exception $e) {
+                return $this->json([
+                    'success' => false,
+                    'message' => 'Erreur lors de l\'upload de la photo : ' . $e->getMessage()
+                ], Response::HTTP_BAD_REQUEST);
+            }
+        }
+
         // Champs optionnels
         if ($dto->bio) {
             $user->setBio($dto->bio);
-        }
-        if ($dto->photo) {
-            $user->setPhoto($dto->photo);
         }
 
         // Créer l'adresse via AddressService
@@ -156,7 +191,150 @@ class UserController extends AbstractController
         }
     }
 
-    // ==================== AUTRES MÉTHODES (INCHANGÉES) ====================
+    #[Route('/me/avatar', name: 'manage_avatar', methods: ['POST'])]
+    #[IsGranted('ROLE_USER')]
+    #[OA\Post(
+        path: '/api/users/me/avatar',
+        description: 'Envoyer `photo` pour uploader/remplacer, ou `deletePhoto=true` pour supprimer',
+        summary: 'Upload ou supprimer l\'avatar',
+        security: [['cookieAuth' => []]],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\MediaType(
+                mediaType: 'multipart/form-data',
+                schema: new OA\Schema(
+                    properties: [
+                        new OA\Property(
+                            property: 'photo',
+                            description: 'Fichier image (JPEG, PNG, WebP, max 5MB)',
+                            type: 'string',
+                            format: 'binary',
+                            nullable: true
+                        ),
+                        new OA\Property(
+                            property: 'deletePhoto',
+                            description: 'Mettre à true pour supprimer l\'avatar',
+                            type: 'boolean',
+                            example: false,
+                            nullable: true
+                        ),
+                    ]
+                )
+            )
+        )
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Avatar modifié avec succès',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Avatar mis à jour avec succès'),
+                new OA\Property(
+                    property: 'photoUrl',
+                    type: 'string',
+                    example: '/uploads/avatars/avatar_123_photo_abc123.jpg',
+                    nullable: true
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Requête invalide')]
+    public function manageAvatar(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $file = $request->files->get('photo');
+        $deletePhoto = $request->request->getBoolean('deletePhoto', false);
+
+        // Validation : on ne peut pas envoyer les deux en même temps
+        if ($file && $deletePhoto) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Vous ne pouvez pas uploader et supprimer en même temps'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Cas 1 : Suppression de l'avatar
+        if ($deletePhoto) {
+            if (!$user->getPhoto()) {
+                return $this->json([
+                    'success' => false,
+                    'message' => 'Aucun avatar à supprimer'
+                ], Response::HTTP_BAD_REQUEST);
+            }
+
+            try {
+                $this->avatarService->deleteAvatar($user->getPhoto());
+                $user->setPhoto(null);
+                $this->entityManager->flush();
+
+                return $this->json([
+                    'success' => true,
+                    'message' => 'Avatar supprimé avec succès',
+                    'photoUrl' => null
+                ], Response::HTTP_OK);
+
+            } catch (\Exception $e) {
+                $this->logger->error('Erreur suppression avatar', [
+                    'user_id' => $user->getId(),
+                    'error' => $e->getMessage()
+                ]);
+
+                return $this->json([
+                    'success' => false,
+                    'message' => 'Erreur lors de la suppression de l\'avatar'
+                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+        }
+
+        // Cas 2 : Upload d'un nouvel avatar
+        if ($file) {
+            try {
+                // Supprimer l'ancien avatar si existant
+                if ($user->getPhoto()) {
+                    $this->avatarService->deleteAvatar($user->getPhoto());
+                }
+
+                // Upload du nouveau
+                $photoUrl = $this->avatarService->uploadAvatar($file, $user->getId());
+                $user->setPhoto($photoUrl);
+                $this->entityManager->flush();
+
+                return $this->json([
+                    'success' => true,
+                    'message' => 'Avatar mis à jour avec succès',
+                    'photoUrl' => $photoUrl
+                ], Response::HTTP_OK);
+
+            } catch (\InvalidArgumentException $e) {
+                // Erreur de validation (taille, format)
+                return $this->json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], Response::HTTP_BAD_REQUEST);
+
+            } catch (\Exception $e) {
+                // Erreur technique
+                $this->logger->error('Erreur upload avatar', [
+                    'user_id' => $user->getId(),
+                    'error' => $e->getMessage()
+                ]);
+
+                return $this->json([
+                    'success' => false,
+                    'message' => 'Erreur lors de l\'upload de la photo'
+                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+        }
+
+        // Cas 3 : Aucune action fournie
+        return $this->json([
+            'success' => false,
+            'message' => 'Veuillez fournir soit un fichier photo, soit deletePhoto=true'
+        ], Response::HTTP_BAD_REQUEST);
+    }
 
     #[Route('/me/profile-status', name: 'profile_status', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
@@ -321,9 +499,6 @@ class UserController extends AbstractController
         }
         if ($dto->bio !== null) {
             $user->setBio($dto->bio);
-        }
-        if ($dto->photo !== null) {
-            $user->setPhoto($dto->photo);
         }
 
         $this->entityManager->flush();

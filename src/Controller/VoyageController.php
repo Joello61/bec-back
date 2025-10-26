@@ -63,7 +63,7 @@ class VoyageController extends AbstractController
             'statut' => $request->query->get('statut'),
         ];
 
-        $result = $this->voyageService->getPaginatedVoyages($page, $limit, $filters);
+        $result = $this->voyageService->getPaginatedVoyages($page, $limit, $filters, $currentUser);
 
         // ==================== CONVERSION AUTOMATIQUE ====================
         $voyagesWithConversion = array_map(function ($voyage) use ($viewerCurrency) {

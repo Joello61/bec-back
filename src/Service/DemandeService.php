@@ -12,6 +12,8 @@ use App\Repository\DemandeRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use App\Constant\EventType;
+use Psr\Log\LoggerInterface;
 
 readonly class DemandeService
 {
@@ -20,12 +22,14 @@ readonly class DemandeService
         private DemandeRepository $demandeRepository,
         private NotificationService $notificationService,
         private MatchingService $matchingService,
-        private CurrencyService $currencyService
+        private CurrencyService $currencyService,
+        private RealtimeNotifier $notifier,
+        private LoggerInterface $logger,
     ) {}
 
-    public function getPaginatedDemandes(int $page, int $limit, array $filters = []): array
+    public function getPaginatedDemandes(int $page, int $limit, array $filters = [], ?User $excludeUser = null): array
     {
-        return $this->demandeRepository->findPaginated($page, $limit, $filters);
+        return $this->demandeRepository->findPaginated($page, $limit, $filters, $excludeUser);
     }
 
     public function getDemande(int $id): Demande
@@ -65,6 +69,59 @@ readonly class DemandeService
         $this->entityManager->persist($demande);
         $this->entityManager->flush();
 
+        try {
+            // 1. Notifie le public (ex : pour un fil d’activité ou une carte en temps réel)
+            $this->notifier->publishPublic(
+                [
+                    'title' => 'Nouvelle demande publiée',
+                    'message' => sprintf(
+                        'Une nouvelle demande de transport a été ajoutée de %s à %s (date limite : %s).',
+                        $demande->getVilleDepart(),
+                        $demande->getVilleArrivee(),
+                        $demande->getDateLimite()?->format('Y-m-d') ?? 'non précisée'
+                    ),
+                    'demandeId' => $demande->getId(),
+                    'villeDepart' => $demande->getVilleDepart(),
+                    'villeArrivee' => $demande->getVilleArrivee(),
+                    'dateLimite' => $demande->getDateLimite()?->format('Y-m-d'),
+                    'createdBy' => $user->getId(),
+                ],
+                EventType::DEMANDE_CREATED
+            );
+
+            // 2. Notifie les administrateurs
+            $this->notifier->publishToGroup(
+                'admin',
+                [
+                    'title' => 'Nouvelle demande créée',
+                    'message' => sprintf(
+                        'Une nouvelle demande (ID: %d) a été créée par l’utilisateur #%d.',
+                        $demande->getId(),
+                        $user->getId()
+                    ),
+                    'demandeId' => $demande->getId(),
+                    'clientId' => $user->getId(),
+                ],
+                EventType::DEMANDE_CREATED
+            );
+
+            // 3. Notifie les administrateurs de mettre à jour les statistiques
+            $this->notifier->publishToGroup(
+                'admin',
+                [
+                    'title' => 'Mise à jour des statistiques',
+                    'message' => 'Une nouvelle demande a été publiée. Les statistiques doivent être actualisées.'
+                ],
+                EventType::ADMIN_STATS_UPDATED
+            );
+        } catch (\JsonException $e) {
+            $this->logger->error('Échec de la publication de DEMANDE_CREATED', [
+                'demande_id' => $demande->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+
         // Notifier les voyages matchés
         $this->notificationService->notifyMatchingVoyages($demande);
 
@@ -101,6 +158,29 @@ readonly class DemandeService
 
         $this->entityManager->flush();
 
+        try {
+            $this->notifier->publishDemandes(
+                [
+                    'title' => 'Demande mise à jour',
+                    'message' => sprintf(
+                        "Les détails de la demande N°%d de %s vers %s (limite : %s) ont été modifiés.",
+                        $demande->getId(),
+                        $demande->getVilleDepart(),
+                        $demande->getVilleArrivee(),
+                        $demande->getDateLimite()?->format('Y-m-d')
+                    ),
+                    'demandeId' => $demande->getId(),
+                    'userId' => $demande->getClient()->getId(), // utile pour filtrer côté front
+                ],
+                EventType::DEMANDE_UPDATED
+            );
+        } catch (\JsonException $e) {
+            $this->logger->error('Échec de la publication de DEMANDE_UPDATED', [
+                'demande_id' => $demande->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         return $demande;
     }
 
@@ -110,12 +190,63 @@ readonly class DemandeService
         $demande->setStatut($statut);
         $this->entityManager->flush();
 
+        try {
+            // 1️⃣ Notifier le flux global (utile pour le live feed, stats, etc.)
+            $this->notifier->publishDemandes(
+                [
+                    'title' => 'Statut de demande mis à jour',
+                    'message' => sprintf(
+                        'Le statut de la demande N°%d est maintenant "%s".',
+                        $demande->getId(),
+                        ucfirst($statut)
+                    ),
+                    'demandeId' => $demande->getId(),
+                    'statut' => $statut,
+                    'userId' => $demande->getClient()->getId(),
+                ],
+                EventType::DEMANDE_STATUT_UPDATED
+            );
+
+            // 2️⃣ Notifier l’auteur de la demande (si tu veux une alerte directe)
+            $this->notifier->publishToUser(
+                $demande->getClient(),
+                [
+                    'title' => 'Votre demande a changé de statut',
+                    'message' => sprintf(
+                        'Le statut de votre demande N°%d est maintenant "%s".',
+                        $demande->getId(),
+                        ucfirst($statut)
+                    ),
+                    'demandeId' => $demande->getId(),
+                    'statut' => $statut,
+                ],
+                EventType::DEMANDE_STATUT_UPDATED
+            );
+
+            // 3️⃣ Notifier les administrateurs (rafraîchissement des stats)
+            $this->notifier->publishToGroup(
+                'admin',
+                [
+                    'title' => 'Demande mise à jour',
+                    'message' => sprintf('Le statut de la demande N°%d a été modifié (%s).', $demande->getId(), $statut),
+                ],
+                EventType::ADMIN_STATS_UPDATED
+            );
+
+        } catch (\JsonException $e) {
+            $this->logger->error('Échec de la publication de DEMANDE_STATUT_UPDATED', [
+                'demande_id' => $demande->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         return $demande;
     }
 
     public function deleteDemande(int $id): void
     {
         $demande = $this->getDemande($id);
+        $demandeId = $demande->getId();
 
         // Éviter de retraiter une demande déjà annulée ou expirée
         if (in_array($demande->getStatut(), ['annulee', 'expiree'], true)) {
@@ -126,7 +257,7 @@ readonly class DemandeService
         $demande->setStatut('annulee');
         $demande->setUpdatedAt();
 
-        // 3️⃣ Parcourir toutes les propositions liées
+        // Parcourir toutes les propositions liées
         foreach ($demande->getPropositions() as $proposition) {
             $voyage = $proposition->getVoyage();
             $statut = $proposition->getStatut();
@@ -173,11 +304,83 @@ readonly class DemandeService
                         'propositionId' => $proposition->getId(),
                     ]
                 );
+
+                try {
+                    $this->notifier->publishToUser(
+                        $voyageur,
+                        [
+                            'title' => 'Proposition annulée',
+                            'message' => sprintf(
+                                'La demande N°%d à laquelle vous aviez fait une proposition a été annulée. Votre proposition associée est donc également annulée.',
+                                $demandeId
+                            ),
+                            'demandeId' => $demandeId,
+                            'propositionId' => $proposition->getId(),
+                        ],
+                        EventType::PROPOSITION_CANCELLED
+                    );
+                } catch (\JsonException $e) {
+                    $this->logger->error('Échec de la publication de PROPOSITION_CANCELLED à l’utilisateur', [
+                        'user_id' => $voyageur->getId(),
+                        'demande_id' => $demandeId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+
             }
         }
 
         // Sauvegarder toutes les modifications
         $this->entityManager->flush();
+
+        try {
+            // 1 Diffusion publique (feed global des demandes)
+            $this->notifier->publishDemandes(
+                [
+                    'title' => 'Demande annulée',
+                    'message' => sprintf(
+                        'La demande N°%d a été annulée par son auteur ou par un administrateur.',
+                        $demandeId
+                    ),
+                    'demandeId' => $demandeId,
+                ],
+                EventType::DEMANDE_CANCELLED
+            );
+
+            // 2 Notifie directement l’auteur (si besoin)
+            if (isset($demande) && $demande->getClient()) {
+                $this->notifier->publishToUser(
+                    $demande->getClient(),
+                    [
+                        'title' => 'Votre demande a été annulée',
+                        'message' => sprintf(
+                            'Votre demande N°%d a été annulée.',
+                            $demandeId,
+                        ),
+                        'demandeId' => $demandeId,
+                    ],
+                    EventType::DEMANDE_CANCELLED
+                );
+            }
+
+            // 3️⃣ Notifie les administrateurs (rafraîchir les stats)
+            $this->notifier->publishToGroup(
+                'admin',
+                [
+                    'title' => 'Statistiques mises à jour',
+                    'message' => sprintf('La demande N°%d a été annulée. Les statistiques doivent être rafraîchies.', $demandeId),
+                ],
+                EventType::ADMIN_STATS_UPDATED
+            );
+
+        } catch (\JsonException $e) {
+            $this->logger->error('Échec de la publication de DEMANDE_CANCELLED', [
+                'demande_id' => $demandeId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+
     }
 
     public function getDemandesByUser(int $userId): array
@@ -191,7 +394,53 @@ readonly class DemandeService
     public function findMatchingVoyages(int $demandeId, ?User $viewer = null): array
     {
         $demande = $this->getDemande($demandeId);
-        return $this->matchingService->findBestMatchesVoyages($demande, $viewer);
+        $matching = $this->matchingService->findBestMatchesVoyages($demande, $viewer);
+
+        if (!empty($matching)) {
+            try {
+                // 1. Notifie le client (propriétaire de la demande)
+                $this->notifier->publishToUser(
+                    $demande->getClient(),
+                    [
+                        'title' => 'Nouvelles correspondances trouvées',
+                        'message' => sprintf(
+                            '%d voyage(s) correspondant(s) à votre demande N°%d ont été trouvés.',
+                            count($matching),
+                            $demande->getId()
+                        ),
+                        'demandeId' => $demande->getId(),
+                        'matchCount' => count($matching),
+                    ],
+                    EventType::DEMANDE_MATCHED
+                );
+
+                // 2. Notifie le visiteur (si ce n’est pas le propriétaire)
+                if ($viewer && $viewer->getId() !== $demande->getClient()->getId()) {
+                    $this->notifier->publishToUser(
+                        $viewer,
+                        [
+                            'title' => 'Résultats de correspondance',
+                            'message' => sprintf(
+                                '%d voyage(s) correspondant(s) à la demande N°%d ont été trouvés.',
+                                count($matching),
+                                $demande->getId()
+                            ),
+                            'demandeId' => $demande->getId(),
+                            'matchCount' => count($matching),
+                        ],
+                        EventType::DEMANDE_MATCHED
+                    );
+                }
+            } catch (\JsonException $e) {
+                $this->logger->error('Échec de la publication de DEMANDE_MATCHED', [
+                    'demande_id' => $demande->getId(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
+        }
+
+        return $matching;
     }
 
     /**

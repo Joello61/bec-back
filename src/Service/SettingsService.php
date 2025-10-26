@@ -8,11 +8,15 @@ use App\DTO\UpdateSettingsDTO;
 use App\Entity\User;
 use App\Entity\UserSettings;
 use Doctrine\ORM\EntityManagerInterface;
+use App\Constant\EventType;
+use Psr\Log\LoggerInterface;
 
 readonly class SettingsService
 {
     public function __construct(
         private EntityManagerInterface $entityManager,
+        private LoggerInterface $logger,
+        private RealtimeNotifier $notifier,
     ) {}
 
     /**
@@ -134,6 +138,34 @@ readonly class SettingsService
         }
 
         $this->entityManager->flush();
+
+        try {;
+            // 1. Notifier l'utilisateur (synchro multi-appareils)
+            $this->notifier->publishToUser(
+                $user,
+                [
+                    'userId' => $user->getId(),
+                    'settingsId' => $settings->getId(),
+                ],
+                EventType::USER_SETTINGS_UPDATED
+            );
+
+            // 2. Notifier les admins
+            $this->notifier->publishToGroup(
+                'admin',
+                [
+                    'userId' => $user->getId(),
+                    'settingsId' => $settings->getId(),
+                ],
+                EventType::USER_SETTINGS_UPDATED
+            );
+
+        } catch (\JsonException $e) {
+            $this->logger->error('Failed to publish USER_SETTINGS_UPDATED (reset)', [
+                'user_id' => $user->getId(),
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return $settings;
     }
