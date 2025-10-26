@@ -88,7 +88,7 @@ services:
 
     App\Service\MercureTokenService:
         arguments:
-            $mercureSubscriberKey: '%env(resolve:MERCURE_SUBSCRIBER_JWT_KEY)%'
+            $mercureJwtSecret: '%env(resolve:MERCURE_JWT_SECRET)%'
 
     App\Service\RefreshTokenManager:
         arguments:
