@@ -61,16 +61,17 @@ class UserController extends AbstractController
         /** @var User $user */
         $user = $this->getUser();
 
+        $data = json_decode($request->getContent(), true);
+
         $dto = new CompleteProfileDTO();
-        $dto->telephone = $request->request->get('telephone');
-        $dto->pays = $request->request->get('pays');
-        $dto->ville = $request->request->get('ville');
-        $dto->quartier = $request->request->get('quartier');
-        $dto->adresseLigne1 = $request->request->get('adresseLigne1');
-        $dto->adresseLigne2 = $request->request->get('adresseLigne2');
-        $dto->codePostal = $request->request->get('codePostal');
-        $dto->bio = $request->request->get('bio');
-        $dto->photo = $request->files->get('photo');
+        $dto->telephone = $data['telephone'] ?? '';
+        $dto->pays = $data['pays'] ?? '';
+        $dto->ville = $data['ville'] ?? '';
+        $dto->quartier = $data['quartier'] ?? null;
+        $dto->adresseLigne1 = $data['adresseLigne1'] ?? null;
+        $dto->adresseLigne2 = $data['adresseLigne2'] ?? null;
+        $dto->codePostal = $data['codePostal'] ?? null;
+        $dto->bio = $data['bio'] ?? null;
 
         // Valider le DTO
         $errors = $this->validator->validate($dto);
