@@ -30,6 +30,10 @@ readonly class PropositionService
         private RealtimeNotifier $notifier,
     ) {}
 
+    public function getPropositionById(int $propositionId): Proposition
+    {
+         return  $this->propositionRepository->find($propositionId);
+    }
     /**
      * Créer une proposition pour un voyage
      */

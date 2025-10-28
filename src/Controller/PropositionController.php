@@ -102,6 +102,27 @@ class PropositionController extends AbstractController
         return $this->json($propositionsWithConversion, Response::HTTP_OK);
     }
 
+    #[Route('/{id}', name: 'proposition', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/propositions/{id}',
+        summary: 'Récupérer une proposition',
+        security: [['cookieAuth' => []]]
+    )]
+    #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))]
+    #[OA\Response(response: 200, description: 'Une proposition')]
+    public function getOne(int $id): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        $proposition = $this->propositionService->getPropositionById($id);
+
+        // ==================== CONVERSION AUTOMATIQUE ====================
+        // Les propositions sont converties dans la devise du voyageur
+        $propositionsWithConversion = $this->propositionService->getPropositionSummaryWithConversion($proposition, $user);
+
+        return $this->json($propositionsWithConversion, Response::HTTP_OK);
+    }
+
     #[Route('/voyage/{voyageId}/accepted', name: 'accepted_by_voyage', methods: ['GET'])]
     #[OA\Get(
         path: '/api/propositions/voyage/{voyageId}/accepted',
