@@ -446,6 +446,144 @@ readonly class PropositionService
         return $proposition;
     }
 
+
+    /**
+     * Annuler une proposition (par le client uniquement)
+     * Seules les propositions "en_attente" peuvent être annulées
+     */
+    public function deleteProposition(int $propositionId, User $client): void
+    {
+        /** @var Proposition|null $proposition */
+        $proposition = $this->propositionRepository->find($propositionId);
+
+        if (!$proposition) {
+            throw new NotFoundHttpException('Proposition non trouvée');
+        }
+
+        // Vérifier que c'est bien le client propriétaire de la proposition
+        if ($proposition->getClient() !== $client) {
+            throw new BadRequestHttpException('Vous n\'êtes pas autorisé à annuler cette proposition');
+        }
+
+        // Vérifier que la proposition est en attente (on ne peut annuler que les propositions en attente)
+        if ($proposition->getStatut() !== 'en_attente') {
+            throw new BadRequestHttpException(
+                sprintf(
+                    'Impossible d\'annuler cette proposition. Statut actuel : %s. Seules les propositions en attente peuvent être annulées.',
+                    $proposition->getStatut()
+                )
+            );
+        }
+
+        $voyage = $proposition->getVoyage();
+        $voyageur = $proposition->getVoyageur();
+        $demande = $proposition->getDemande();
+
+        // Mettre à jour le statut de la proposition
+        $proposition->setStatut('annulee');
+        $proposition->setReponduAt(new \DateTimeImmutable());
+
+        // ==================== REMETTRE LA DEMANDE EN RECHERCHE ====================
+        // Si la demande n'est pas déjà annulée, on la remet en recherche
+        if ($demande->getStatut() !== 'annulee' || $demande->getStatut() !== 'expiree') {
+            $demande->setStatut('en_recherche');
+        }
+
+        $this->entityManager->flush();
+
+        // Notifier le voyageur de l'annulation
+        $this->notificationService->createNotification(
+            $voyageur,
+            'proposition_annulee',
+            'Proposition annulée',
+            sprintf(
+                '%s %s a annulé sa proposition pour votre voyage %s vers %s.',
+                $client->getPrenom(),
+                $client->getNom(),
+                $voyage->getVilleDepart(),
+                $voyage->getVilleArrivee()
+            ),
+            [
+                'propositionId' => $proposition->getId(),
+                'voyageId' => $voyage->getId(),
+                'demandeId' => $demande->getId(),
+            ]
+        );
+
+        try {
+            // 1. Notifie le voyageur (mise à jour de l'interface)
+            $this->notifier->publishToUser(
+                $voyageur,
+                [
+                    'title' => 'Proposition annulée',
+                    'message' => sprintf(
+                        'La proposition N°%d pour votre voyage N°%d a été annulée par le client.',
+                        $propositionId,
+                        $voyage->getId()
+                    ),
+                    'propositionId' => $propositionId,
+                    'voyageId' => $voyage->getId(),
+                    'statut' => 'annulee',
+                ],
+                EventType::PROPOSITION_CANCELLED
+            );
+
+            // 2. Notifie le client (synchronisation multi-appareils)
+            $this->notifier->publishToUser(
+                $client,
+                [
+                    'title' => 'Proposition annulée',
+                    'message' => sprintf(
+                        'Votre proposition N°%d a été annulée avec succès.',
+                        $propositionId
+                    ),
+                    'propositionId' => $propositionId,
+                    'voyageId' => $voyage->getId(),
+                    'statut' => 'annulee',
+                ],
+                EventType::PROPOSITION_CANCELLED
+            );
+
+            // 3. Notifie le flux global des demandes (remise en recherche)
+            if ($demande->getStatut() === 'en_recherche') {
+                $this->notifier->publishDemandes(
+                    [
+                        'title' => 'Demande remise en recherche',
+                        'message' => sprintf(
+                            'La demande N°%d a été remise en recherche suite à l\'annulation d\'une proposition.',
+                            $demande->getId()
+                        ),
+                        'demandeId' => $demande->getId(),
+                        'statut' => 'en_recherche',
+                    ],
+                    EventType::DEMANDE_STATUT_UPDATED
+                );
+            }
+
+            // 4. Notifie les administrateurs (mise à jour des statistiques)
+            $this->notifier->publishToGroup(
+                'admin',
+                [
+                    'title' => 'Proposition annulée',
+                    'message' => sprintf(
+                        'La proposition N°%d a été annulée par le client (ID: %d). Les statistiques doivent être actualisées.',
+                        $propositionId,
+                        $client->getId()
+                    ),
+                    'propositionId' => $propositionId,
+                    'clientId' => $client->getId(),
+                ],
+                EventType::ADMIN_STATS_UPDATED
+            );
+
+        } catch (\JsonException $e) {
+            $this->logger->error('Échec de la publication de PROPOSITION_CANCELLED', [
+                'proposition_id' => $propositionId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     /**
      * Récupérer les propositions pour un voyage
      */

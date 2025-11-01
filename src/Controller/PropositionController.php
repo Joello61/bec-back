@@ -15,6 +15,8 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -100,6 +102,78 @@ class PropositionController extends AbstractController
         }, $propositions);
 
         return $this->json($propositionsWithConversion, Response::HTTP_OK);
+    }
+
+    #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
+    #[OA\Delete(
+        path: '/api/propositions/{id}',
+        summary: 'Annuler une proposition (par le client uniquement)',
+        description: 'Permet au client d\'annuler sa propre proposition. Seules les propositions en attente peuvent être annulées. La demande sera automatiquement remise en recherche.',
+        security: [['cookieAuth' => []]]
+    )]
+    #[OA\Parameter(
+        name: 'id',
+        in: 'path',
+        required: true,
+        description: 'ID de la proposition à annuler',
+        schema: new OA\Schema(type: 'integer')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Proposition annulée avec succès',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'message', type: 'string', example: 'Proposition annulée avec succès')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 400,
+        description: 'Action invalide (proposition déjà acceptée, refusée ou non autorisée)',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Impossible d\'annuler cette proposition. Statut actuel : acceptee')
+            ]
+        )
+    )]
+    #[OA\Response(
+        response: 404,
+        description: 'Proposition non trouvée',
+        content: new OA\JsonContent(
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Proposition non trouvée')
+            ]
+        )
+    )]
+    public function delete(int $id): JsonResponse
+    {
+        try {
+            /** @var User $user */
+            $user = $this->getUser();
+
+            $this->propositionService->deleteProposition($id, $user);
+
+            return $this->json([
+                'success' => true,
+                'message' => 'Proposition annulée avec succès'
+            ], Response::HTTP_OK);
+
+        } catch (NotFoundHttpException $e) {
+            return $this->json([
+                'error' => $e->getMessage()
+            ], Response::HTTP_NOT_FOUND);
+
+        } catch (BadRequestHttpException $e) {
+            return $this->json([
+                'error' => $e->getMessage()
+            ], Response::HTTP_BAD_REQUEST);
+
+        } catch (\Exception $e) {
+            return $this->json([
+                'error' => 'Une erreur est survenue lors de l\'annulation de la proposition'
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 
     #[Route('/{id}', name: 'proposition', methods: ['GET'])]
