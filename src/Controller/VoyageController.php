@@ -35,7 +35,39 @@ class VoyageController extends AbstractController
         private readonly VoyageRepository $voyageRepository,
         private readonly CurrencyService $currencyService,
         private readonly SerializerInterface $serializer,
+        private readonly NormalizerInterface $normalizer,
     ) {}
+
+    #[Route('/public', name: 'public_list', methods: ['GET'])]
+    #[OA\Get(path: '/api/voyages/public', summary: 'Liste publique des voyages')]
+    #[OA\Parameter(name: 'page', in: 'query', schema: new OA\Schema(type: 'integer', default: 1))]
+    #[OA\Parameter(name: 'limit', in: 'query', schema: new OA\Schema(type: 'integer', default: 10))]
+    #[OA\Parameter(name: 'villeDepart', in: 'query', schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(name: 'villeArrivee', in: 'query', schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(name: 'dateDepart', in: 'query', schema: new OA\Schema(type: 'string', format: 'date'))]
+    #[OA\Response(response: 200, description: 'Liste paginée des voyages')]
+    public function publicList(Request $request): JsonResponse {
+
+        $page = $request->query->getInt('page', 1);
+        $limit = $request->query->getInt('limit', 10);
+        $filters = [
+            'villeDepart' => $request->query->get('villeDepart'),
+            'villeArrivee' => $request->query->get('villeArrivee'),
+            'dateDepart' => $request->query->get('dateDepart'),
+        ];
+
+        try {
+            $result = $this->voyageService->getPublicPaginatedVoyages($page, $limit, $filters);
+            $normalizedVoyages = $this->normalizer->normalize($result['data'], null, ['groups' => ['public:voyage:list']]);
+        } catch (ExceptionInterface $e) {
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return new JsonResponse([
+            'data' => $normalizedVoyages,
+            'pagination' => $result['pagination']
+        ], Response::HTTP_OK);
+    }
 
     #[Route('', name: 'list', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]

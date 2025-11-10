@@ -50,8 +50,14 @@ security:
         - { path: ^/api/auth/google/callback, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/facebook, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/facebook/callback, roles: PUBLIC_ACCESS }
+        - { path: ^/api/contacts/send, roles: PUBLIC_ACCESS }
+        - { path: ^/api/demandes/public, roles: PUBLIC_ACCESS }
+        - { path: ^/api/voyages/public, roles: PUBLIC_ACCESS }
+        - { path: ^/api/geo/cities/top100, roles: PUBLIC_ACCESS }
+        - { path: ^/api/geo/cities/search-global, roles: PUBLIC_ACCESS }
+
+        # Documentation admin
         - { path: ^/api/doc, roles: ROLE_ADMIN }
-        - { path: /api/contacts/send, roles: PUBLIC_ACCESS }
 
         # ==================== ROUTES ADMIN ====================
         # Toutes les routes /api/admin nécessitent ROLE_ADMIN

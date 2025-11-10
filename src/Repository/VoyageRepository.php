@@ -16,6 +16,65 @@ class VoyageRepository extends ServiceEntityRepository
         parent::__construct($registry, Voyage::class);
     }
 
+    public function findPublicPaginated(int $page = 1, int $limit = 10, array $filters = []): array
+    {
+        $offset = ($page - 1) * $limit;
+
+        $qb = $this->createQueryBuilder('v')
+            ->orderBy('v.createdAt', 'DESC')
+            ->andWhere('v.statut = :statut')
+            ->setParameter('statut', 'actif')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit);
+
+        if (!empty($filters['villeDepart'])) {
+            $qb->andWhere('v.villeDepart LIKE :villeDepart')
+                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
+        }
+
+        if (!empty($filters['villeArrivee'])) {
+            $qb->andWhere('v.villeArrivee LIKE :villeArrivee')
+                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
+        }
+
+        if (!empty($filters['dateDepart'])) {
+            $qb->andWhere('v.dateDepart >= :dateDepart')
+                ->setParameter('dateDepart', new \DateTime($filters['dateDepart']));
+        }
+
+        $voyages = $qb->getQuery()->getResult();
+
+        $countQb = $this->createQueryBuilder('v')
+            ->select('COUNT(v.id)')
+            ->andWhere('v.statut = :statut')
+            ->setParameter('statut', 'actif');
+
+        if (!empty($filters['villeDepart'])) {
+            $countQb->andWhere('v.villeDepart LIKE :villeDepart')
+                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
+        }
+        if (!empty($filters['villeArrivee'])) {
+            $countQb->andWhere('v.villeArrivee LIKE :villeArrivee')
+                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
+        }
+        if (!empty($filters['dateDepart'])) {
+            $countQb->andWhere('v.dateDepart >= :dateDepart')
+                ->setParameter('dateDepart', new \DateTime($filters['dateDepart']));
+        }
+
+        $total = $countQb->getQuery()->getSingleScalarResult();
+
+        return [
+            'data' => $voyages,
+            'pagination' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'pages' => (int) ceil($total / $limit),
+            ],
+        ];
+    }
+
     public function findPaginated(int $page = 1, int $limit = 10, array $filters = [], ?User $excludeUser = null): array
     {
         $offset = ($page - 1) * $limit;

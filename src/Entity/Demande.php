@@ -19,7 +19,7 @@ class Demande
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['demande:read', 'demande:list', 'favori:read', 'favori:list'])]
+    #[Groups(['public:demande:list', 'demande:read', 'demande:list', 'favori:read', 'favori:list'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'demandes')]
@@ -28,29 +28,29 @@ class Demande
     private ?User $client = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['demande:read', 'demande:list', 'demande:write', 'favori:list', 'signalement:list'])]
+    #[Groups(['public:demande:list', 'demande:read', 'demande:list', 'demande:write', 'favori:list', 'signalement:list'])]
     private ?string $villeDepart = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['demande:read', 'demande:list', 'demande:write', 'favori:list', 'signalement:list'])]
+    #[Groups(['public:demande:list', 'demande:read', 'demande:list', 'demande:write', 'favori:list', 'signalement:list'])]
     private ?string $villeArrivee = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true)]
-    #[Groups(['demande:read', 'demande:list', 'demande:write', 'favori:list'])]
+    #[Groups(['public:demande:list', 'demande:read', 'demande:list', 'demande:write', 'favori:list'])]
     private ?\DateTimeInterface $dateLimite = null;
 
     #[ORM\Column(type: Types::DECIMAL, precision: 5, scale: 2)]
-    #[Groups(['demande:read', 'demande:list', 'demande:write', 'favori:list'])]
+    #[Groups(['public:demande:list', 'demande:read', 'demande:list', 'demande:write', 'favori:list'])]
     private ?string $poidsEstime = null;
 
     // ==================== NOUVEAUX CHAMPS PRIX/COMMISSION ====================
 
     #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
-    #[Groups(['demande:read', 'demande:list', 'demande:write', 'favori:list'])]
+    #[Groups(['public:demande:list', 'demande:read', 'demande:list', 'demande:write', 'favori:list'])]
     private ?string $prixParKilo = null;
 
     #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
-    #[Groups(['demande:read', 'demande:list', 'demande:write', 'favori:list'])]
+    #[Groups(['public:demande:list', 'demande:read', 'demande:list', 'demande:write', 'favori:list'])]
     private ?string $commissionProposeePourUnBagage = null;
 
     // ==================== DEVISE ====================
@@ -59,11 +59,11 @@ class Demande
      * Code ISO 4217 de la devise (EUR, USD, XAF, etc.)
      */
     #[ORM\Column(length: 3)]
-    #[Groups(['demande:read', 'demande:list', 'demande:write', 'favori:list'])]
+    #[Groups(['public:demande:list', 'demande:read', 'demande:list', 'demande:write', 'favori:list'])]
     private string $currency = 'EUR';
 
     #[ORM\Column(type: Types::TEXT)]
-    #[Groups(['demande:read', 'demande:write'])]
+    #[Groups(['public:demande:list', 'demande:read', 'demande:write'])]
     private ?string $description = null;
 
     #[ORM\Column(length: 50)]
