@@ -20,7 +20,9 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Serializer\Exception\ExceptionInterface;
 use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
+use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 use Symfony\Component\Serializer\SerializerInterface;
 
 #[Route('/api/demandes', name: 'api_demande_')]
@@ -32,7 +34,39 @@ class DemandeController extends AbstractController
         private readonly DemandeRepository $demandeRepository,
         private readonly CurrencyService $currencyService,
         private readonly SerializerInterface $serializer,
+        private readonly NormalizerInterface $normalizer,
     ) {}
+
+    #[Route('/public', name: 'public_list', methods: ['GET'])]
+    #[OA\Get(path: '/api/demandes/public', summary: 'Liste des demandes publiques')]
+    #[OA\Parameter(name: 'page', in: 'query', schema: new OA\Schema(type: 'integer', default: 1))]
+    #[OA\Parameter(name: 'limit', in: 'query', schema: new OA\Schema(type: 'integer', default: 10))]
+    #[OA\Parameter(name: 'villeDepart', in: 'query', schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(name: 'villeArrivee', in: 'query', schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(name: 'dateLimite', in: 'query', schema: new OA\Schema(type: 'string'))]
+    #[OA\Response(response: 200, description: 'Liste paginée')]
+    public function publicList(Request $request): JsonResponse
+    {
+        $page = $request->query->getInt('page', 1);
+        $limit = $request->query->getInt('limit', 10);
+        $filters = [
+            'villeDepart' => $request->query->get('villeDepart'),
+            'villeArrivee' => $request->query->get('villeArrivee'),
+            'dateLimite' => $request->query->get('dateLimite'),
+        ];
+
+        try {
+            $result = $this->demandeService->getPublicPaginatedDemandes($page, $limit, $filters);
+            $normalizedDemandes = $this->normalizer->normalize($result['data'], 'json', ['groups' => ['public:demande:list']]);
+        } catch (ExceptionInterface $e) {
+            return new JsonResponse(['error' => $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return new JsonResponse([
+            'data' => $normalizedDemandes,
+            'pagination' => $result['pagination']
+        ], Response::HTTP_OK);
+    }
 
     #[Route('', name: 'list', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
@@ -42,6 +76,7 @@ class DemandeController extends AbstractController
     #[OA\Parameter(name: 'villeDepart', in: 'query', schema: new OA\Schema(type: 'string'))]
     #[OA\Parameter(name: 'villeArrivee', in: 'query', schema: new OA\Schema(type: 'string'))]
     #[OA\Parameter(name: 'statut', in: 'query', schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(name: 'dateLimite', in: 'query', schema: new OA\Schema(type: 'string'))]
     #[OA\Response(response: 200, description: 'Liste paginée')]
     public function list(Request $request): JsonResponse
     {

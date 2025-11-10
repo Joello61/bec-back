@@ -32,6 +32,12 @@ readonly class VoyageService
         return $this->voyageRepository->findPaginated($page, $limit, $filters, $excludeUser);
     }
 
+    public function getPublicPaginatedVoyages(int $page, int $limit, array $filters = []): array
+    {
+        return $this->voyageRepository->findPublicPaginated($page, $limit, $filters);
+
+    }
+
     public function getVoyage(int $id): Voyage
     {
         $voyage = $this->voyageRepository->find($id);

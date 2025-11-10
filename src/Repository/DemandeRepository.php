@@ -16,6 +16,66 @@ class DemandeRepository extends ServiceEntityRepository
         parent::__construct($registry, Demande::class);
     }
 
+    public function findPublicPaginated(int $page = 1, int $limit = 10, array $filters = []): array
+    {
+        $offset = ($page - 1) * $limit;
+
+        $qb = $this->createQueryBuilder('d')
+            ->orderBy('d.createdAt', 'DESC')
+            ->andWhere('d.statut = :statut')
+            ->setParameter('statut', 'en_recherche')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit);
+
+        if (!empty($filters['villeDepart'])) {
+            $qb->andWhere('d.villeDepart LIKE :villeDepart')
+                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
+        }
+
+        if (!empty($filters['villeArrivee'])) {
+            $qb->andWhere('d.villeArrivee LIKE :villeArrivee')
+                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
+        }
+
+        if (!empty($filters['dateLimite'])) {
+            $qb->andWhere('d.dateLimite <= :today')
+                ->setParameter('today', new \DateTime('today'));
+        }
+
+        $demandes = $qb->getQuery()->getResult();
+
+        $countQb = $this->createQueryBuilder('d')
+            ->select('COUNT(d.id)')
+            ->andWhere('d.statut = :statut')
+            ->setParameter('statut', 'en_recherche');
+
+        if (!empty($filters['villeDepart'])) {
+            $countQb->andWhere('d.villeDepart LIKE :villeDepart')
+                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
+        }
+        if (!empty($filters['villeArrivee'])) {
+            $countQb->andWhere('d.villeArrivee LIKE :villeArrivee')
+                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
+        }
+
+        if (!empty($filters['dateLimite'])) {
+            $countQb->andWhere('d.dateLimite <= :today')
+                ->setParameter('today', new \DateTime('today'));
+        }
+
+        $total = $countQb->getQuery()->getSingleScalarResult();
+
+        return [
+            'data' => $demandes,
+            'pagination' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'pages' => (int) ceil($total / $limit),
+            ],
+        ];
+    }
+
     public function findPaginated(int $page = 1, int $limit = 10, array $filters = [], ?User $excludeUser = null): array
     {
         $offset = ($page - 1) * $limit;

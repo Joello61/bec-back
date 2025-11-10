@@ -32,6 +32,12 @@ readonly class DemandeService
         return $this->demandeRepository->findPaginated($page, $limit, $filters, $excludeUser);
     }
 
+    public function getPublicPaginatedDemandes(int $page, int $limit, array $filters = []): array
+    {
+        return $this->demandeRepository->findPublicPaginated($page, $limit, $filters);
+
+    }
+
     public function getDemande(int $id): Demande
     {
         $demande = $this->demandeRepository->find($id);

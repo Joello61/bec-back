@@ -19,7 +19,7 @@ class Voyage
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['voyage:read', 'voyage:list', 'proposition:list', 'favori:read', 'favori:list'])]
+    #[Groups(['public:voyage:list', 'voyage:read', 'voyage:list', 'proposition:list', 'favori:read', 'favori:list'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'voyages')]
@@ -28,37 +28,37 @@ class Voyage
     private ?User $voyageur = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['voyage:read', 'voyage:list', 'voyage:write', 'proposition:list', 'favori:list', 'signalement:list'])]
+    #[Groups(['public:voyage:list', 'voyage:read', 'voyage:list', 'voyage:write', 'proposition:list', 'favori:list', 'signalement:list'])]
     private ?string $villeDepart = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['voyage:read', 'voyage:list', 'voyage:write', 'proposition:list', 'favori:list', 'signalement:list'])]
+    #[Groups(['public:voyage:list', 'voyage:read', 'voyage:list', 'voyage:write', 'proposition:list', 'favori:list', 'signalement:list'])]
     private ?string $villeArrivee = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE)]
-    #[Groups(['voyage:read', 'voyage:list', 'voyage:write', 'proposition:list', 'favori:list'])]
+    #[Groups(['public:voyage:list', 'voyage:read', 'voyage:list', 'voyage:write', 'proposition:list', 'favori:list'])]
     private ?\DateTimeInterface $dateDepart = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE)]
-    #[Groups(['voyage:read', 'voyage:list', 'voyage:write', 'proposition:list', 'favori:list'])]
+    #[Groups(['public:voyage:list', 'voyage:read', 'voyage:list', 'voyage:write', 'proposition:list', 'favori:list'])]
     private ?\DateTimeInterface $dateArrivee = null;
 
     #[ORM\Column(type: Types::DECIMAL, precision: 5, scale: 2)]
-    #[Groups(['voyage:read', 'voyage:list', 'voyage:write', 'favori:list'])]
+    #[Groups(['public:voyage:list', 'voyage:read', 'voyage:list', 'voyage:write', 'favori:list'])]
     private ?string $poidsDisponible = null;
 
     #[ORM\Column(type: Types::DECIMAL, precision: 5, scale: 2, options: ['default' => 0])]
-    #[Groups(['voyage:read', 'voyage:list', 'voyage:write', 'favori:list'])]
+    #[Groups(['public:voyage:list', 'voyage:read', 'voyage:list', 'voyage:write', 'favori:list'])]
     private ?string $poidsDisponibleRestant = null;
 
     // ==================== NOUVEAUX CHAMPS PRIX/COMMISSION ====================
 
     #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
-    #[Groups(['voyage:read', 'voyage:list', 'voyage:write', 'favori:list'])]
+    #[Groups(['public:voyage:list', 'voyage:read', 'voyage:list', 'voyage:write', 'favori:list'])]
     private ?string $prixParKilo = null;
 
     #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
-    #[Groups(['voyage:read', 'voyage:list', 'voyage:write', 'favori:list'])]
+    #[Groups(['public:voyage:list', 'voyage:read', 'voyage:list', 'voyage:write', 'favori:list'])]
     private ?string $commissionProposeePourUnBagage = null;
 
     // ==================== DEVISE ====================
@@ -67,11 +67,11 @@ class Voyage
      * Code ISO 4217 de la devise (EUR, USD, XAF, etc.)
      */
     #[ORM\Column(length: 3)]
-    #[Groups(['voyage:read', 'voyage:list', 'voyage:write', 'favori:list'])]
+    #[Groups(['public:voyage:list', 'voyage:read', 'voyage:list', 'voyage:write', 'favori:list'])]
     private string $currency = 'EUR';
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
-    #[Groups(['voyage:read', 'voyage:write'])]
+    #[Groups(['public:voyage:list', 'voyage:read', 'voyage:write'])]
     private ?string $description = null;
 
     #[ORM\Column(length: 50)]
