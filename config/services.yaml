@@ -1,4 +1,8 @@
 parameters:
+    # Valeur par défaut pour la validation de config au moment de la compilation
+    # du container (Symfony teste sinon un enumNode avec une chaîne vide).
+    env(JWT_COOKIE_SAMESITE): 'lax'
+
     app.upload_public_path: '/uploads/avatars'
     app.uploads_directory: '%kernel.project_dir%/public/%env(UPLOADS_DIR)%'
     app.max_file_size: '%env(int:MAX_FILE_SIZE)%'
