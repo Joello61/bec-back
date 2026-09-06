@@ -17,7 +17,8 @@ readonly class ExceptionListener
 {
     public function __construct(
         private LoggerInterface $logger,
-        private string $environment
+        private string $environment,
+        private bool $debug
     ) {}
 
     public function onKernelException(ExceptionEvent $event): void
@@ -53,8 +54,8 @@ readonly class ExceptionListener
         }
 
         // En développement OU si APP_DEBUG=1, ajouter plus de détails
-        if ($this->environment === 'dev' || $_ENV['APP_DEBUG'] ?? false) {
-            $message = $exception->getMessage();  // ← AJOUTER : Message réel !
+        if ($this->environment === 'dev' || $this->debug) {
+            $message = $exception->getMessage();
             $errors = [
                 'exception' => get_class($exception),
                 'message' => $exception->getMessage(),

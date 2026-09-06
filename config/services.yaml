@@ -119,6 +119,7 @@ services:
     App\EventListener\ExceptionListener:
         arguments:
             $environment: '%kernel.environment%'
+            $debug: '%kernel.debug%'
         tags:
             - { name: kernel.event_listener, event: kernel.exception, priority: 10 }
 
