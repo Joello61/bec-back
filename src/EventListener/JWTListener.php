@@ -25,6 +25,7 @@ readonly class JWTListener
         private RefreshTokenManager $refreshTokenManager,
         private CookieManager $cookieManager,
         private LoggerInterface $logger,
+        private bool $debug,
     ) {}
 
     /**
@@ -112,12 +113,17 @@ readonly class JWTListener
     {
         $exception = $event->getException();
 
-        $response = new JsonResponse([
+        $data = [
             'success' => false,
             'message' => $exception->getMessage(),
-            'type' => get_class($exception),
-            'trace' => $exception->getTraceAsString(),
-        ], Response::HTTP_UNAUTHORIZED);
+        ];
+
+        if ($this->debug) {
+            $data['type'] = get_class($exception);
+            $data['trace'] = $exception->getTraceAsString();
+        }
+
+        $response = new JsonResponse($data, Response::HTTP_UNAUTHORIZED);
 
         $event->setResponse($response);
     }

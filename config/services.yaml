@@ -110,6 +110,8 @@ services:
 
     # JWT Event Listener
     App\EventListener\JWTListener:
+        arguments:
+            $debug: '%kernel.debug%'
         tags:
             - { name: kernel.event_listener, event: lexik_jwt_authentication.on_authentication_success, method: onAuthenticationSuccess }
             - { name: kernel.event_listener, event: lexik_jwt_authentication.on_jwt_created, method: onJWTCreated }
