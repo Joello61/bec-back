@@ -650,7 +650,6 @@ class AuthController extends AbstractController
     }
 
     #[Route('/logout', name: 'api_logout', methods: ['POST'])]
-    #[IsGranted('ROLE_USER')]
     #[OA\Post(
         path: '/api/logout',
         summary: 'Déconnexion',
