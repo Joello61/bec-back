@@ -41,6 +41,28 @@ class AvisRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    public function getAverageNotesForUsers(array $userIds): array
+    {
+        if ($userIds === []) {
+            return [];
+        }
+
+        $results = $this->createQueryBuilder('a')
+            ->select('IDENTITY(a.cible) as userId, AVG(a.note) as moyenne')
+            ->where('a.cible IN (:userIds)')
+            ->setParameter('userIds', $userIds)
+            ->groupBy('a.cible')
+            ->getQuery()
+            ->getResult();
+
+        $averages = [];
+        foreach ($results as $row) {
+            $averages[(int) $row['userId']] = (float) $row['moyenne'];
+        }
+
+        return $averages;
+    }
+
     public function getAverageNote(int $userId): ?float
     {
         $result = $this->createQueryBuilder('a')
