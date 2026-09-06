@@ -31,7 +31,7 @@ class Address
     private ?string $pays = null;
 
     #[ORM\Column(length: 100)]
-    #[Groups(['address:read', 'address:write', 'user:read', 'voyage:read', 'demande:read', 'admin:user:read'])]
+    #[Groups(['address:read', 'address:write', 'user:read', 'user:read:public', 'voyage:read', 'demande:read', 'admin:user:read'])]
     private ?string $ville = null;
 
     // ==================== FORMAT AFRIQUE ====================
