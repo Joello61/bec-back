@@ -47,7 +47,7 @@ readonly class CookieManager
             name: self::COOKIE_REFRESH_TOKEN,
             value: $token,
             ttl: $this->getRefreshTokenTtl(),
-            sameSite: 'none'
+            sameSite: $this->getSameSite()
         );
     }
 
@@ -60,7 +60,7 @@ readonly class CookieManager
             name: self::COOKIE_MERCURE,
             value: $token,
             ttl: 3600, // 1 heure
-            sameSite: 'none' // Nécessaire pour Mercure
+            sameSite: $this->getSameSite()
         );
     }
 
