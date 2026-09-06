@@ -11,6 +11,7 @@ use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\AddressService;
 use App\Service\AvatarService;
+use App\Service\AvisService;
 use App\Service\UserStatsService;
 use App\Service\VerificationService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -22,8 +23,10 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[Route('/api/users', name: 'api_user_')]
@@ -40,6 +43,7 @@ class UserController extends AbstractController
         private readonly bool $smsVerificationEnabled,
         private readonly ValidatorInterface $validator,
         private readonly AvatarService $avatarService,
+        private readonly AvisService $avisService,
     ) {}
 
     // ==================== COMPLÉTER PROFIL (MODIFIÉ) ====================
@@ -456,15 +460,21 @@ class UserController extends AbstractController
 
     #[Route('', name: 'list', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
-    public function list(Request $request): JsonResponse
+    public function list(Request $request, NormalizerInterface $normalizer): JsonResponse
     {
         $page = $request->query->getInt('page', 1);
-        $limit = $request->query->getInt('limit', 10);
+        $limit = min($request->query->getInt('limit', 10), 50);
         $result = $this->userRepository->findPaginated($page, $limit);
-        return $this->json($result, Response::HTTP_OK, [], ['groups' => ['user:read']]);
+
+        $data = $this->withPublicProfileData($result['data'], $normalizer);
+
+        return $this->json([
+            'data' => $data,
+            'pagination' => $result['pagination'],
+        ], Response::HTTP_OK);
     }
 
-    #[Route('/{id}', name: 'show', methods: ['GET'])]
+    #[Route('/{id}', name: 'show', requirements: ['id' => '\d+'], methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
     public function show(int $id): JsonResponse
     {
@@ -509,8 +519,21 @@ class UserController extends AbstractController
 
     #[Route('/search', name: 'search', methods: ['GET'])]
     #[IsGranted('ROLE_USER')]
-    public function search(Request $request): JsonResponse
-    {
+    public function search(
+        Request $request,
+        NormalizerInterface $normalizer,
+        RateLimiterFactoryInterface $usersSearchLimiter
+    ): JsonResponse {
+        /** @var User $currentUser */
+        $currentUser = $this->getUser();
+
+        $limiter = $usersSearchLimiter->create((string) $currentUser->getId());
+        if (false === $limiter->consume(1)->isAccepted()) {
+            return $this->json([
+                'message' => 'Trop de recherches. Veuillez réessayer plus tard.'
+            ], Response::HTTP_TOO_MANY_REQUESTS);
+        }
+
         $query = $request->query->get('q', '');
 
         if (strlen($query) < 2) {
@@ -519,7 +542,7 @@ class UserController extends AbstractController
 
         $users = $this->userRepository->search($query);
 
-        return $this->json($users, Response::HTTP_OK, [], ['groups' => ['user:read']]);
+        return $this->json($this->withPublicProfileData($users, $normalizer), Response::HTTP_OK);
     }
 
     #[Route('/me/dashboard', name: 'dashboard', methods: ['GET'])]
@@ -531,5 +554,23 @@ class UserController extends AbstractController
         $dashboard = $this->userStatsService->getUserDashboard($user);
 
         return $this->json($dashboard, Response::HTTP_OK, [], ['groups' => ['dashboard:read']]);
+    }
+
+    /**
+     * @param User[] $users
+     */
+    private function withPublicProfileData(array $users, NormalizerInterface $normalizer): array
+    {
+        $normalized = $normalizer->normalize($users, null, ['groups' => ['user:read:public']]);
+
+        $averages = $this->avisService->getAverageNotesForUsers(
+            array_map(static fn (User $user) => $user->getId(), $users)
+        );
+
+        foreach ($normalized as &$item) {
+            $item['noteAvisMoyen'] = $averages[$item['id']] ?? 0;
+        }
+
+        return $normalized;
     }
 }
