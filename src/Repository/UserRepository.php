@@ -122,6 +122,18 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
     {
         $offset = ($page - 1) * $limit;
 
+        // La colonne `roles` est de type `json` (pas `jsonb`) : PostgreSQL n'a pas
+        // d'operateur LIKE sur json, et DQL ne supporte pas CAST nativement. On resout
+        // le filtre par role via une requete native parametree (id des utilisateurs
+        // concernes), puis on contraint les requetes DQL par u.id IN (...).
+        $roleFilteredIds = null;
+        if (isset($filters['role'])) {
+            $roleFilteredIds = $this->getEntityManager()->getConnection()->fetchFirstColumn(
+                'SELECT id FROM users WHERE roles::text LIKE :role',
+                ['role' => '%"' . $filters['role'] . '"%']
+            );
+        }
+
         $qb = $this->createQueryBuilder('u')
             ->leftJoin('u.settings', 's')
             ->leftJoin('u.address', 'a')
@@ -135,9 +147,9 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
                 ->setParameter('banned', $filters['banned']);
         }
 
-        if (isset($filters['role'])) {
-            $qb->andWhere('u.roles LIKE :role')
-                ->setParameter('role', '%' . $filters['role'] . '%');
+        if ($roleFilteredIds !== null) {
+            $qb->andWhere('u.id IN (:roleIds)')
+                ->setParameter('roleIds', $roleFilteredIds ?: [0]);
         }
 
         if (isset($filters['verified'])) {
@@ -155,9 +167,9 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
                 ->setParameter('banned', $filters['banned']);
         }
 
-        if (isset($filters['role'])) {
-            $countQb->andWhere('u.roles LIKE :role')
-                ->setParameter('role', '%' . $filters['role'] . '%');
+        if ($roleFilteredIds !== null) {
+            $countQb->andWhere('u.id IN (:roleIds)')
+                ->setParameter('roleIds', $roleFilteredIds ?: [0]);
         }
 
         if (isset($filters['verified'])) {

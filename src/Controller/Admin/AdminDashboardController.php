@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller\Admin;
 
-use App\Entity\User;
+use App\Repository\UserRepository;
 use App\Service\Admin\AdminStatsService;
 use App\Service\Admin\AuditLogService;
 use OpenApi\Attributes as OA;
@@ -23,6 +23,7 @@ class AdminDashboardController extends AbstractController
     public function __construct(
         private readonly AdminStatsService $adminStatsService,
         private readonly AuditLogService $auditLogService,
+        private readonly UserRepository $userRepository,
     ) {}
 
     /**
@@ -314,9 +315,11 @@ class AdminDashboardController extends AbstractController
     {
         $limit = $request->query->getInt('limit', 50);
 
-        /* @var User $admin*/
-        $admin = $this->getUser();
-        // TODO: Vérifier que l'admin existe via UserRepository
+        $admin = $this->userRepository->find($adminId);
+
+        if (!$admin) {
+            return $this->json(['message' => 'Administrateur non trouvé'], Response::HTTP_NOT_FOUND);
+        }
 
         $logs = $this->auditLogService->getLogsByAdmin($admin, $limit);
 
