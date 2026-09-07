@@ -203,6 +203,22 @@ class AuthControllerTest extends WebTestCase
         self::assertTrue($payload['success']);
     }
 
+    public function testResendVerificationForExistingUserSucceeds(): void
+    {
+        $user = $this->createLocalUser('resend-verification', 'Password123', emailVerifie: false);
+
+        $this->client->request(
+            'POST',
+            '/api/resend-verification',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['email' => $user->getEmail(), 'type' => 'email'])
+        );
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertTrue($payload['success']);
+    }
+
     public function testResetPasswordRejectsInvalidToken(): void
     {
         $this->client->request(
