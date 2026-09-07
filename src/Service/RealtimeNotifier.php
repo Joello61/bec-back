@@ -23,6 +23,7 @@ readonly class RealtimeNotifier
      * Publication générique.
      *
      * @throws \JsonException
+     * @param array<string, mixed> $data
      */
     private function publish(string $topic, array $data, string $eventType, bool $private = false): void
     {
@@ -45,6 +46,7 @@ readonly class RealtimeNotifier
     /**
      * Notifie un utilisateur spécifique.
      * @throws \JsonException
+     * @param array<string, mixed> $data
      */
     public function publishToUser(User $user, array $data, string $eventType): void
     {
@@ -59,6 +61,7 @@ readonly class RealtimeNotifier
     /**
      * Notifie un groupe spécifique (ex: admin, modérateurs...).
      * @throws \JsonException
+     * @param array<string, mixed> $data
      */
     public function publishToGroup(string $group, array $data, string $eventType): void
     {
@@ -73,6 +76,7 @@ readonly class RealtimeNotifier
     /**
      * Publication sur le flux public global (news, alertes, etc.)
      * @throws \JsonException
+     * @param array<string, mixed> $data
      */
     public function publishPublic(array $data, string $eventType): void
     {
@@ -87,6 +91,7 @@ readonly class RealtimeNotifier
     /**
      * Publication sur le flux public des DEMANDES.
      * @throws \JsonException
+     * @param array<string, mixed> $data
      */
     public function publishDemandes(array $data, string $eventType): void
     {
@@ -101,6 +106,7 @@ readonly class RealtimeNotifier
     /**
      * Publication sur le flux public des VOYAGES.
      * @throws \JsonException
+     * @param array<string, mixed> $data
      */
     public function publishVoyages(array $data, string $eventType): void
     {
@@ -116,6 +122,8 @@ readonly class RealtimeNotifier
     /**
      * Ajoute des métadonnées standard à chaque payload
      * (utile pour les filtres côté frontend).
+     * @param array<string, mixed> $data
+     * @return array<string, mixed>
      */
     private function enrichPayload(array $data): array
     {
