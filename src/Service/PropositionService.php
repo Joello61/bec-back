@@ -484,8 +484,8 @@ readonly class PropositionService
         $proposition->setReponduAt(new \DateTimeImmutable());
 
         // ==================== REMETTRE LA DEMANDE EN RECHERCHE ====================
-        // Si la demande n'est pas déjà annulée, on la remet en recherche
-        if ($demande->getStatut() !== 'annulee' || $demande->getStatut() !== 'expiree') {
+        // Si la demande n'est pas déjà annulée ou expirée, on la remet en recherche
+        if ($demande->getStatut() !== 'annulee' && $demande->getStatut() !== 'expiree') {
             $demande->setStatut('en_recherche');
         }
 
