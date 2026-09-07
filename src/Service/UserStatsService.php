@@ -194,6 +194,9 @@ readonly class UserStatsService
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function getUserStats(int $userId, User $viewer): array
     {
         $voyagesTermines = $this->voyageRepository->count([
