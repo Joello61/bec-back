@@ -86,15 +86,19 @@ class Voyage
     #[Groups(['voyage:read'])]
     private ?\DateTimeInterface $updatedAt = null;
 
+    /** @var Collection<int, Avis> */
     #[ORM\OneToMany(targetEntity: Avis::class, mappedBy: 'voyage', cascade: ['remove'])]
     private Collection $avis;
 
+    /** @var Collection<int, Favori> */
     #[ORM\OneToMany(targetEntity: Favori::class, mappedBy: 'voyage', cascade: ['remove'])]
     private Collection $favoris;
 
+    /** @var Collection<int, Signalement> */
     #[ORM\OneToMany(targetEntity: Signalement::class, mappedBy: 'voyage', cascade: ['remove'])]
     private Collection $signalements;
 
+    /** @var Collection<int, Proposition> */
     #[ORM\OneToMany(targetEntity: Proposition::class, mappedBy: 'voyage', cascade: ['persist', 'remove'])]
     private Collection $propositions;
 
@@ -276,21 +280,25 @@ class Voyage
         return $this;
     }
 
+    /** @return Collection<int, Avis> */
     public function getAvis(): Collection
     {
         return $this->avis;
     }
 
+    /** @return Collection<int, Favori> */
     public function getFavoris(): Collection
     {
         return $this->favoris;
     }
 
+    /** @return Collection<int, Signalement> */
     public function getSignalements(): Collection
     {
         return $this->signalements;
     }
 
+    /** @return Collection<int, Proposition> */
     public function getPropositions(): Collection
     {
         return $this->propositions;
