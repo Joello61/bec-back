@@ -6,6 +6,7 @@ namespace App\Service\OAuth;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\SettingsService;
 use Doctrine\ORM\EntityManagerInterface;
 use League\OAuth2\Client\Provider\Facebook;
 use League\OAuth2\Client\Provider\FacebookUser;
@@ -18,6 +19,7 @@ readonly class FacebookAuthService
         private EntityManagerInterface $entityManager,
         private UserRepository $userRepository,
         private LoggerInterface $logger,
+        private SettingsService $settingsService,
         private Facebook $facebookProvider,
     ) {}
 
@@ -123,6 +125,8 @@ readonly class FacebookAuthService
 
             $this->entityManager->persist($user);
             $this->entityManager->flush();
+
+            $this->settingsService->createDefaultSettings($user);
 
             $this->logger->info('Nouvel utilisateur créé via Facebook', [
                 'user_id' => $user->getId(),
