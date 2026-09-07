@@ -32,6 +32,7 @@ class Conversation
     #[Groups(['conversation:read', 'conversation:list'])]
     private ?User $participant2 = null;
 
+    /** @var Collection<int, Message> */
     #[ORM\OneToMany(targetEntity: Message::class, mappedBy: 'conversation', cascade: ['persist', 'remove'], orphanRemoval: true)]
     #[ORM\OrderBy(['createdAt' => 'ASC'])]
     #[Groups(['conversation:read'])]
@@ -98,6 +99,7 @@ class Conversation
         return $this;
     }
 
+    /** @return Collection<int, Message> */
     public function getMessages(): Collection
     {
         return $this->messages;

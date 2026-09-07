@@ -85,6 +85,7 @@ class Country
     #[Groups(['country:read'])]
     private ?string $phoneCode = null;
 
+    /** @var Collection<int, City> */
     #[ORM\OneToMany(targetEntity: City::class, mappedBy: 'country', cascade: ['remove'])]
     private Collection $cities;
 
@@ -199,6 +200,7 @@ class Country
         return $this;
     }
 
+    /** @return Collection<int, City> */
     public function getCities(): Collection
     {
         return $this->cities;

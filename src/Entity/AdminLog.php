@@ -55,6 +55,7 @@ class AdminLog
      * Détails supplémentaires sous forme JSON
      * Exemple : {"reason": "Contenu inapproprié", "oldValue": "...", "newValue": "..."}
      */
+    /** @var array<string, mixed>|null */
     #[ORM\Column(type: Types::JSON, nullable: true)]
     #[Groups(['admin:log:read'])]
     private ?array $details = null;
@@ -134,11 +135,13 @@ class AdminLog
         return $this;
     }
 
+    /** @return array<string, mixed>|null */
     public function getDetails(): ?array
     {
         return $this->details;
     }
 
+    /** @param array<string, mixed>|null $details */
     public function setDetails(?array $details): static
     {
         $this->details = $details;
