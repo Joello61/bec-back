@@ -67,7 +67,7 @@ class CurrencyController extends AbstractController
      * @param string $code Code ISO 4217 (EUR, USD, XAF, etc.)
      * @return JsonResponse
      */
-    #[Route('/{code}', name: 'show', methods: ['GET'])]
+    #[Route('/{code}', name: 'show', requirements: ['code' => '[A-Za-z]{3}'], methods: ['GET'])]
     public function show(string $code): JsonResponse
     {
         $currency = $this->currencyService->getCurrency(strtoupper($code));
