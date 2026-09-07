@@ -15,23 +15,13 @@ use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
 readonly class GoogleAuthService
 {
-    private Google $googleProvider;
-
     public function __construct(
         private EntityManagerInterface $entityManager,
         private UserRepository $userRepository,
         private LoggerInterface $logger,
         private SettingsService $settingsService,
-        string $googleClientId,
-        string $googleClientSecret,
-        string $googleRedirectUri
-    ) {
-        $this->googleProvider = new Google([
-            'clientId' => $googleClientId,
-            'clientSecret' => $googleClientSecret,
-            'redirectUri' => $googleRedirectUri,
-        ]);
-    }
+        private Google $googleProvider,
+    ) {}
 
     /**
      * Génère l'URL d'autorisation Google

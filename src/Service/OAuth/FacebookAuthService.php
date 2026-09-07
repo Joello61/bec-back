@@ -14,23 +14,12 @@ use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
 readonly class FacebookAuthService
 {
-    private Facebook $facebookProvider;
-
     public function __construct(
         private EntityManagerInterface $entityManager,
         private UserRepository $userRepository,
         private LoggerInterface $logger,
-        string $facebookAppId,
-        string $facebookAppSecret,
-        string $facebookRedirectUri
-    ) {
-        $this->facebookProvider = new Facebook([
-            'clientId' => $facebookAppId,
-            'clientSecret' => $facebookAppSecret,
-            'redirectUri' => $facebookRedirectUri,
-            'graphApiVersion' => 'v18.0',
-        ]);
-    }
+        private Facebook $facebookProvider,
+    ) {}
 
     /**
      * Génère l'URL d'autorisation Facebook

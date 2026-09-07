@@ -14,16 +14,11 @@ use Twilio\Exceptions\TwilioException;
  */
 readonly class TwilioService
 {
-    private Client $twilioClient;
-
     public function __construct(
         private LoggerInterface $logger,
-        private string $twilioAccountSid,
-        private string $twilioAuthToken,
-        private string $twilioPhoneNumber
-    ) {
-        $this->twilioClient = new Client($twilioAccountSid, $twilioAuthToken);
-    }
+        private string $twilioPhoneNumber,
+        private Client $twilioClient,
+    ) {}
 
     /**
      * Envoie un SMS via Twilio
