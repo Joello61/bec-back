@@ -26,6 +26,7 @@ readonly class AdminStatsService
 
     /**
      * Récupère toutes les statistiques globales pour le dashboard admin
+     * @return array<string, mixed>
      */
     public function getGlobalStats(): array
     {
@@ -41,6 +42,7 @@ readonly class AdminStatsService
 
     /**
      * Statistiques sur les utilisateurs
+     * @return array<string, mixed>
      */
     public function getUsersStats(): array
     {
@@ -89,6 +91,7 @@ readonly class AdminStatsService
 
     /**
      * Statistiques sur les voyages
+     * @return array<string, mixed>
      */
     public function getVoyagesStats(): array
     {
@@ -128,6 +131,7 @@ readonly class AdminStatsService
 
     /**
      * Statistiques sur les demandes
+     * @return array<string, mixed>
      */
     public function getDemandesStats(): array
     {
@@ -165,6 +169,7 @@ readonly class AdminStatsService
 
     /**
      * Statistiques sur les signalements
+     * @return array<string, mixed>
      */
     public function getSignalementsStats(): array
     {
@@ -196,6 +201,7 @@ readonly class AdminStatsService
 
     /**
      * Statistiques d'activité (7 derniers jours)
+     * @return array<string, mixed>
      */
     public function getActivityStats(): array
     {
@@ -245,6 +251,7 @@ readonly class AdminStatsService
 
     /**
      * Statistiques d'engagement
+     * @return array<string, mixed>
      */
     public function getEngagementStats(): array
     {
@@ -275,6 +282,7 @@ readonly class AdminStatsService
 
     /**
      * Statistiques détaillées pour les utilisateurs (pour graphiques)
+     * @return list<array<string, bool|float|int|string|null>>
      */
     public function getUsersDetailedStats(int $days = 30): array
     {
@@ -307,6 +315,7 @@ readonly class AdminStatsService
 
     /**
      * Statistiques par méthode d'authentification
+     * @return array<string, mixed>
      */
     public function getAuthProvidersStats(): array
     {
@@ -334,6 +343,8 @@ readonly class AdminStatsService
 
     /**
      * Calcule la tendance (hausse/baisse) sur les 7 derniers jours
+     * @param array<array{inscriptions: int}> $data
+     * @return array{direction: string, percentage: int|float}
      */
     private function calculateTrend(array $data): array
     {
