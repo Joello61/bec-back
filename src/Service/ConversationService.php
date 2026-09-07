@@ -162,7 +162,6 @@ readonly class ConversationService
      */
     public function markConversationAsRead(int $conversationId, User $user): int
     {
-        /** @var Conversation $conversation */
         $conversation = $this->conversationRepository->find($conversationId);
 
         if (!$conversation) {
@@ -223,7 +222,6 @@ readonly class ConversationService
      */
     public function deleteConversation(int $conversationId, User $user): void
     {
-        /** @var Conversation $conversation */
         $conversation = $this->conversationRepository->find($conversationId);
 
         if (!$conversation) {
