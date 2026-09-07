@@ -124,20 +124,6 @@ class CurrencyRepository extends ServiceEntityRepository
         return $count > 0;
     }
 
-    /**
-     * Récupère toutes les devises avec leur mapping pays
-     */
-    public function findAllWithCountries(): array
-    {
-        return $this->createQueryBuilder('c')
-            ->where('c.isActive = :active')
-            ->andWhere('JSON_LENGTH(c.countries) > 0')
-            ->setParameter('active', true)
-            ->orderBy('c.code', 'ASC')
-            ->getQuery()
-            ->getResult();
-    }
-
     public function save(Currency $currency): void
     {
         $this->getEntityManager()->persist($currency);
