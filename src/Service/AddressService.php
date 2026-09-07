@@ -171,7 +171,7 @@ readonly class AddressService
         // ==================== MISE À JOUR DE LA DEVISE SI LE PAYS A CHANGÉ ====================
         if ($oldCountry !== $newCountry) {
             $newCurrency = $this->currencyService->getCurrencyAndLangByCountry($newCountry)['currency'];
-            $newLang = $this->currencyService->getCurrencyAndLangByCountry($newCountry)['lang'];
+            $newLang = $this->currencyService->getCurrencyAndLangByCountry($newCountry)['languages'];
 
             $address->getUser()->getSettings()?->setDevise($newCurrency);
             $address->getUser()->getSettings()?->setLangue($newLang);
