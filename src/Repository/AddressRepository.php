@@ -9,6 +9,9 @@ use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends ServiceEntityRepository<Address>
+ */
 class AddressRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -41,6 +44,7 @@ class AddressRepository extends ServiceEntityRepository
 
     /**
      * Trouve les adresses créées entre deux dates
+      * @return Address[]
      */
     public function findCreatedBetween(\DateTimeInterface $start, \DateTimeInterface $end): array
     {
@@ -55,6 +59,7 @@ class AddressRepository extends ServiceEntityRepository
 
     /**
      * Trouve les adresses par ville
+      * @return Address[]
      */
     public function findByVille(string $ville): array
     {
@@ -67,6 +72,7 @@ class AddressRepository extends ServiceEntityRepository
 
     /**
      * Trouve les adresses par pays
+      * @return Address[]
      */
     public function findByPays(string $pays): array
     {
