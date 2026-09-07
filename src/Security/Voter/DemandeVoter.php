@@ -10,6 +10,9 @@ use App\Service\VisibilityService;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
+/**
+ * @extends Voter<string, Demande|int|null>
+ */
 class DemandeVoter extends Voter
 {
     public const EDIT = 'DEMANDE_EDIT';
