@@ -94,7 +94,7 @@ class AdminUserController extends AbstractController
     public function list(Request $request): JsonResponse
     {
         $page = $request->query->getInt('page', 1);
-        $limit = $request->query->getInt('limit', 20);
+        $limit = min($request->query->getInt('limit', 20), 50);
 
         $filters = [
             'banned' => $request->query->get('banned') === 'true' ? true : ($request->query->get('banned') === 'false' ? false : null),
