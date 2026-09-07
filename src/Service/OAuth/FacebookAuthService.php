@@ -54,7 +54,10 @@ readonly class FacebookAuthService
 
             // Récupérer les informations de l'utilisateur
             /** @var FacebookUser $facebookUser */
-            $facebookUser = $this->facebookProvider->getResourceOwner($accessToken);
+            // getAccessToken() declare un retour AccessTokenInterface, mais renvoie
+            // toujours une instance concrete AccessToken pour ce grant type - limitation
+            // de typage de league/oauth2-client, pas un risque reel a l'execution.
+            $facebookUser = $this->facebookProvider->getResourceOwner($accessToken); // @phpstan-ignore argument.type
 
             $facebookId = $facebookUser->getId();
             $email = $facebookUser->getEmail();
@@ -67,7 +70,7 @@ readonly class FacebookAuthService
 
             // Parser le nom (Facebook donne le nom complet)
             $nameParts = explode(' ', $name, 2);
-            $firstName = $nameParts[0] ?? 'Prénom';
+            $firstName = $nameParts[0];
             $lastName = $nameParts[1] ?? 'Nom';
 
             // Vérifier si l'utilisateur existe déjà avec ce Facebook ID
