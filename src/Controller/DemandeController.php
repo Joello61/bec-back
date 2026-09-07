@@ -11,6 +11,7 @@ use App\Entity\Voyage;
 use App\Repository\DemandeRepository;
 use App\Service\CurrencyService;
 use App\Service\DemandeService;
+use App\Service\VisibilityService;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -35,6 +36,7 @@ class DemandeController extends AbstractController
         private readonly CurrencyService $currencyService,
         private readonly SerializerInterface $serializer,
         private readonly NormalizerInterface $normalizer,
+        private readonly VisibilityService $visibilityService,
     ) {}
 
     #[Route('/public', name: 'public_list', methods: ['GET'])]
@@ -97,10 +99,16 @@ class DemandeController extends AbstractController
         $result = $this->demandeService->getPaginatedDemandes($page, $limit, $filters, $currentUser);
 
         // ==================== CONVERSION AUTOMATIQUE ====================
-        $demandesWithConversion = array_map(function ($demande) use ($viewerCurrency) {
+        $demandesWithConversion = array_map(function ($demande) use ($viewerCurrency, $currentUser) {
             $demandeData = json_decode(
                 $this->serializer->serialize($demande, 'json', ['groups' => ['demande:list']]),
                 true
+            );
+            $demandeData = $this->visibilityService->injectContactIfVisible(
+                $demandeData,
+                'client',
+                $demande->getClient(),
+                $currentUser
             );
 
             // Ajouter les montants convertis si la devise est différente
@@ -135,6 +143,12 @@ class DemandeController extends AbstractController
             $this->serializer->serialize($demande, 'json', ['groups' => ['demande:read']]),
             true
         );
+        $demandeData = $this->visibilityService->injectContactIfVisible(
+            $demandeData,
+            'client',
+            $demande->getClient(),
+            $currentUser
+        );
 
         // ==================== CONVERSION AUTOMATIQUE ====================
         if ($demande->getCurrency() !== $viewerCurrency) {
@@ -162,7 +176,7 @@ class DemandeController extends AbstractController
         $matchingVoyages = $this->demandeService->findMatchingVoyages($id, $currentUser);
 
         // ==================== 2. SÉRIALISER ET ENRICHIR ====================
-        $result = array_map(function ($match) use ($viewerCurrency) {
+        $result = array_map(function ($match) use ($viewerCurrency, $currentUser) {
             // Sérialiser le voyage avec gestion des références circulaires
             $voyageData = json_decode(
                 $this->serializer->serialize(
@@ -176,6 +190,12 @@ class DemandeController extends AbstractController
                     ]
                 ),
                 true
+            );
+            $voyageData = $this->visibilityService->injectContactIfVisible(
+                $voyageData,
+                'voyageur',
+                $match['voyage']->getVoyageur(),
+                $currentUser
             );
 
             // ==================== CONVERSION DE DEVISE ====================
@@ -247,7 +267,10 @@ class DemandeController extends AbstractController
         $this->denyAccessUnlessGranted('DEMANDE_CREATE');
 
         $demande = $this->demandeService->createDemande($dto, $user);
-        return $this->json($demande, Response::HTTP_CREATED, [], ['groups' => ['demande:read']]);
+        $demandeData = $this->normalizer->normalize($demande, null, ['groups' => ['demande:read']]);
+        $demandeData = $this->visibilityService->injectContactIfVisible($demandeData, 'client', $demande->getClient(), $user);
+
+        return $this->json($demandeData, Response::HTTP_CREATED);
     }
 
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
@@ -256,6 +279,9 @@ class DemandeController extends AbstractController
     #[OA\Response(response: 200, description: 'Demande mise à jour')]
     public function update(int $id, #[MapRequestPayload] UpdateDemandeDTO $dto): JsonResponse
     {
+        /** @var User $currentUser */
+        $currentUser = $this->getUser();
+
         $demande = $this->demandeRepository->find($id);
 
         if (!$demande) {
@@ -265,7 +291,10 @@ class DemandeController extends AbstractController
         $this->denyAccessUnlessGranted('DEMANDE_EDIT', $demande);
 
         $updatedDemande = $this->demandeService->updateDemande($id, $dto);
-        return $this->json($updatedDemande, Response::HTTP_OK, [], ['groups' => ['demande:read']]);
+        $demandeData = $this->normalizer->normalize($updatedDemande, null, ['groups' => ['demande:read']]);
+        $demandeData = $this->visibilityService->injectContactIfVisible($demandeData, 'client', $updatedDemande->getClient(), $currentUser);
+
+        return $this->json($demandeData, Response::HTTP_OK);
     }
 
     #[Route('/{id}/statut', name: 'update_status', methods: ['PATCH'])]
@@ -274,6 +303,9 @@ class DemandeController extends AbstractController
     #[OA\Response(response: 200, description: 'Statut mis à jour')]
     public function updateStatus(int $id, Request $request): JsonResponse
     {
+        /** @var User $currentUser */
+        $currentUser = $this->getUser();
+
         $demande = $this->demandeRepository->find($id);
 
         if (!$demande) {
@@ -290,7 +322,10 @@ class DemandeController extends AbstractController
         }
 
         $updatedDemande = $this->demandeService->updateStatut($id, $statut);
-        return $this->json($updatedDemande, Response::HTTP_OK, [], ['groups' => ['demande:read']]);
+        $demandeData = $this->normalizer->normalize($updatedDemande, null, ['groups' => ['demande:read']]);
+        $demandeData = $this->visibilityService->injectContactIfVisible($demandeData, 'client', $updatedDemande->getClient(), $currentUser);
+
+        return $this->json($demandeData, Response::HTTP_OK);
     }
 
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
@@ -325,10 +360,16 @@ class DemandeController extends AbstractController
         $demandes = $this->demandeService->getDemandesByUser($userId);
 
         // ==================== CONVERSION AUTOMATIQUE ====================
-        $demandesWithConversion = array_map(function ($demande) use ($viewerCurrency) {
+        $demandesWithConversion = array_map(function ($demande) use ($viewerCurrency, $currentUser) {
             $demandeData = json_decode(
                 $this->serializer->serialize($demande, 'json', ['groups' => ['demande:list']]),
                 true
+            );
+            $demandeData = $this->visibilityService->injectContactIfVisible(
+                $demandeData,
+                'client',
+                $demande->getClient(),
+                $currentUser
             );
 
             if ($demande->getCurrency() !== $viewerCurrency) {

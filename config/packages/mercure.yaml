@@ -6,3 +6,22 @@ mercure:
             jwt:
                 secret: '%env(MERCURE_JWT_SECRET)%'
                 publish: '*'
+
+# Phase 10 : aucun hub Mercure réel n'est joignable en environnement de test
+# (cf. Phase D0 du plan de déploiement, pas encore de docker-compose de dev).
+# RealtimeNotifier est appelé par plusieurs services métier (VoyageService,
+# DemandeService, AvisService...) sans isolation - remplacer le hub réel par le
+# MockHub officiel du composant symfony/mercure évite un 500 sur tout test
+# fonctionnel qui déclenche une création/mise à jour de voyage ou de demande.
+when@test:
+    services:
+        App\Tests\Mercure\NullMercurePublisher: ~
+
+        mercure.hub.default:
+            class: Symfony\Component\Mercure\MockHub
+            arguments:
+                - '%env(MERCURE_URL)%'
+                - !service { class: Symfony\Component\Mercure\Jwt\StaticTokenProvider, arguments: ['test-token'] }
+                - '@App\Tests\Mercure\NullMercurePublisher'
+                - null
+                - '%env(MERCURE_PUBLIC_URL)%'

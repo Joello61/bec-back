@@ -175,4 +175,22 @@ readonly class VisibilityService
 
         return $settings->isShowEmail();
     }
+
+    /**
+     * Réinjecte email/téléphone dans un tableau déjà normalisé (ex. un voyage/une
+     * demande sérialisés sans ces champs), uniquement si les préférences du
+     * propriétaire l'autorisent pour ce viewer.
+     */
+    public function injectContactIfVisible(array $normalized, string $ownerKey, User $owner, ?User $viewer): array
+    {
+        if ($this->isEmailVisibleFor($owner, $viewer)) {
+            $normalized[$ownerKey]['email'] = $owner->getEmail();
+        }
+
+        if ($this->isPhoneVisibleFor($owner, $viewer)) {
+            $normalized[$ownerKey]['telephone'] = $owner->getTelephone();
+        }
+
+        return $normalized;
+    }
 }

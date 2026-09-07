@@ -527,7 +527,7 @@ Votre demande est de nouveau en recherche d’un voyageur.",
     public function findMatchingDemandes(int $voyageId, ?User $viewer = null): array
     {
         $voyage = $this->getVoyage($voyageId);
-        return $this->matchingService->findMatchingDemandes($voyage, $viewer);
+        return $this->matchingService->findBestMatchesDemandes($voyage, $viewer);
     }
 
     /**

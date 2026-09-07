@@ -10,6 +10,7 @@ use App\Entity\User;
 use App\Repository\VoyageRepository;
 use App\Service\AvisService;
 use App\Service\CurrencyService;
+use App\Service\VisibilityService;
 use App\Service\VoyageService;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -36,6 +37,7 @@ class VoyageController extends AbstractController
         private readonly CurrencyService $currencyService,
         private readonly SerializerInterface $serializer,
         private readonly NormalizerInterface $normalizer,
+        private readonly VisibilityService $visibilityService,
     ) {}
 
     #[Route('/public', name: 'public_list', methods: ['GET'])]
@@ -98,10 +100,16 @@ class VoyageController extends AbstractController
         $result = $this->voyageService->getPaginatedVoyages($page, $limit, $filters, $currentUser);
 
         // ==================== CONVERSION AUTOMATIQUE ====================
-        $voyagesWithConversion = array_map(function ($voyage) use ($viewerCurrency) {
+        $voyagesWithConversion = array_map(function ($voyage) use ($viewerCurrency, $currentUser) {
             $voyageData = json_decode(
                 $this->serializer->serialize($voyage, 'json', ['groups' => ['voyage:list']]),
                 true
+            );
+            $voyageData = $this->visibilityService->injectContactIfVisible(
+                $voyageData,
+                'voyageur',
+                $voyage->getVoyageur(),
+                $currentUser
             );
 
             // Ajouter les montants convertis si la devise est différente
@@ -139,6 +147,12 @@ class VoyageController extends AbstractController
 
         $noteAvisMoyen = $this->avisService->getStatsByUser($voyage->getVoyageur()->getId())['average'] ?? 0;
         $dataVoyage['voyageur']['noteAvisMoyen'] = $noteAvisMoyen;
+        $dataVoyage = $this->visibilityService->injectContactIfVisible(
+            $dataVoyage,
+            'voyageur',
+            $voyage->getVoyageur(),
+            $currentUser
+        );
 
         // ==================== CONVERSION AUTOMATIQUE ====================
         if ($voyage->getCurrency() !== $viewerCurrency) {
@@ -165,50 +179,67 @@ class VoyageController extends AbstractController
         $demandes = $this->voyageService->findMatchingDemandes($id, $currentUser);
 
         // ==================== CONVERSION AUTOMATIQUE ====================
-        $demandesWithConversion = array_map(function ($match) use ($viewerCurrency) {
-            if (isset($match['demande']) && $match['demande']->getCurrency() !== $viewerCurrency) {
-                $demandeData = json_decode(
-                    $this->serializer->serialize($match['demande'], 'json', ['groups' => ['demande:list']]),
-                    true
-                );
+        $demandesWithConversion = array_map(function ($match) use ($viewerCurrency, $currentUser) {
+            if (!isset($match['demande'])) {
+                return $match;
+            }
 
-                // Conversion des montants
-                if ($match['demande']->getPrixParKilo() || $match['demande']->getCommissionProposeePourUnBagage()) {
-                    $converted = [
-                        'originalCurrency' => $match['demande']->getCurrency(),
-                        'targetCurrency' => $viewerCurrency,
-                    ];
+            $demande = $match['demande'];
 
-                    if ($match['demande']->getPrixParKilo()) {
-                        $converted['prixParKilo'] = $this->currencyService->convert(
-                            (float) $match['demande']->getPrixParKilo(),
-                            $match['demande']->getCurrency(),
-                            $viewerCurrency
-                        );
-                        $converted['prixParKiloFormatted'] = $this->currencyService->formatAmount(
-                            $converted['prixParKilo'],
-                            $viewerCurrency
-                        );
-                    }
+            // La sérialisation avec groupes doit toujours avoir lieu, pas seulement
+            // quand la devise diffère : sans ça, un $match['demande'] resté entité
+            // brute (devise identique) part sans aucun groupe dans le JSON final,
+            // ce qui provoque une CircularReferenceException (client -> demandes ->
+            // client) plutôt qu'une réponse propre.
+            $demandeData = json_decode(
+                $this->serializer->serialize($demande, 'json', ['groups' => ['demande:list']]),
+                true
+            );
+            $demandeData = $this->visibilityService->injectContactIfVisible(
+                $demandeData,
+                'client',
+                $demande->getClient(),
+                $currentUser
+            );
 
-                    if ($match['demande']->getCommissionProposeePourUnBagage()) {
-                        $converted['commission'] = $this->currencyService->convert(
-                            (float) $match['demande']->getCommissionProposeePourUnBagage(),
-                            $match['demande']->getCurrency(),
-                            $viewerCurrency
-                        );
-                        $converted['commissionFormatted'] = $this->currencyService->formatAmount(
-                            $converted['commission'],
-                            $viewerCurrency
-                        );
-                    }
+            // Conversion des montants
+            if ($demande->getCurrency() !== $viewerCurrency
+                && ($demande->getPrixParKilo() || $demande->getCommissionProposeePourUnBagage())
+            ) {
+                $converted = [
+                    'originalCurrency' => $demande->getCurrency(),
+                    'targetCurrency' => $viewerCurrency,
+                ];
 
-                    $demandeData['converted'] = $converted;
+                if ($demande->getPrixParKilo()) {
+                    $converted['prixParKilo'] = $this->currencyService->convert(
+                        (float) $demande->getPrixParKilo(),
+                        $demande->getCurrency(),
+                        $viewerCurrency
+                    );
+                    $converted['prixParKiloFormatted'] = $this->currencyService->formatAmount(
+                        $converted['prixParKilo'],
+                        $viewerCurrency
+                    );
                 }
 
-                $demandeData['viewerCurrency'] = $viewerCurrency;
-                $match['demande'] = $demandeData;
+                if ($demande->getCommissionProposeePourUnBagage()) {
+                    $converted['commission'] = $this->currencyService->convert(
+                        (float) $demande->getCommissionProposeePourUnBagage(),
+                        $demande->getCurrency(),
+                        $viewerCurrency
+                    );
+                    $converted['commissionFormatted'] = $this->currencyService->formatAmount(
+                        $converted['commission'],
+                        $viewerCurrency
+                    );
+                }
+
+                $demandeData['converted'] = $converted;
             }
+
+            $demandeData['viewerCurrency'] = $viewerCurrency;
+            $match['demande'] = $demandeData;
 
             return $match;
         }, $demandes);
@@ -228,7 +259,10 @@ class VoyageController extends AbstractController
         $this->denyAccessUnlessGranted('VOYAGE_CREATE');
 
         $voyage = $this->voyageService->createVoyage($dto, $user);
-        return $this->json($voyage, Response::HTTP_CREATED, [], ['groups' => ['voyage:read']]);
+        $voyageData = $this->normalizer->normalize($voyage, null, ['groups' => ['voyage:read']]);
+        $voyageData = $this->visibilityService->injectContactIfVisible($voyageData, 'voyageur', $voyage->getVoyageur(), $user);
+
+        return $this->json($voyageData, Response::HTTP_CREATED);
     }
 
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
@@ -237,6 +271,9 @@ class VoyageController extends AbstractController
     #[OA\Response(response: 200, description: 'Voyage mis à jour')]
     public function update(int $id, #[MapRequestPayload] UpdateVoyageDTO $dto): JsonResponse
     {
+        /** @var User $currentUser */
+        $currentUser = $this->getUser();
+
         // Charger le voyage pour vérifier les permissions
         $voyage = $this->voyageRepository->find($id);
 
@@ -247,7 +284,10 @@ class VoyageController extends AbstractController
         $this->denyAccessUnlessGranted('VOYAGE_EDIT', $voyage);
 
         $updatedVoyage = $this->voyageService->updateVoyage($id, $dto);
-        return $this->json($updatedVoyage, Response::HTTP_OK, [], ['groups' => ['voyage:read']]);
+        $voyageData = $this->normalizer->normalize($updatedVoyage, null, ['groups' => ['voyage:read']]);
+        $voyageData = $this->visibilityService->injectContactIfVisible($voyageData, 'voyageur', $updatedVoyage->getVoyageur(), $currentUser);
+
+        return $this->json($voyageData, Response::HTTP_OK);
     }
 
     #[Route('/{id}/statut', name: 'update_status', methods: ['PATCH'])]
@@ -256,6 +296,9 @@ class VoyageController extends AbstractController
     #[OA\Response(response: 200, description: 'Statut mis à jour')]
     public function updateStatus(int $id, Request $request): JsonResponse
     {
+        /** @var User $currentUser */
+        $currentUser = $this->getUser();
+
         // Charger le voyage pour vérifier les permissions
         $voyage = $this->voyageRepository->find($id);
 
@@ -273,7 +316,10 @@ class VoyageController extends AbstractController
         }
 
         $updatedVoyage = $this->voyageService->updateStatut($id, $statut);
-        return $this->json($updatedVoyage, Response::HTTP_OK, [], ['groups' => ['voyage:read']]);
+        $voyageData = $this->normalizer->normalize($updatedVoyage, null, ['groups' => ['voyage:read']]);
+        $voyageData = $this->visibilityService->injectContactIfVisible($voyageData, 'voyageur', $updatedVoyage->getVoyageur(), $currentUser);
+
+        return $this->json($voyageData, Response::HTTP_OK);
     }
 
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
@@ -309,10 +355,16 @@ class VoyageController extends AbstractController
         $voyages = $this->voyageService->getVoyagesByUser($userId);
 
         // ==================== CONVERSION AUTOMATIQUE ====================
-        $voyagesWithConversion = array_map(function ($voyage) use ($viewerCurrency) {
+        $voyagesWithConversion = array_map(function ($voyage) use ($viewerCurrency, $currentUser) {
             $voyageData = json_decode(
                 $this->serializer->serialize($voyage, 'json', ['groups'=> ['voyage:list']]),
                 true
+            );
+            $voyageData = $this->visibilityService->injectContactIfVisible(
+                $voyageData,
+                'voyageur',
+                $voyage->getVoyageur(),
+                $currentUser
             );
 
             if ($voyage->getCurrency() !== $viewerCurrency) {
