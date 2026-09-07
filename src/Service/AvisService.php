@@ -231,21 +231,34 @@ readonly class AvisService
 
     }
 
+    /**
+     * @return \App\Entity\Avis[]
+     */
     public function getAvisByUser(int $userId): array
     {
         return $this->avisRepository->findByUser($userId);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getStatsByUser(int $userId): array
     {
         return $this->avisRepository->getStatsByUser($userId);
     }
 
+    /**
+     * @param int[] $userIds
+     * @return array<int, float>
+     */
     public function getAverageNotesForUsers(array $userIds): array
     {
         return $this->avisRepository->getAverageNotesForUsers($userIds);
     }
 
+    /**
+     * @return \App\Entity\Avis[]
+     */
     public function getAvisByVoyage(int $voyageId): array
     {
         return $this->avisRepository->findByVoyage($voyageId);
