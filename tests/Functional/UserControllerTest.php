@@ -120,6 +120,34 @@ class UserControllerTest extends WebTestCase
         self::assertSame(429, $this->client->getResponse()->getStatusCode());
     }
 
+    public function testNoteAvisMoyenIsAttributedToTheCorrectUserWhenSeveralAreListedTogether(): void
+    {
+        $viewer = $this->createUser('viewer-notes');
+        $rater1 = $this->createUser('rater1-notes');
+        $rater2 = $this->createUser('rater2-notes');
+        $userWithTwoRatings = $this->createUser('two-ratings');
+        $userWithOneRating = $this->createUser('one-rating');
+        $userWithNoRating = $this->createUser('no-rating');
+
+        $this->rate($rater1, $userWithTwoRatings, 2);
+        $this->rate($rater2, $userWithTwoRatings, 4);
+        $this->rate($rater1, $userWithOneRating, 5);
+        $this->authenticateAs($viewer);
+
+        $this->client->request('GET', '/api/users?limit=50');
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+
+        $twoRatingsItem = $this->findById($payload['data'], $userWithTwoRatings->getId());
+        $oneRatingItem = $this->findById($payload['data'], $userWithOneRating->getId());
+        $noRatingItem = $this->findById($payload['data'], $userWithNoRating->getId());
+
+        self::assertSame(3.0, (float) $twoRatingsItem['noteAvisMoyen'], 'moyenne de 2 et 4');
+        self::assertSame(5.0, (float) $oneRatingItem['noteAvisMoyen']);
+        self::assertSame(0.0, (float) $noRatingItem['noteAvisMoyen'], 'aucun avis ne doit valoir 0, jamais la moyenne d\'un autre utilisateur de la page');
+    }
+
     private function createUser(string $emailPrefix, string $ville = 'Douala'): User
     {
         $user = new User();
