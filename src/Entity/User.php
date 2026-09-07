@@ -318,11 +318,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function setAddress(?Address $address): static
     {
-        // Gérer la relation bidirectionnelle
-        if ($address === null && $this->address !== null) {
-            $this->address->setUser(null);
-        }
-
         $this->address = $address;
 
         if ($address !== null && $address->getUser() !== $this) {
