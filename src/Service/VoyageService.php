@@ -388,7 +388,7 @@ readonly class VoyageService
             // Si la demande est encore active, on la remet en recherche
             if ($demande && !in_array($demande->getStatut(), ['annulee', 'expiree'], true)) {
                 $demande->setStatut('en_recherche');
-                $demande->setUpdatedAt(new \DateTimeImmutable());
+                $demande->setUpdatedAt();
                 $client = $demande->getClient();
 
                 // Notifier le client concerné
