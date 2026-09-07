@@ -20,6 +20,7 @@ readonly class AuditLogService
 
     /**
      * Enregistre une action admin dans les logs
+     * @param array<string, mixed>|null $details
      */
     public function logAdminAction(
         User $admin,
@@ -51,6 +52,7 @@ readonly class AuditLogService
 
     /**
      * Récupère les logs récents avec pagination
+     * @return array<string, mixed>
      */
     public function getRecentLogs(int $page = 1, int $limit = 50): array
     {
@@ -59,6 +61,7 @@ readonly class AuditLogService
 
     /**
      * Récupère les logs d'un admin spécifique
+     * @return \App\Entity\AdminLog[]
      */
     public function getLogsByAdmin(User $admin, int $limit = 50): array
     {
@@ -67,6 +70,7 @@ readonly class AuditLogService
 
     /**
      * Récupère les logs par type de cible
+     * @return \App\Entity\AdminLog[]
      */
     public function getLogsByTargetType(string $targetType, int $limit = 50): array
     {
@@ -75,6 +79,7 @@ readonly class AuditLogService
 
     /**
      * Récupère les logs par action
+     * @return \App\Entity\AdminLog[]
      */
     public function getLogsByAction(string $action, int $limit = 50): array
     {
@@ -83,6 +88,7 @@ readonly class AuditLogService
 
     /**
      * Récupère l'historique complet d'une cible (user, voyage, demande, etc.)
+     * @return \App\Entity\AdminLog[]
      */
     public function getTargetHistory(string $targetType, int $targetId): array
     {
@@ -91,6 +97,8 @@ readonly class AuditLogService
 
     /**
      * Recherche dans les logs avec filtres avancés
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
      */
     public function searchLogs(array $filters = [], int $page = 1, int $limit = 50): array
     {
@@ -107,6 +115,7 @@ readonly class AuditLogService
 
     /**
      * Récupère les statistiques d'actions sur une période
+     * @return array<string, int>
      */
     public function getActionStats(\DateTime $startDate, \DateTime $endDate): array
     {
@@ -115,6 +124,7 @@ readonly class AuditLogService
 
     /**
      * Récupère les statistiques d'actions du jour
+     * @return array<string, int>
      */
     public function getTodayStats(): array
     {
@@ -126,6 +136,7 @@ readonly class AuditLogService
 
     /**
      * Récupère les statistiques d'actions de la semaine
+     * @return array<string, int>
      */
     public function getWeekStats(): array
     {
@@ -137,6 +148,7 @@ readonly class AuditLogService
 
     /**
      * Récupère les statistiques d'actions du mois
+     * @return array<string, int>
      */
     public function getMonthStats(): array
     {
@@ -148,6 +160,7 @@ readonly class AuditLogService
 
     /**
      * Récupère les admins les plus actifs
+     * @return array<string, mixed>[]
      */
     public function getMostActiveAdmins(int $limit = 10): array
     {
@@ -182,6 +195,7 @@ readonly class AuditLogService
 
     /**
      * Récupère les actions les plus fréquentes
+     * @return array<string, mixed>[]
      */
     public function getMostFrequentActions(int $limit = 10): array
     {
@@ -198,6 +212,7 @@ readonly class AuditLogService
 
     /**
      * Récupère les types de cibles les plus modérés
+     * @return array<string, mixed>[]
      */
     public function getMostModeratedTargets(int $limit = 10): array
     {
@@ -214,6 +229,7 @@ readonly class AuditLogService
 
     /**
      * Récupère les logs d'une journée spécifique
+     * @return array<string, mixed>
      */
     public function getLogsByDate(\DateTime $date): array
     {
@@ -228,6 +244,7 @@ readonly class AuditLogService
 
     /**
      * Exporte les logs en CSV
+     * @param array<string, mixed> $filters
      */
     public function exportLogsToCSV(array $filters = []): string
     {
@@ -290,6 +307,7 @@ readonly class AuditLogService
 
     /**
      * Récupère un résumé quotidien des actions admin
+     * @return array<string, mixed>
      */
     public function getDailySummary(\DateTime $date): array
     {
@@ -331,6 +349,7 @@ readonly class AuditLogService
 
     /**
      * Récupère l'activité d'un admin sur une période
+     * @return array<string, mixed>
      */
     public function getAdminActivity(User $admin, \DateTime $startDate, \DateTime $endDate): array
     {
