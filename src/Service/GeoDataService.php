@@ -22,6 +22,7 @@ readonly class GeoDataService
     /**
      * Récupère tous les pays pour le select
      * Résultat mis en cache pour 1 mois
+     * @return list<array<string, mixed>>
      */
     public function getAllCountries(): array
     {
@@ -59,6 +60,7 @@ readonly class GeoDataService
      * Récupère les villes d'un pays par CODE ISO (FR, CM, US, etc.)
      * Retourne les villes les plus peuplées (top 100)
      * Résultat mis en cache
+     * @return list<array<string, mixed>>
      */
     public function getCitiesByCountryCode(string $countryCode): array
     {
@@ -82,6 +84,7 @@ readonly class GeoDataService
     /**
      * Recherche de villes dans un pays (autocomplete) par CODE ISO
      * Permet de trouver des villes hors du top 100
+     * @return list<array<string, mixed>>
      */
     public function searchCitiesByCountryCode(string $countryCode, string $query, int $limit = 50): array
     {
@@ -126,6 +129,7 @@ readonly class GeoDataService
     /**
      * Récupère les villes les plus peuplées du monde (top 100)
      * Résultat mis en cache
+     * @return list<array<string, mixed>>
      */
     public function getTopCitiesGlobal(int $limit = 100): array
     {
@@ -150,6 +154,7 @@ readonly class GeoDataService
     /**
      * Recherche globale de villes (tous pays confondus)
      * Résultat mis en cache
+     * @return list<array<string, mixed>>
      */
     public function searchCitiesGlobal(string $query, int $limit = 50): array
     {

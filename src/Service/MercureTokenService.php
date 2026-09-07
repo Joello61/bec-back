@@ -22,6 +22,7 @@ readonly class MercureTokenService
     /**
      * Génère un JWT Mercure pour un utilisateur donné.
      * @param User|null $user (null = utilisateur non connecté)
+     * @param list<string> $extraTopics
      */
     public function generate(?User $user = null, array $extraTopics = []): string
     {

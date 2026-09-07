@@ -66,6 +66,7 @@ readonly class CurrencySeeder
 
     /**
      * Retourne les données des devises à insérer
+     * @return list<array<string, mixed>>
      */
     private function getCurrenciesData(): array
     {
