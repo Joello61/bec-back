@@ -21,11 +21,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['user:read', 'user:read:public', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'message:read', 'avis:read', 'proposition:list', 'message:list', 'conversation:list', 'conversation:read', 'favori:read', 'favori:list', 'admin:user:list', 'admin:user:read'])]
+    #[Groups(['user:read', 'user:read:public', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'message:read', 'avis:read', 'proposition:list', 'message:list', 'conversation:list', 'conversation:read', 'favori:read', 'favori:list', 'admin:user:list', 'admin:user:read', 'admin:log:list', 'admin:log:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 180, unique: true)]
-    #[Groups(['user:read', 'user:write', 'admin:user:list', 'admin:user:read'])]
+    #[Groups(['user:read', 'user:write', 'admin:user:list', 'admin:user:read', 'admin:log:list', 'admin:log:read'])]
     private ?string $email = null;
 
     #[ORM\Column]
@@ -36,11 +36,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $password = null;
 
     #[ORM\Column(length: 100)]
-    #[Groups(['user:read', 'user:read:public', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'message:read', 'proposition:list', 'message:list', 'conversation:list', 'conversation:read', 'favori:read', 'favori:list', 'signalement:list', 'admin:user:list', 'admin:user:read'])]
+    #[Groups(['user:read', 'user:read:public', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'message:read', 'proposition:list', 'message:list', 'conversation:list', 'conversation:read', 'favori:read', 'favori:list', 'signalement:list', 'admin:user:list', 'admin:user:read', 'admin:log:list', 'admin:log:read'])]
     private ?string $nom = null;
 
     #[ORM\Column(length: 100)]
-    #[Groups(['user:read', 'user:read:public', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'message:read', 'proposition:list', 'message:list', 'conversation:list', 'conversation:read', 'favori:read', 'favori:list', 'signalement:list', 'admin:user:list', 'admin:user:read'])]
+    #[Groups(['user:read', 'user:read:public', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'message:read', 'proposition:list', 'message:list', 'conversation:list', 'conversation:read', 'favori:read', 'favori:list', 'signalement:list', 'admin:user:list', 'admin:user:read', 'admin:log:list', 'admin:log:read'])]
     private ?string $prenom = null;
 
     #[ORM\Column(length: 20, nullable: true)]
