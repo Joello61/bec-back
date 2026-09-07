@@ -17,6 +17,7 @@ use App\Repository\VoyageRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 readonly class NotificationService
 {
@@ -205,7 +206,7 @@ readonly class NotificationService
         return $this->notificationRepository->countUnread($userId);
     }
 
-    public function markAsRead(int $id): void
+    public function markAsRead(int $id, User $currentUser): void
     {
         $notification = $this->notificationRepository->find($id);
 
@@ -217,6 +218,10 @@ readonly class NotificationService
         if (!$user) {
             $this->logger->error('Notification has no user', ['notification_id' => $id]);
             return;
+        }
+
+        if ($user !== $currentUser) {
+            throw new AccessDeniedException('Vous ne pouvez pas marquer cette notification comme lue.');
         }
 
         $notification->setLue(true);
@@ -275,7 +280,7 @@ readonly class NotificationService
         }
     }
 
-    public function deleteNotification(int $id): void
+    public function deleteNotification(int $id, User $currentUser): void
     {
         $notification = $this->notificationRepository->find($id);
 
@@ -284,6 +289,10 @@ readonly class NotificationService
         }
 
         $user = $notification->getUser(); // <-- Récupérer l'utilisateur
+
+        if ($user !== $currentUser) {
+            throw new AccessDeniedException('Vous ne pouvez pas supprimer cette notification.');
+        }
 
         $this->entityManager->remove($notification);
         $this->entityManager->flush();
