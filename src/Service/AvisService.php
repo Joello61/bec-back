@@ -241,6 +241,11 @@ readonly class AvisService
         return $this->avisRepository->getStatsByUser($userId);
     }
 
+    public function getAverageNotesForUsers(array $userIds): array
+    {
+        return $this->avisRepository->getAverageNotesForUsers($userIds);
+    }
+
     public function getAvisByVoyage(int $voyageId): array
     {
         return $this->avisRepository->findByVoyage($voyageId);
