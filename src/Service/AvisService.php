@@ -131,7 +131,6 @@ readonly class AvisService
 
     public function updateAvis(int $id, CreateAvisDTO $dto): Avis
     {
-        /** @var Avis $avis */
         $avis = $this->avisRepository->find($id);
 
         if (!$avis) {
@@ -187,7 +186,6 @@ readonly class AvisService
 
     public function deleteAvis(int $id): void
     {
-        /** @var Avis $avis */
         $avis = $this->avisRepository->find($id);
 
         if (!$avis) {
