@@ -194,7 +194,7 @@ class CityRepository extends ServiceEntityRepository
 
     /**
      * Recherche de villes dans une région spécifique
-      * @return City[]
+     * @return City[]
      */
     public function findByCountryAndRegion(
         Country $country,
