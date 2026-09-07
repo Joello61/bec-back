@@ -6,6 +6,7 @@ namespace App\Controller\Admin;
 
 use App\DTO\Admin\DeleteContentDTO;
 use App\Entity\User;
+use App\Repository\UserRepository;
 use App\Service\Admin\ModerationService;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -23,6 +24,7 @@ class AdminModerationController extends AbstractController
 {
     public function __construct(
         private readonly ModerationService $moderationService,
+        private readonly UserRepository $userRepository,
     ) {}
 
     /**
@@ -283,8 +285,7 @@ class AdminModerationController extends AbstractController
     #[OA\Response(response: 404, description: 'Utilisateur non trouvé')]
     public function deleteAllUserContent(int $userId, \Symfony\Component\HttpFoundation\Request $request): JsonResponse
     {
-        $userRepository = $this->container->get('doctrine')->getRepository(User::class);
-        $user = $userRepository->find($userId);
+        $user = $this->userRepository->find($userId);
 
         if (!$user) {
             return $this->json(['message' => 'Utilisateur non trouvé'], Response::HTTP_NOT_FOUND);
