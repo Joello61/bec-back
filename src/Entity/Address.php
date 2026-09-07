@@ -70,7 +70,7 @@ class Address
      */
     #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
     #[Groups(['address:read'])]
-    private ?\DateTimeInterface $lastModifiedAt = null;
+    private ?\DateTime $lastModifiedAt = null;
 
     public function __construct()
     {
@@ -260,7 +260,7 @@ class Address
         return $this->lastModifiedAt;
     }
 
-    public function setLastModifiedAt(?\DateTimeInterface $lastModifiedAt): static
+    public function setLastModifiedAt(?\DateTime $lastModifiedAt): static
     {
         $this->lastModifiedAt = $lastModifiedAt;
         return $this;
