@@ -177,16 +177,25 @@ readonly class FavoriService
         }
     }
 
+    /**
+     * @return \App\Entity\Favori[]
+     */
     public function getUserFavoris(int $userId): array
     {
         return $this->favoriRepository->findByUser($userId);
     }
 
+    /**
+     * @return \App\Entity\Favori[]
+     */
     public function getUserFavorisVoyages(int $userId): array
     {
         return $this->favoriRepository->findVoyagesByUser($userId);
     }
 
+    /**
+     * @return \App\Entity\Favori[]
+     */
     public function getUserFavorisDemandes(int $userId): array
     {
         return $this->favoriRepository->findDemandesByUser($userId);

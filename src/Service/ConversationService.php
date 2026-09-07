@@ -114,6 +114,7 @@ readonly class ConversationService
 
     /**
      * Récupère la liste des conversations de l'utilisateur
+     * @return Conversation[]
      */
     public function getConversationsList(User $user): array
     {
@@ -161,7 +162,6 @@ readonly class ConversationService
      */
     public function markConversationAsRead(int $conversationId, User $user): int
     {
-        /** @var Conversation $conversation */
         $conversation = $this->conversationRepository->find($conversationId);
 
         if (!$conversation) {
@@ -222,7 +222,6 @@ readonly class ConversationService
      */
     public function deleteConversation(int $conversationId, User $user): void
     {
-        /** @var Conversation $conversation */
         $conversation = $this->conversationRepository->find($conversationId);
 
         if (!$conversation) {

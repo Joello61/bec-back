@@ -28,6 +28,7 @@ class CurrencyRepository extends ServiceEntityRepository
 
     /**
      * Récupère toutes les devises actives
+     * @return Currency[]
      */
     public function findAllActive(): array
     {
@@ -59,6 +60,7 @@ class CurrencyRepository extends ServiceEntityRepository
 
     /**
      * Récupère toutes les devises dont le taux de change est obsolète (> 24h)
+     * @return Currency[]
      */
     public function findWithStaleExchangeRates(): array
     {
@@ -77,6 +79,7 @@ class CurrencyRepository extends ServiceEntityRepository
 
     /**
      * Récupère les devises les plus utilisées
+     * @return Currency[]
      */
     public function findMostUsed(int $limit = 5): array
     {
@@ -119,20 +122,6 @@ class CurrencyRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
 
         return $count > 0;
-    }
-
-    /**
-     * Récupère toutes les devises avec leur mapping pays
-     */
-    public function findAllWithCountries(): array
-    {
-        return $this->createQueryBuilder('c')
-            ->where('c.isActive = :active')
-            ->andWhere('JSON_LENGTH(c.countries) > 0')
-            ->setParameter('active', true)
-            ->orderBy('c.code', 'ASC')
-            ->getQuery()
-            ->getResult();
     }
 
     public function save(Currency $currency): void

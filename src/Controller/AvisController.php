@@ -61,7 +61,7 @@ class AvisController extends AbstractController
     public function create(
         #[MapRequestPayload] CreateAvisDTO $dto
     ): JsonResponse {
-        /* @var User $user*/
+        /** @var User $user */
         $user = $this->getUser();
 
         $this->denyAccessUnlessGranted('AVIS_CREATE');

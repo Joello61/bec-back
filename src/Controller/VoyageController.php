@@ -253,7 +253,7 @@ class VoyageController extends AbstractController
     #[OA\Response(response: 201, description: 'Voyage créé')]
     public function create(#[MapRequestPayload] CreateVoyageDTO $dto): JsonResponse
     {
-        /* @var User $user*/
+        /** @var User $user */
         $user = $this->getUser();
 
         $this->denyAccessUnlessGranted('VOYAGE_CREATE');

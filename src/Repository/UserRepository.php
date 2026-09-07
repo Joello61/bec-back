@@ -11,6 +11,9 @@ use Symfony\Component\Security\Core\Exception\UnsupportedUserException;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\PasswordUpgraderInterface;
 
+/**
+ * @extends ServiceEntityRepository<User>
+ */
 class UserRepository extends ServiceEntityRepository implements PasswordUpgraderInterface
 {
     public function __construct(ManagerRegistry $registry)
@@ -40,6 +43,9 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->getOneOrNullResult();
     }
 
+    /**
+     * @return array{data: User[], pagination: array{page: int, limit: int, total: int, pages: int}}
+     */
     public function findPaginated(int $page = 1, int $limit = 10): array
     {
         $offset = ($page - 1) * $limit;
@@ -75,6 +81,9 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         ];
     }
 
+    /**
+     * @return User[]
+     */
     public function search(string $query): array
     {
         return $this->createQueryBuilder('u')
@@ -90,6 +99,9 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->getResult();
     }
 
+    /**
+     * @return User[]
+     */
     public function findVerifiedUsers(): array
     {
         return $this->createQueryBuilder('u')
@@ -118,6 +130,10 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         return $count;
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     * @return array{data: User[], pagination: array{page: int, limit: int, total: int, pages: int}}
+     */
     public function findAllPaginatedAdmin(int $page, int $limit, array $filters = []): array
     {
         $offset = ($page - 1) * $limit;
@@ -190,6 +206,9 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         ];
     }
 
+    /**
+     * @return User[]
+     */
     public function findByRole(string $role): array
     {
         // roles est de type `json` (pas jsonb) : pas d'operateur LIKE en PostgreSQL -
@@ -218,6 +237,9 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         return $this->count(['isBanned' => true]);
     }
 
+    /**
+     * @return User[]
+     */
     public function findBanned(): array
     {
         return $this->createQueryBuilder('u')
@@ -257,6 +279,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
 
     /**
      * Trouve les utilisateurs par ville via leur adresse
+     * @return User[]
      */
     public function findByVille(string $ville): array
     {
@@ -271,6 +294,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
 
     /**
      * Trouve les utilisateurs par pays via leur adresse
+     * @return User[]
      */
     public function findByPays(string $pays): array
     {

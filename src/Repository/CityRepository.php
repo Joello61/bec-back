@@ -23,6 +23,7 @@ class CityRepository extends ServiceEntityRepository
      * Recherche de villes par pays avec autocomplete
      * Trie par population décroissante pour afficher les plus grandes villes en premier
      * ✅ CORRECTION : Recherche case-insensitive avec LOWER()
+     * @return City[]
      */
     public function searchByCountryAndName(
         Country $country,
@@ -45,6 +46,7 @@ class CityRepository extends ServiceEntityRepository
     /**
      * Recherche de villes par code pays (ISO 3166-1 alpha-2)
      * ✅ CORRECTION : Recherche case-insensitive avec LOWER()
+     * @return City[]
      */
     public function searchByCountryCodeAndName(
         string $countryCode,
@@ -67,6 +69,7 @@ class CityRepository extends ServiceEntityRepository
 
     /**
      * Récupère les villes les plus peuplées d'un pays
+     * @return City[]
      */
     public function findTopCitiesByCountry(Country $country, int $limit = 100): array
     {
@@ -81,6 +84,7 @@ class CityRepository extends ServiceEntityRepository
 
     /**
      * Récupère les villes les plus peuplées par CODE pays (ISO 3166-1 alpha-2)
+     * @return City[]
      */
     public function findTopCitiesByCountryCode(string $countryCode, int $limit = 100): array
     {
@@ -96,6 +100,7 @@ class CityRepository extends ServiceEntityRepository
 
     /**
      * Récupère les villes les plus peuplées par nom français du pays
+     * @return City[]
      */
     public function findTopCitiesByCountryNameFr(string $countryNameFr, int $limit = 100): array
     {
@@ -155,6 +160,7 @@ class CityRepository extends ServiceEntityRepository
     /**
      * Recherche globale (tous pays confondus) - pour debug/admin
      * ✅ CORRECTION : Case-insensitive + addSelect('co')
+     * @return City[]
      */
     public function searchGlobal(string $query, int $limit = 50): array
     {
@@ -173,6 +179,7 @@ class CityRepository extends ServiceEntityRepository
 
     /**
      * Récupère les villes les plus peuplées du monde
+     * @return City[]
      */
     public function findTopCitiesGlobal(int $limit = 100): array
     {
@@ -187,6 +194,7 @@ class CityRepository extends ServiceEntityRepository
 
     /**
      * Recherche de villes dans une région spécifique
+     * @return City[]
      */
     public function findByCountryAndRegion(
         Country $country,
@@ -212,7 +220,7 @@ class CityRepository extends ServiceEntityRepository
         return $this->findOneBy(['geonameId' => $geonameId]);
     }
 
-    public function findTimeZoneByCityAndPays($city, $pays): ?string
+    public function findTimeZoneByCityAndPays(string $city, int $pays): ?string
     {
         $result = $this->createQueryBuilder('c')
             ->select('c.timezone')

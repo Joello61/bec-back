@@ -74,6 +74,7 @@ class Currency
      * Liste des pays utilisant cette devise (JSON)
      * Ex: ["FR", "BE", "LU"] pour EUR
      */
+    /** @var list<string> */
     #[ORM\Column(type: Types::JSON)]
     #[Groups(['currency:read'])]
     private array $countries = [];
@@ -217,11 +218,13 @@ class Currency
         return $this;
     }
 
+    /** @return list<string> */
     public function getCountries(): array
     {
         return $this->countries;
     }
 
+    /** @param list<string> $countries */
     public function setCountries(array $countries): static
     {
         $this->countries = array_map('strtoupper', $countries);

@@ -10,6 +10,9 @@ use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends ServiceEntityRepository<Message>
+ */
 class MessageRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -19,6 +22,7 @@ class MessageRepository extends ServiceEntityRepository
 
     /**
      * Récupère les messages d'une conversation spécifique
+     * @return Message[]
      */
     public function findByConversation(Conversation $conversation, int $limit = 50, int $offset = 0): array
     {
@@ -37,6 +41,7 @@ class MessageRepository extends ServiceEntityRepository
 
     /**
      * Récupère les messages d'une conversation avec pagination
+     * @return array{data: Message[], pagination: array{page: int, limit: int, total: int, pages: int}}
      */
     public function findByConversationPaginated(Conversation $conversation, int $page = 1, int $limit = 50): array
     {
@@ -131,6 +136,7 @@ class MessageRepository extends ServiceEntityRepository
 
     /**
      * Récupère les N derniers messages d'une conversation
+     * @return Message[]
      */
     public function findRecentMessagesInConversation(Conversation $conversation, int $limit = 20): array
     {
@@ -151,6 +157,7 @@ class MessageRepository extends ServiceEntityRepository
 
     /**
      * Recherche dans les messages d'une conversation
+     * @return Message[]
      */
     public function searchInConversation(Conversation $conversation, string $query): array
     {

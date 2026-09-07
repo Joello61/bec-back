@@ -28,6 +28,7 @@ readonly class AddressService
 
     /**
      * Crée une adresse pour un utilisateur
+     * @param array<string, mixed> $data
      */
     public function createAddress(User $user, array $data): Address
     {
@@ -119,6 +120,7 @@ readonly class AddressService
 
     /**
      * Met à jour une adresse (avec vérification des 6 mois)
+     * @param array<string, mixed> $data
      */
     public function updateAddress(Address $address, array $data): Address
     {
@@ -241,6 +243,7 @@ readonly class AddressService
 
     /**
      * Récupère les informations de modification pour l'utilisateur
+     * @return array<string, mixed>
      */
     public function getModificationInfo(User $user): array
     {
@@ -281,6 +284,7 @@ readonly class AddressService
 
     /**
      * Valide les données d'adresse
+     * @param array<string, mixed> $data
      */
     private function validateAddressData(array $data): void
     {

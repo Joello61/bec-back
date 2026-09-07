@@ -131,7 +131,6 @@ readonly class AvisService
 
     public function updateAvis(int $id, CreateAvisDTO $dto): Avis
     {
-        /** @var Avis $avis */
         $avis = $this->avisRepository->find($id);
 
         if (!$avis) {
@@ -187,7 +186,6 @@ readonly class AvisService
 
     public function deleteAvis(int $id): void
     {
-        /** @var Avis $avis */
         $avis = $this->avisRepository->find($id);
 
         if (!$avis) {
@@ -231,21 +229,34 @@ readonly class AvisService
 
     }
 
+    /**
+     * @return \App\Entity\Avis[]
+     */
     public function getAvisByUser(int $userId): array
     {
         return $this->avisRepository->findByUser($userId);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getStatsByUser(int $userId): array
     {
         return $this->avisRepository->getStatsByUser($userId);
     }
 
+    /**
+     * @param int[] $userIds
+     * @return array<int, float>
+     */
     public function getAverageNotesForUsers(array $userIds): array
     {
         return $this->avisRepository->getAverageNotesForUsers($userIds);
     }
 
+    /**
+     * @return \App\Entity\Avis[]
+     */
     public function getAvisByVoyage(int $voyageId): array
     {
         return $this->avisRepository->findByVoyage($voyageId);

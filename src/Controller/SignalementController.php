@@ -50,7 +50,7 @@ class SignalementController extends AbstractController
         $limit = $request->query->getInt('limit', 10);
         $statut = $request->query->get('statut');
 
-        /* @var User $currentUser*/
+        /** @var User $currentUser */
         $currentUser = $this->getUser();
 
         $result = $this->signalementService->getUserSignalements($currentUser, $page, $limit, $statut);
@@ -102,7 +102,7 @@ class SignalementController extends AbstractController
             );
         }
 
-        /* @var User $currentUser*/
+        /** @var User $currentUser */
         $currentUser = $this->getUser();
 
         $this->denyAccessUnlessGranted('SIGNALEMENT_CREATE');

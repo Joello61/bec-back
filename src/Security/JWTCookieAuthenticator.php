@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Security;
 
+use App\Entity\User;
 use Lexik\Bundle\JWTAuthenticationBundle\Security\Authenticator\JWTAuthenticator;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\TokenExtractor\TokenExtractorInterface;
@@ -19,6 +20,9 @@ use Symfony\Component\Security\Http\Authenticator\Passport\Passport;
 class JWTCookieAuthenticator extends JWTAuthenticator
 {
 
+    /**
+     * @param UserProviderInterface<User> $userProvider
+     */
     public function __construct(
         JWTTokenManagerInterface $jwtManager,
         EventDispatcherInterface $eventDispatcher,

@@ -8,6 +8,14 @@ use Symfony\Component\Serializer\Annotation\Groups;
 
 readonly class DashboardDTO
 {
+    /**
+     * @param array<string, mixed> $summary
+     * @param array<string, mixed> $voyages
+     * @param array<string, mixed> $demandes
+     * @param array<string, mixed> $notifications
+     * @param array<string, mixed> $messages
+     * @param array<string, mixed> $stats
+     */
     public function __construct(
         #[Groups(['dashboard:read'])]
         public array $summary,
@@ -28,6 +36,14 @@ readonly class DashboardDTO
         public array $stats
     ) {}
 
+    /**
+     * @param array<string, mixed> $summary
+     * @param array<string, mixed> $voyages
+     * @param array<string, mixed> $demandes
+     * @param array<string, mixed> $notifications
+     * @param array<string, mixed> $messages
+     * @param array<string, mixed> $stats
+     */
     public static function create(
         array $summary,
         array $voyages,

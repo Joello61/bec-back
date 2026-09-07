@@ -379,7 +379,7 @@ class AuthController extends AbstractController
         }
 
         // Rate limiting
-        $limiter = $verificationLimiter->create($user->getId());
+        $limiter = $verificationLimiter->create((string) $user->getId());
         if (false === $limiter->consume(1)->isAccepted()) {
             return $this->json([
                 'success' => false,

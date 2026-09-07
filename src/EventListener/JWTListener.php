@@ -55,13 +55,10 @@ readonly class JWTListener
             $refreshCookie = $this->cookieManager->createRefreshTokenCookie($refreshToken);
 
             // Attacher les cookies à la réponse
-            $response = $event->getResponse();
-            if ($response) {
-                $this->cookieManager->attachCookies($response, [
-                    $mercureCookie,
-                    $refreshCookie
-                ]);
-            }
+            $this->cookieManager->attachCookies($event->getResponse(), [
+                $mercureCookie,
+                $refreshCookie
+            ]);
 
         } catch (\Exception $e) {
             $this->logger->error('Erreur lors de la création des cookies d\'authentification', [

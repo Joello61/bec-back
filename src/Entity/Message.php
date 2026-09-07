@@ -53,6 +53,7 @@ class Message
     #[Groups(['message:read', 'message:list', 'conversation:read', 'conversation:list'])]
     private ?\DateTimeInterface $createdAt = null;
 
+    /** @var Collection<int, Signalement> */
     #[ORM\OneToMany(targetEntity: Signalement::class, mappedBy: 'message', cascade: ['remove'])]
     private Collection $signalements;
 
@@ -144,6 +145,7 @@ class Message
         return $this->createdAt;
     }
 
+    /** @return Collection<int, Signalement> */
     public function getSignalements(): Collection
     {
         return $this->signalements;

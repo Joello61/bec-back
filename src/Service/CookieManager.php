@@ -175,7 +175,7 @@ readonly class CookieManager
 
     // ==================== Getters pour les paramètres ====================
 
-    private function getCookieDomain(): ?string
+    private function getCookieDomain(): string
     {
         return $this->params->get('app.jwt_cookie_domain');
     }

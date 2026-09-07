@@ -9,6 +9,9 @@ use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends ServiceEntityRepository<Signalement>
+ */
 class SignalementRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -16,6 +19,9 @@ class SignalementRepository extends ServiceEntityRepository
         parent::__construct($registry, Signalement::class);
     }
 
+    /**
+     * @return array{data: Signalement[], pagination: array{page: int, limit: int, total: int, pages: int}}
+     */
     public function findPaginated(int $page = 1, int $limit = 10, ?string $statut = null): array
     {
         $offset = ($page - 1) * $limit;
@@ -59,6 +65,9 @@ class SignalementRepository extends ServiceEntityRepository
         ];
     }
 
+    /**
+     * @return array{data: Signalement[], pagination: array{page: int, limit: int, total: int, pages: int}}
+     */
     public function findUserSignalementPaginated(User $user, int $page = 1, int $limit = 10, ?string $statut = null): array
     {
         $offset = ($page - 1) * $limit;
@@ -106,6 +115,9 @@ class SignalementRepository extends ServiceEntityRepository
         ];
     }
 
+    /**
+     * @return Signalement[]
+     */
     public function findByStatut(string $statut): array
     {
         return $this->createQueryBuilder('s')
@@ -122,6 +134,9 @@ class SignalementRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * @return Signalement[]
+     */
     public function findByVoyage(int $voyageId): array
     {
         return $this->createQueryBuilder('s')
@@ -134,6 +149,9 @@ class SignalementRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * @return Signalement[]
+     */
     public function findByDemande(int $demandeId): array
     {
         return $this->createQueryBuilder('s')
@@ -146,6 +164,9 @@ class SignalementRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * @return Signalement[]
+     */
     public function findByMessage(int $messageId): array
     {
         return $this->createQueryBuilder('s')
@@ -158,6 +179,9 @@ class SignalementRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * @return Signalement[]
+     */
     public function findByUtilisateurSignale(int $utilisateurSignaleId): array
     {
         return $this->createQueryBuilder('s')
@@ -180,6 +204,9 @@ class SignalementRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    /**
+     * @return Signalement[]
+     */
     public function findBySignaleur(int $signaleurId): array
     {
         return $this->createQueryBuilder('s')
