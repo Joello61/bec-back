@@ -192,11 +192,22 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
 
     public function findByRole(string $role): array
     {
+        // roles est de type `json` (pas jsonb) : pas d'operateur LIKE en PostgreSQL -
+        // meme correctif que findAllPaginatedAdmin (Lot 9), requete native parametree.
+        $ids = $this->getEntityManager()->getConnection()->fetchFirstColumn(
+            'SELECT id FROM users WHERE roles::text LIKE :role',
+            ['role' => '%"' . $role . '"%']
+        );
+
+        if (!$ids) {
+            return [];
+        }
+
         return $this->createQueryBuilder('u')
             ->leftJoin('u.address', 'a')
             ->addSelect('a')
-            ->where('u.roles LIKE :role')
-            ->setParameter('role', '%' . $role . '%')
+            ->where('u.id IN (:ids)')
+            ->setParameter('ids', $ids)
             ->orderBy('u.createdAt', 'DESC')
             ->getQuery()
             ->getResult();
