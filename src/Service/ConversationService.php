@@ -114,6 +114,7 @@ readonly class ConversationService
 
     /**
      * Récupère la liste des conversations de l'utilisateur
+     * @return Conversation[]
      */
     public function getConversationsList(User $user): array
     {
