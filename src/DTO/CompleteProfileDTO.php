@@ -104,6 +104,8 @@ class CompleteProfileDTO
 
     /**
      * Convertit le DTO en tableau pour AddressService
+     *
+     * @return array<string, string>
      */
     public function toAddressArray(): array
     {
