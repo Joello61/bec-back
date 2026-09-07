@@ -54,7 +54,10 @@ readonly class GoogleAuthService
 
             // Récupérer les informations de l'utilisateur
             /** @var GoogleUser $googleUser */
-            $googleUser = $this->googleProvider->getResourceOwner($accessToken);
+            // getAccessToken() declare un retour AccessTokenInterface, mais renvoie
+            // toujours une instance concrete AccessToken pour ce grant type - limitation
+            // de typage de league/oauth2-client, pas un risque reel a l'execution.
+            $googleUser = $this->googleProvider->getResourceOwner($accessToken); // @phpstan-ignore argument.type
 
             $googleId = $googleUser->getId();
             $email = $googleUser->getEmail();

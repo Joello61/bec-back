@@ -15,7 +15,7 @@ class RefreshTokenManager
 {
     // Durée de vie du refresh token en secondes (ex: 30 jours)
     private int $refreshTokenTtl;
-    private $hasher;
+    private \Symfony\Component\PasswordHasher\PasswordHasherInterface $hasher;
 
     private const SELECTOR_LENGTH = 16; // Longueur en octets pour le sélecteur
     private const VALIDATOR_LENGTH = 32; // Longueur en octets pour le validateur (avant hachage)

@@ -31,7 +31,9 @@ class NotificationController extends AbstractController
     #[OA\Response(response: 200, description: 'Liste des notifications')]
     public function list(): JsonResponse
     {
-        $notifications = $this->notificationService->getUserNotifications($this->getUser()->getId());
+        /** @var User $user */
+        $user = $this->getUser();
+        $notifications = $this->notificationService->getUserNotifications($user->getId());
 
         return $this->json($notifications, Response::HTTP_OK, [], ['groups' => ['notification:list']]);
     }
@@ -45,7 +47,9 @@ class NotificationController extends AbstractController
     #[OA\Response(response: 200, description: 'Liste des notifications non lues')]
     public function unread(): JsonResponse
     {
-        $notifications = $this->notificationService->getUnreadNotifications($this->getUser()->getId());
+        /** @var User $user */
+        $user = $this->getUser();
+        $notifications = $this->notificationService->getUnreadNotifications($user->getId());
 
         return $this->json($notifications, Response::HTTP_OK, [], ['groups' => ['notification:list']]);
     }
@@ -67,7 +71,9 @@ class NotificationController extends AbstractController
     )]
     public function unreadCount(): JsonResponse
     {
-        $count = $this->notificationService->countUnread($this->getUser()->getId());
+        /** @var User $user */
+        $user = $this->getUser();
+        $count = $this->notificationService->countUnread($user->getId());
 
         return $this->json(['count' => $count]);
     }
@@ -98,7 +104,9 @@ class NotificationController extends AbstractController
     #[OA\Response(response: 200, description: 'Toutes les notifications marquées comme lues')]
     public function markAllAsRead(): JsonResponse
     {
-        $this->notificationService->markAllAsRead($this->getUser()->getId());
+        /** @var User $user */
+        $user = $this->getUser();
+        $this->notificationService->markAllAsRead($user->getId());
 
         return $this->json(['message' => 'Toutes les notifications ont été marquées comme lues']);
     }

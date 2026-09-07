@@ -153,6 +153,8 @@ class DeleteContentDTO
 
     /**
      * Retourne les données pour le log admin
+     *
+     * @return array<string, mixed>
      */
     public function getLogData(): array
     {

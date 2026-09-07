@@ -9,6 +9,9 @@ use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends ServiceEntityRepository<Demande>
+ */
 class DemandeRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -16,6 +19,10 @@ class DemandeRepository extends ServiceEntityRepository
         parent::__construct($registry, Demande::class);
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     * @return array{data: Demande[], pagination: array{page: int, limit: int, total: int, pages: int}}
+     */
     public function findPublicPaginated(int $page = 1, int $limit = 10, array $filters = []): array
     {
         $offset = ($page - 1) * $limit;
@@ -76,6 +83,10 @@ class DemandeRepository extends ServiceEntityRepository
         ];
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     * @return array{data: Demande[], pagination: array{page: int, limit: int, total: int, pages: int}}
+     */
     public function findPaginated(int $page = 1, int $limit = 10, array $filters = [], ?User $excludeUser = null): array
     {
         $offset = ($page - 1) * $limit;
@@ -169,6 +180,9 @@ class DemandeRepository extends ServiceEntityRepository
         ];
     }
 
+    /**
+     * @return Demande[]
+     */
     public function findByClient(int $clientId): array
     {
         return $this->createQueryBuilder('d')
@@ -179,6 +193,9 @@ class DemandeRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * @return Demande[]
+     */
     public function findEnRecherche(): array
     {
         return $this->createQueryBuilder('d')
@@ -195,6 +212,9 @@ class DemandeRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * @return Demande[]
+     */
     public function findMatchingVoyage(string $villeDepart, string $villeArrivee, ?\DateTimeInterface $dateDepart = null, ?int $excludeUserId = null): array
     {
         $qb = $this->createQueryBuilder('d')
@@ -229,6 +249,8 @@ class DemandeRepository extends ServiceEntityRepository
 
     /**
      * Liste TOUTES les demandes (pour admin) sans filtre de visibilité
+     * @param array<string, mixed> $filters
+     * @return array{data: Demande[], pagination: array{page: int, limit: int, total: int, pages: int}}
      */
     public function findAllPaginatedAdmin(int $page, int $limit, array $filters = []): array
     {
@@ -312,6 +334,9 @@ class DemandeRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    /**
+     * @return Demande[]
+     */
     public function findExpiredDemandes(\DateTimeInterface $today): array
     {
         return $this->createQueryBuilder('d')

@@ -220,6 +220,8 @@ class DemandeController extends AbstractController
     /**
      * Convertit les prix d'un voyage dans une devise cible
      * Méthode privée pour éviter la duplication de code
+     *
+     * @return array<string, string|float>
      */
     private function convertVoyagePrices(Voyage $voyage, string $targetCurrency): array
     {
@@ -261,7 +263,7 @@ class DemandeController extends AbstractController
     #[OA\Response(response: 201, description: 'Demande créée')]
     public function create(#[MapRequestPayload] CreateDemandeDTO $dto): JsonResponse
     {
-        /* @var User $user*/
+        /** @var User $user */
         $user = $this->getUser();
 
         $this->denyAccessUnlessGranted('DEMANDE_CREATE');

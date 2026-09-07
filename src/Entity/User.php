@@ -28,6 +28,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read', 'user:write', 'admin:user:list', 'admin:user:read', 'admin:log:list', 'admin:log:read'])]
     private ?string $email = null;
 
+    /** @var list<string> */
     #[ORM\Column]
     #[Groups(['admin:user:list','admin:user:read'])]
     private array $roles = [];
@@ -108,42 +109,55 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read'])]
     private ?UserSettings $settings = null;
 
+    /** @var Collection<int, Voyage> */
     #[ORM\OneToMany(targetEntity: Voyage::class, mappedBy: 'voyageur', cascade: ['remove'])]
     private Collection $voyages;
 
+    /** @var Collection<int, Demande> */
     #[ORM\OneToMany(targetEntity: Demande::class, mappedBy: 'client', cascade: ['remove'])]
     private Collection $demandes;
 
+    /** @var Collection<int, Message> */
     #[ORM\OneToMany(targetEntity: Message::class, mappedBy: 'expediteur', cascade: ['remove'])]
     private Collection $messagesEnvoyes;
 
+    /** @var Collection<int, Message> */
     #[ORM\OneToMany(targetEntity: Message::class, mappedBy: 'destinataire', cascade: ['remove'])]
     private Collection $messagesRecus;
 
+    /** @var Collection<int, Notification> */
     #[ORM\OneToMany(targetEntity: Notification::class, mappedBy: 'user', cascade: ['remove'])]
     private Collection $notifications;
 
+    /** @var Collection<int, Favori> */
     #[ORM\OneToMany(targetEntity: Favori::class, mappedBy: 'user', cascade: ['remove'])]
     private Collection $favoris;
 
+    /** @var Collection<int, Avis> */
     #[ORM\OneToMany(targetEntity: Avis::class, mappedBy: 'auteur', cascade: ['remove'])]
     private Collection $avisDonnes;
 
+    /** @var Collection<int, Avis> */
     #[ORM\OneToMany(targetEntity: Avis::class, mappedBy: 'cible', cascade: ['remove'])]
     private Collection $avisRecus;
 
+    /** @var Collection<int, Signalement> */
     #[ORM\OneToMany(targetEntity: Signalement::class, mappedBy: 'signaleur', cascade: ['remove'])]
     private Collection $signalements;
 
+    /** @var Collection<int, Conversation> */
     #[ORM\OneToMany(targetEntity: Conversation::class, mappedBy: 'participant1')]
     private Collection $conversationsAsParticipant1;
 
+    /** @var Collection<int, Conversation> */
     #[ORM\OneToMany(targetEntity: Conversation::class, mappedBy: 'participant2')]
     private Collection $conversationsAsParticipant2;
 
+    /** @var Collection<int, Signalement> */
     #[ORM\OneToMany(targetEntity: Signalement::class, mappedBy: 'utilisateurSignale')]
     private Collection $signalementsRecus;
 
+    /** @var Collection<int, RefreshToken> */
     #[ORM\OneToMany(targetEntity: RefreshToken::class, mappedBy: 'user', orphanRemoval: true)]
     private Collection $refreshTokens;
 
@@ -240,6 +254,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return array_unique($roles);
     }
 
+    /** @param list<string> $roles */
     public function setRoles(array $roles): static
     {
         $this->roles = $roles;
@@ -303,11 +318,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function setAddress(?Address $address): static
     {
-        // Gérer la relation bidirectionnelle
-        if ($address === null && $this->address !== null) {
-            $this->address->setUser(null);
-        }
-
         $this->address = $address;
 
         if ($address !== null && $address->getUser() !== $this) {
@@ -420,66 +430,79 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    /** @return Collection<int, Voyage> */
     public function getVoyages(): Collection
     {
         return $this->voyages;
     }
 
+    /** @return Collection<int, Demande> */
     public function getDemandes(): Collection
     {
         return $this->demandes;
     }
 
+    /** @return Collection<int, Message> */
     public function getMessagesEnvoyes(): Collection
     {
         return $this->messagesEnvoyes;
     }
 
+    /** @return Collection<int, Message> */
     public function getMessagesRecus(): Collection
     {
         return $this->messagesRecus;
     }
 
+    /** @return Collection<int, Notification> */
     public function getNotifications(): Collection
     {
         return $this->notifications;
     }
 
+    /** @return Collection<int, Favori> */
     public function getFavoris(): Collection
     {
         return $this->favoris;
     }
 
+    /** @return Collection<int, Avis> */
     public function getAvisDonnes(): Collection
     {
         return $this->avisDonnes;
     }
 
+    /** @return Collection<int, Avis> */
     public function getAvisRecus(): Collection
     {
         return $this->avisRecus;
     }
 
+    /** @return Collection<int, Signalement> */
     public function getSignalements(): Collection
     {
         return $this->signalements;
     }
 
+    /** @return Collection<int, Signalement> */
     public function getSignalementsRecus(): Collection
     {
         return $this->signalementsRecus;
     }
 
+    /** @return Collection<int, Conversation> */
     public function getConversationsAsParticipant1(): Collection
     {
         return $this->conversationsAsParticipant1;
     }
 
+    /** @return Collection<int, Conversation> */
     public function getConversationsAsParticipant2(): Collection
     {
         return $this->conversationsAsParticipant2;
     }
 
+    /** @return Conversation[] */
     public function getAllConversations(): array
     {
         return array_merge(

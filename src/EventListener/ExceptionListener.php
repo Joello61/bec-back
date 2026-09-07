@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\EventListener;
 
+use App\Entity\User;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
@@ -113,10 +114,12 @@ readonly class ExceptionListener
         $event->setResponse($response);
     }
 
-        /**
-         * Retourne les champs manquants du profil
-         */
-        private function getProfileMissingFields($user): array
+    /**
+     * Retourne les champs manquants du profil
+     *
+     * @return string[]
+     */
+    private function getProfileMissingFields(User $user): array
     {
         $missing = [];
 
@@ -132,12 +135,14 @@ readonly class ExceptionListener
             $missing[] = 'telephone_verification';
         }
 
-        if (!$user->getPays() || !$user->getVille()) {
+        $address = $user->getAddress();
+
+        if (!$address || !$address->getPays() || !$address->getVille()) {
             $missing[] = 'location';
         }
 
-        $africanFormat = $user->getQuartier() !== null;
-        $diasporaFormat = $user->getAdresseLigne1() !== null && $user->getCodePostal() !== null;
+        $africanFormat = $address?->getQuartier() !== null;
+        $diasporaFormat = $address?->getAdresseLigne1() !== null && $address->getCodePostal() !== null;
 
         if (!$africanFormat && !$diasporaFormat) {
             $missing[] = 'address';

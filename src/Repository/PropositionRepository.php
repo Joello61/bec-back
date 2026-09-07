@@ -8,6 +8,9 @@ use App\Entity\Proposition;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends ServiceEntityRepository<Proposition>
+ */
 class PropositionRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -17,6 +20,7 @@ class PropositionRepository extends ServiceEntityRepository
 
     /**
      * Trouver toutes les propositions pour un voyage
+     * @return Proposition[]
      */
     public function findByVoyage(int $voyageId): array
     {
@@ -33,6 +37,7 @@ class PropositionRepository extends ServiceEntityRepository
 
     /**
      * Trouver toutes les propositions faites par un client
+     * @return Proposition[]
      */
     public function findByClient(int $clientId): array
     {
@@ -49,6 +54,7 @@ class PropositionRepository extends ServiceEntityRepository
 
     /**
      * Trouver toutes les propositions reçues par un voyageur
+     * @return Proposition[]
      */
     public function findByVoyageur(int $voyageurId): array
     {
@@ -66,6 +72,7 @@ class PropositionRepository extends ServiceEntityRepository
 
     /**
      * Trouver les propositions en attente pour un voyageur
+     * @return Proposition[]
      */
     public function findPendingByVoyageur(int $voyageurId): array
     {
@@ -114,6 +121,7 @@ class PropositionRepository extends ServiceEntityRepository
 
     /**
      * Trouver les propositions acceptées pour un voyage
+     * @return Proposition[]
      */
     public function findAcceptedByVoyage(int $voyageId): array
     {

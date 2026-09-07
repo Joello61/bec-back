@@ -558,6 +558,7 @@ class UserController extends AbstractController
 
     /**
      * @param User[] $users
+     * @return array<int, mixed>
      */
     private function withPublicProfileData(array $users, NormalizerInterface $normalizer): array
     {

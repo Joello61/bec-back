@@ -78,12 +78,15 @@ class Demande
     #[Groups(['demande:read'])]
     private ?\DateTimeInterface $updatedAt = null;
 
+    /** @var Collection<int, Favori> */
     #[ORM\OneToMany(targetEntity: Favori::class, mappedBy: 'demande', cascade: ['remove'])]
     private Collection $favoris;
 
+    /** @var Collection<int, Signalement> */
     #[ORM\OneToMany(targetEntity: Signalement::class, mappedBy: 'demande', cascade: ['remove'])]
     private Collection $signalements;
 
+    /** @var Collection<int, Proposition> */
     #[ORM\OneToMany(targetEntity: Proposition::class, mappedBy: 'demande', cascade: ['persist', 'remove'])]
     private Collection $propositions;
 
@@ -242,16 +245,19 @@ class Demande
         return $this;
     }
 
+    /** @return Collection<int, Favori> */
     public function getFavoris(): Collection
     {
         return $this->favoris;
     }
 
+    /** @return Collection<int, Signalement> */
     public function getSignalements(): Collection
     {
         return $this->signalements;
     }
 
+    /** @return Collection<int, Proposition> */
     public function getPropositions(): Collection
     {
         return $this->propositions;

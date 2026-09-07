@@ -48,6 +48,7 @@ security:
         - { path: ^/api/forgot-password, roles: PUBLIC_ACCESS }
         - { path: ^/api/reset-password, roles: PUBLIC_ACCESS }
         - { path: ^/api/verify-email, roles: PUBLIC_ACCESS }
+        - { path: ^/api/resend-verification, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/google, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/google/callback, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/facebook, roles: PUBLIC_ACCESS }

@@ -31,7 +31,7 @@ class FavoriController extends AbstractController
     #[OA\Response(response: 200, description: 'Liste des favoris')]
     public function list(): JsonResponse
     {
-        /* @var $user User */
+        /** @var User $user */
         $user = $this->getUser();
         $favoris = $this->favoriService->getUserFavoris($user->getId());
 
@@ -47,7 +47,7 @@ class FavoriController extends AbstractController
     #[OA\Response(response: 200, description: 'Liste des voyages favoris')]
     public function voyages(): JsonResponse
     {
-        /* @var $user User */
+        /** @var User $user */
         $user = $this->getUser();
         $favoris = $this->favoriService->getUserFavorisVoyages($user->getId());
 
@@ -63,7 +63,7 @@ class FavoriController extends AbstractController
     #[OA\Response(response: 200, description: 'Liste des demandes favorites')]
     public function demandes(): JsonResponse
     {
-        /* @var $user User */
+        /** @var User $user */
         $user = $this->getUser();
         $favoris = $this->favoriService->getUserFavorisDemandes($user->getId());
 
@@ -81,7 +81,7 @@ class FavoriController extends AbstractController
     #[OA\Response(response: 400, description: 'Déjà dans les favoris')]
     public function addVoyage(int $voyageId): JsonResponse
     {
-        /* @var $user User */
+        /** @var User $user */
         $user = $this->getUser();
         $favori = $this->favoriService->addVoyageToFavoris($user, $voyageId);
 
@@ -99,7 +99,7 @@ class FavoriController extends AbstractController
     #[OA\Response(response: 400, description: 'Déjà dans les favoris')]
     public function addDemande(int $demandeId): JsonResponse
     {
-        /* @var $user User */
+        /** @var User $user */
         $user = $this->getUser();
         $favori = $this->favoriService->addDemandeToFavoris($user, $demandeId);
 
@@ -116,13 +116,8 @@ class FavoriController extends AbstractController
     #[OA\Response(response: 204, description: 'Retiré des favoris')]
     public function remove(int $id, string $type): JsonResponse
     {
-
-        /* @var $user User */
+        /** @var User $user */
         $user = $this->getUser();
-
-        if (!$user) {
-            return $this->json(["message" => "Vous devez être connecté"], Response::HTTP_UNAUTHORIZED);
-        }
 
         $this->favoriService->removeFromFavoris($id, $type, $user);
 

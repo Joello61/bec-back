@@ -36,6 +36,7 @@ class Notification
     #[Groups(['notification:read', 'notification:list'])]
     private ?string $message = null;
 
+    /** @var array<string, mixed>|null */
     #[ORM\Column(type: Types::JSON, nullable: true)]
     #[Groups(['notification:read'])]
     private ?array $data = null;
@@ -103,11 +104,13 @@ class Notification
         return $this;
     }
 
+    /** @return array<string, mixed>|null */
     public function getData(): ?array
     {
         return $this->data;
     }
 
+    /** @param array<string, mixed>|null $data */
     public function setData(?array $data): static
     {
         $this->data = $data;

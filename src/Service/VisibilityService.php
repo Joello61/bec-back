@@ -85,6 +85,8 @@ readonly class VisibilityService
 
     /**
      * Filtrer une liste de voyages selon la visibilité
+     * @param \App\Entity\Voyage[] $voyages
+     * @return \App\Entity\Voyage[]
      */
     public function filterVisibleVoyages(array $voyages, ?User $viewer): array
     {
@@ -96,6 +98,8 @@ readonly class VisibilityService
 
     /**
      * Filtrer une liste de demandes selon la visibilité
+     * @param \App\Entity\Demande[] $demandes
+     * @return \App\Entity\Demande[]
      */
     public function filterVisibleDemandes(array $demandes, ?User $viewer): array
     {
@@ -180,6 +184,8 @@ readonly class VisibilityService
      * Réinjecte email/téléphone dans un tableau déjà normalisé (ex. un voyage/une
      * demande sérialisés sans ces champs), uniquement si les préférences du
      * propriétaire l'autorisent pour ce viewer.
+     * @param array<string, mixed> $normalized
+     * @return array<string, mixed>
      */
     public function injectContactIfVisible(array $normalized, string $ownerKey, User $owner, ?User $viewer): array
     {

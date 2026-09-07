@@ -15,6 +15,8 @@ class UpdateUserRolesDTO
      * - ROLE_USER : Utilisateur standard (obligatoire, ajouté automatiquement)
      * - ROLE_MODERATOR : Modérateur avec accès limité à l'admin
      * - ROLE_ADMIN : Administrateur avec tous les droits
+     *
+     * @var string[]
      */
     #[Assert\NotBlank(message: 'Au moins un rôle doit être spécifié')]
     #[Assert\Type(

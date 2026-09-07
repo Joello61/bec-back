@@ -27,11 +27,19 @@ readonly class VoyageService
         private RealtimeNotifier $notifier,
     ) {}
 
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
     public function getPaginatedVoyages(int $page, int $limit, array $filters = [], ?User $excludeUser = null): array
     {
         return $this->voyageRepository->findPaginated($page, $limit, $filters, $excludeUser);
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
     public function getPublicPaginatedVoyages(int $page, int $limit, array $filters = []): array
     {
         return $this->voyageRepository->findPublicPaginated($page, $limit, $filters);
@@ -380,7 +388,7 @@ readonly class VoyageService
             // Si la demande est encore active, on la remet en recherche
             if ($demande && !in_array($demande->getStatut(), ['annulee', 'expiree'], true)) {
                 $demande->setStatut('en_recherche');
-                $demande->setUpdatedAt(new \DateTimeImmutable());
+                $demande->setUpdatedAt();
                 $client = $demande->getClient();
 
                 // Notifier le client concerné
@@ -516,6 +524,9 @@ Votre demande est de nouveau en recherche d’un voyageur.",
 
     }
 
+    /**
+     * @return \App\Entity\Voyage[]
+     */
     public function getVoyagesByUser(int $userId): array
     {
         return $this->voyageRepository->findByVoyageur($userId);
@@ -523,6 +534,7 @@ Votre demande est de nouveau en recherche d’un voyageur.",
 
     /**
      * Trouver les demandes correspondantes à un voyage (avec scoring)
+     * @return array<string, mixed>[]
      */
     public function findMatchingDemandes(int $voyageId, ?User $viewer = null): array
     {
@@ -532,6 +544,7 @@ Votre demande est de nouveau en recherche d’un voyageur.",
 
     /**
      * Convertir les montants d'un voyage dans une devise cible
+     * @return array<string, mixed>
      */
     public function convertVoyageAmounts(Voyage $voyage, string $targetCurrency): array
     {

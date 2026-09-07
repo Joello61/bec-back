@@ -8,6 +8,9 @@ use App\Entity\Avis;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends ServiceEntityRepository<Avis>
+ */
 class AvisRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -15,6 +18,9 @@ class AvisRepository extends ServiceEntityRepository
         parent::__construct($registry, Avis::class);
     }
 
+    /**
+     * @return Avis[]
+     */
     public function findByUser(int $userId): array
     {
         return $this->createQueryBuilder('a')
@@ -28,6 +34,9 @@ class AvisRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * @return Avis[]
+     */
     public function findByVoyage(int $voyageId): array
     {
         return $this->createQueryBuilder('a')
@@ -41,6 +50,10 @@ class AvisRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * @param int[] $userIds
+     * @return array<int, float>
+     */
     public function getAverageNotesForUsers(array $userIds): array
     {
         if ($userIds === []) {
@@ -96,6 +109,9 @@ class AvisRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    /**
+     * @return array{total: int, average: float, distribution: array<int, int>}
+     */
     public function getStatsByUser(int $userId): array
     {
         $qb = $this->createQueryBuilder('a')

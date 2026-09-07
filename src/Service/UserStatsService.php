@@ -37,6 +37,9 @@ readonly class UserStatsService
         );
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function getSummary(int $userId): array
     {
         $voyagesActifs = $this->voyageRepository->count([
@@ -67,6 +70,9 @@ readonly class UserStatsService
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function getVoyagesData(int $userId): array
     {
         $voyages = $this->voyageRepository->findBy(
@@ -97,6 +103,9 @@ readonly class UserStatsService
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function getDemandesData(int $userId): array
     {
         $demandes = $this->demandeRepository->findBy(
@@ -123,6 +132,9 @@ readonly class UserStatsService
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function getNotificationsData(int $userId): array
     {
         $notifications = $this->notificationRepository->findBy(
@@ -150,6 +162,9 @@ readonly class UserStatsService
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function getMessagesData(int $userId): array
     {
         $messagesRecus = $this->messageRepository->findBy(
@@ -179,6 +194,9 @@ readonly class UserStatsService
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     private function getUserStats(int $userId, User $viewer): array
     {
         $voyagesTermines = $this->voyageRepository->count([
@@ -196,15 +214,16 @@ readonly class UserStatsService
         return [
             'voyagesEffectues' => $voyagesTermines,
             'bagagesTransportes' => $demandesReussies,
-            'noteMoyenne' => $avisStats['average'] ?? 0,
-            'nombreAvis' => $avisStats['total'] ?? 0,
-            'repartitionNotes' => $avisStats['distribution'] ?? [],
+            'noteMoyenne' => $avisStats['average'],
+            'nombreAvis' => $avisStats['total'],
+            'repartitionNotes' => $avisStats['distribution'],
         ];
     }
 
     /**
      * Récupère les statistiques publiques d'un utilisateur
      * Respecte les préférences de visibilité
+     * @return array<string, mixed>
      */
     public function getUserPublicStats(User $profileOwner, ?User $viewer): array
     {
@@ -234,15 +253,16 @@ readonly class UserStatsService
             'visible' => true,
             'voyagesEffectues' => $voyagesTermines,
             'bagagesTransportes' => $demandesReussies,
-            'noteMoyenne' => $avisStats['average'] ?? 0,
-            'nombreAvis' => $avisStats['total'] ?? 0,
-            'repartitionNotes' => $avisStats['distribution'] ?? [],
+            'noteMoyenne' => $avisStats['average'],
+            'nombreAvis' => $avisStats['total'],
+            'repartitionNotes' => $avisStats['distribution'],
         ];
     }
 
     /**
      * Récupère les informations de profil visibles
      * Respecte les préférences de visibilité
+     * @return array<string, mixed>
      */
     public function getVisibleProfileData(User $profileOwner, ?User $viewer): array
     {

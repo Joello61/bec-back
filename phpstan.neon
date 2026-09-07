@@ -1,0 +1,22 @@
+includes:
+    - vendor/phpstan/phpstan-symfony/extension.neon
+    - vendor/phpstan/phpstan-symfony/rules.neon
+    - vendor/phpstan/phpstan-doctrine/extension.neon
+    - vendor/phpstan/phpstan-doctrine/rules.neon
+
+parameters:
+    level: 6
+    paths:
+        - src
+    symfony:
+        containerXmlPath: var/cache/dev/App_KernelDevDebugContainer.xml
+    doctrine:
+        objectManagerLoader: tests/object-manager.php
+    ignoreErrors:
+        # Idiome Doctrine standard : un champ obligatoire (colonne NOT NULL) est
+        # declare nullable en PHP avec une valeur par defaut null, toujours fixee
+        # via un setter ou #[PrePersist] avant le flush() - jamais garanti par le
+        # systeme de types, mais convention largement acceptee dans l'ecosysteme
+        # Symfony/Doctrine plutot qu'un refactor de construction sur 18 entites.
+        - identifier: doctrine.columnType
+        - identifier: doctrine.associationType

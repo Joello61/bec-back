@@ -586,6 +586,7 @@ readonly class PropositionService
 
     /**
      * Récupérer les propositions pour un voyage
+     * @return \App\Entity\Proposition[]
      */
     public function getPropositionsByVoyage(int $voyageId): array
     {
@@ -594,6 +595,7 @@ readonly class PropositionService
 
     /**
      * Récupérer les propositions acceptées pour un voyage
+     * @return \App\Entity\Proposition[]
      */
     public function getAcceptedPropositionsByVoyage(int $voyageId): array
     {
@@ -602,6 +604,7 @@ readonly class PropositionService
 
     /**
      * Récupérer les propositions faites par un client
+     * @return \App\Entity\Proposition[]
      */
     public function getPropositionsByClient(int $clientId): array
     {
@@ -610,6 +613,7 @@ readonly class PropositionService
 
     /**
      * Récupérer les propositions reçues par un voyageur
+     * @return \App\Entity\Proposition[]
      */
     public function getPropositionsByVoyageur(int $voyageurId): array
     {
@@ -626,6 +630,7 @@ readonly class PropositionService
 
     /**
      * Convertir les montants d'une proposition dans une devise cible
+     * @return array<string, mixed>
      */
     public function convertPropositionAmounts(Proposition $proposition, string $targetCurrency): array
     {
@@ -660,6 +665,7 @@ readonly class PropositionService
     /**
      * Obtenir le récapitulatif d'une proposition avec conversion
      * Utile pour afficher au voyageur les montants dans sa devise
+     * @return array<string, mixed>
      */
     public function getPropositionSummaryWithConversion(Proposition $proposition, User $viewer): array
     {
