@@ -4,16 +4,15 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional;
 
-use App\Entity\Address;
 use App\Entity\Demande;
 use App\Entity\User;
-use App\Entity\UserSettings;
 use App\Entity\Voyage;
+use App\Tests\Support\JwtAuthenticationTrait;
+use App\Tests\Support\UserFactoryTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
-use Symfony\Component\BrowserKit\Cookie;
 
 /**
  * Phase 10 du plan de correction (bec-docs/docs/plan-correction/plan-correction-cobage.md) :
@@ -23,6 +22,9 @@ use Symfony\Component\BrowserKit\Cookie;
  */
 class VoyageControllerTest extends WebTestCase
 {
+    use UserFactoryTrait;
+    use JwtAuthenticationTrait;
+
     private KernelBrowser $client;
     private EntityManagerInterface $em;
     private JWTTokenManagerInterface $jwtManager;
@@ -139,53 +141,6 @@ class VoyageControllerTest extends WebTestCase
         self::assertArrayNotHasKey('telephone', $payload[0]['demande']['client']);
     }
 
-    private function createUser(string $emailPrefix, ?bool $showEmail = null, ?bool $showPhone = null): User
-    {
-        $user = new User();
-        $user->setEmail($emailPrefix . '-' . uniqid() . '@example.test');
-        $user->setNom('Test');
-        $user->setPrenom($emailPrefix);
-        $user->setPassword('irrelevant');
-
-        $address = new Address();
-        $address->setPays('Cameroun');
-        $address->setVille('Douala');
-        $address->setQuartier('Bonapriso');
-        $address->setUser($user);
-        $user->setAddress($address);
-
-        $this->em->persist($user);
-        $this->em->persist($address);
-
-        if ($showEmail !== null || $showPhone !== null) {
-            $settings = new UserSettings();
-            $settings->setUser($user);
-            if ($showEmail !== null) {
-                $settings->setShowEmail($showEmail);
-            }
-            if ($showPhone !== null) {
-                $settings->setShowPhone($showPhone);
-            }
-            $user->setSettings($settings);
-            $this->em->persist($settings);
-        }
-
-        $this->em->flush();
-
-        return $user;
-    }
-
-    private function createCompleteProfileUser(string $emailPrefix, ?bool $showEmail = null, ?bool $showPhone = null): User
-    {
-        $user = $this->createUser($emailPrefix, $showEmail, $showPhone);
-        $user->setTelephone('+237600000002');
-        $user->setTelephoneVerifie(true);
-        $user->setEmailVerifie(true);
-        $this->em->flush();
-
-        return $user;
-    }
-
     private function createVoyage(User $voyageur, string $villeDepart = 'Douala', string $villeArrivee = 'Paris'): Voyage
     {
         $voyage = new Voyage();
@@ -200,12 +155,6 @@ class VoyageControllerTest extends WebTestCase
         $this->em->flush();
 
         return $voyage;
-    }
-
-    private function authenticateAs(User $user): void
-    {
-        $token = $this->jwtManager->create($user);
-        $this->client->getCookieJar()->set(new Cookie('bagage_token', $token, null, '/', 'localhost', false, false));
     }
 
     private function findByVoyageurId(array $items, int $voyageurId): array
