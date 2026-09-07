@@ -112,7 +112,7 @@ class AdminUserController extends AbstractController
     /**
      * Détails d'un utilisateur
      */
-    #[Route('/{id}', name: 'show', methods: ['GET'])]
+    #[Route('/{id}', name: 'show', requirements: ['id' => '\d+'], methods: ['GET'])]
     #[OA\Get(
         path: '/api/admin/users/{id}',
         summary: 'Détails complets d\'un utilisateur',
@@ -140,7 +140,7 @@ class AdminUserController extends AbstractController
     /**
      * Bannir un utilisateur
      */
-    #[Route('/{id}/ban', name: 'ban', methods: ['POST'])]
+    #[Route('/{id}/ban', name: 'ban', requirements: ['id' => '\d+'], methods: ['POST'])]
     #[OA\Post(
         path: '/api/admin/users/{id}/ban',
         summary: 'Bannir un utilisateur',
@@ -211,7 +211,7 @@ class AdminUserController extends AbstractController
     /**
      * Débannir un utilisateur
      */
-    #[Route('/{id}/unban', name: 'unban', methods: ['POST'])]
+    #[Route('/{id}/unban', name: 'unban', requirements: ['id' => '\d+'], methods: ['POST'])]
     #[OA\Post(
         path: '/api/admin/users/{id}/unban',
         summary: 'Débannir un utilisateur',
@@ -264,7 +264,7 @@ class AdminUserController extends AbstractController
     /**
      * Modifier les rôles d'un utilisateur
      */
-    #[Route('/{id}/roles', name: 'update_roles', methods: ['PATCH'])]
+    #[Route('/{id}/roles', name: 'update_roles', requirements: ['id' => '\d+'], methods: ['PATCH'])]
     #[OA\Patch(
         path: '/api/admin/users/{id}/roles',
         summary: 'Modifier les rôles d\'un utilisateur',
@@ -329,7 +329,7 @@ class AdminUserController extends AbstractController
     /**
      * Supprimer un utilisateur (RGPD)
      */
-    #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
+    #[Route('/{id}', name: 'delete', requirements: ['id' => '\d+'], methods: ['DELETE'])]
     #[OA\Delete(
         path: '/api/admin/users/{id}',
         summary: 'Supprimer définitivement un utilisateur',
@@ -393,7 +393,7 @@ class AdminUserController extends AbstractController
     /**
      * Historique d'activité d'un utilisateur
      */
-    #[Route('/{id}/activity', name: 'activity', methods: ['GET'])]
+    #[Route('/{id}/activity', name: 'activity', requirements: ['id' => '\d+'], methods: ['GET'])]
     #[OA\Get(
         path: '/api/admin/users/{id}/activity',
         summary: 'Historique d\'activité d\'un utilisateur',
@@ -465,7 +465,7 @@ class AdminUserController extends AbstractController
     /**
      * Historique des actions admin sur un utilisateur
      */
-    #[Route('/{id}/admin-logs', name: 'admin_logs', methods: ['GET'])]
+    #[Route('/{id}/admin-logs', name: 'admin_logs', requirements: ['id' => '\d+'], methods: ['GET'])]
     #[OA\Get(
         path: '/api/admin/users/{id}/admin-logs',
         summary: 'Historique des actions admin sur cet utilisateur',
