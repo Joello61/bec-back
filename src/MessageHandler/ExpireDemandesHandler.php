@@ -24,8 +24,11 @@ final readonly class ExpireDemandesHandler
         $today = new \DateTime();
         $today->setTime(0, 0, 0);
 
-        $expiredDemandes = $this->demandeRepository->findExpiredDemandes($today);
-        $totalCount = count($expiredDemandes);
+        $expiredDemandeIds = array_map(
+            static fn ($demande) => $demande->getId(),
+            $this->demandeRepository->findExpiredDemandes($today)
+        );
+        $totalCount = count($expiredDemandeIds);
 
         if ($totalCount === 0) {
             $this->logger->info('Aucune demande à expirer');
@@ -37,18 +40,29 @@ final readonly class ExpireDemandesHandler
         $processed = 0;
         $errors = 0;
         $batchSize = $message->batchSize ?? 100;
-        $batches = array_chunk($expiredDemandes, $batchSize);
+        $batches = array_chunk($expiredDemandeIds, $batchSize);
 
-        foreach ($batches as $batchIndex => $batch) {
-            foreach ($batch as $demande) {
+        foreach ($batches as $batchIndex => $batchIds) {
+            foreach ($batchIds as $demandeId) {
                 try {
+                    // Recharge l'entite depuis l'EntityManager courant : apres le clear()
+                    // du lot precedent, une entite issue du findExpiredDemandes() initial
+                    // est detachee. La persist() d'une entite detachee (avec un id deja
+                    // existant) est traitee par Doctrine comme un nouvel enregistrement,
+                    // ce qui echoue via son association client non configuree en
+                    // cascade persist - reproduit et confirme par test (Lot 12), meme
+                    // bug que ExpireVoyagesHandler.
+                    $demande = $this->demandeRepository->find($demandeId);
+                    if ($demande === null) {
+                        continue;
+                    }
+
                     $demande->setStatut('expiree');
-                    $this->entityManager->persist($demande);
                     $processed++;
                 } catch (\Exception $e) {
                     $errors++;
                     $this->logger->error('Erreur expiration demande', [
-                        'demande_id' => $demande->getId(),
+                        'demande_id' => $demandeId,
                         'error' => $e->getMessage()
                     ]);
                 }
@@ -58,7 +72,7 @@ final readonly class ExpireDemandesHandler
             $this->entityManager->clear();
 
             $this->logger->info("Lot {$batchIndex} traité", [
-                'batch_size' => count($batch),
+                'batch_size' => count($batchIds),
                 'total_processed' => $processed
             ]);
         }
