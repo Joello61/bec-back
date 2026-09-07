@@ -65,6 +65,9 @@ readonly class ContactService
         return $this->contactRepository->find($id);
     }
 
+    /**
+     * @return \App\Entity\Contact[]
+     */
     public function getAllContacts(): array
     {
         return $this->contactRepository->findBy([], ['createdAt' => 'DESC']);

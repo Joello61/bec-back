@@ -103,6 +103,7 @@ readonly class ModerationService
 
     /**
      * Modifier les rôles d'un utilisateur
+     * @param list<string> $roles
      */
     public function updateUserRoles(User $user, array $roles, User $admin): void
     {
@@ -390,6 +391,7 @@ readonly class ModerationService
 
     /**
      * Supprimer tous les contenus d'un utilisateur
+     * @return array<string, int>
      */
     public function deleteAllUserContent(User $user, User $admin, string $reason): array
     {

@@ -122,11 +122,17 @@ readonly class SignalementService
         return $signalement;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getUserSignalements(User $user, int $page, int $limit, ?string $statut): array
     {
         return $this->signalementRepository->findUserSignalementPaginated($user, $page, $limit, $statut);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getAllSignalements(int $page, int $limit, ?string $statut): array
     {
         return $this->signalementRepository->findPaginated($page, $limit, $statut);

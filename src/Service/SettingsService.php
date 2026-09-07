@@ -207,6 +207,7 @@ readonly class SettingsService
 
     /**
      * Exporter les données utilisateur (RGPD)
+     * @return array<string, mixed>
      */
     public function exportUserData(User $user): array
     {
