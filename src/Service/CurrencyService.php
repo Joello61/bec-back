@@ -7,6 +7,7 @@ namespace App\Service;
 use App\Entity\Currency;
 use App\Repository\CountryRepository;
 use App\Repository\CurrencyRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
@@ -51,6 +52,7 @@ readonly class CurrencyService
         private LoggerInterface $logger,
         private string $exchangeRateApiKey,
         private CountryRepository $countryRepository,
+        private EntityManagerInterface $entityManager,
         private string $defaultCurrency = 'EUR',
         private string $defaultLanguages = 'fr-FR'
     ) {}
@@ -200,7 +202,7 @@ readonly class CurrencyService
                 }
             }
 
-            $this->currencyRepository->getEntityManager()->flush();
+            $this->entityManager->flush();
 
             $this->logger->info('Taux de change mis à jour avec succès', [
                 'count' => count($currencies)
