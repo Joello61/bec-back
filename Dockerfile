@@ -56,6 +56,16 @@ RUN chmod +x /usr/local/bin/docker-entrypoint-dev.sh /usr/local/bin/docker-entry
 
 ENTRYPOINT ["docker-entrypoint-dev.sh"]
 EXPOSE 9000
+
+# Sans ceci, bec-infra/docker-compose.yml ne peut pas exprimer "attendre que
+# php-fpm écoute réellement" (juste "le conteneur a démarré") - constaté à la
+# vérification de la Phase D0 : nginx (démarrage quasi instantané) tentait de
+# router vers backend avant la fin de composer install/génération JWT dans
+# l'entrypoint, provoquant un 502 "Connection refused" pendant les premières
+# secondes d'un démarrage à froid complet (docker compose down && up).
+HEALTHCHECK --interval=5s --timeout=3s --start-period=60s --retries=5 \
+    CMD php -r '$fp=@fsockopen("127.0.0.1",9000,$errno,$errstr,2);if(!$fp){exit(1);}fclose($fp);exit(0);'
+
 CMD ["php-fpm"]
 
 # ---------------------------------------------------------------------------
