@@ -44,14 +44,17 @@ class CurrencyRepository extends ServiceEntityRepository
      */
     public function findByCountry(string $countryCode): ?Currency
     {
-        return $this->createQueryBuilder('c')
-            ->where('JSON_CONTAINS(c.countries, :country) = 1')
-            ->andWhere('c.isActive = :active')
-            ->setParameter('country', json_encode(strtoupper($countryCode)))
-            ->setParameter('active', true)
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
+        // countries est de type `json` (pas jsonb) : pas d'operateur PostgreSQL de
+        // containment, et JSON_CONTAINS() (beberlei/doctrineextensions) est une
+        // fonction MySQL non enregistree comme fonction DQL sur ce projet - resolu
+        // via une requete SQL native parametree, meme pattern que UserRepository::
+        // findAllPaginatedAdmin pour le filtre par role (Lot 9).
+        $id = $this->getEntityManager()->getConnection()->fetchOne(
+            'SELECT id FROM currencies WHERE countries::text LIKE :country AND is_active = true LIMIT 1',
+            ['country' => '%"' . strtoupper($countryCode) . '"%']
+        );
+
+        return $id ? $this->find($id) : null;
     }
 
     /**
