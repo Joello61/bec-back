@@ -53,6 +53,9 @@ readonly class NotificationService
         };
     }
 
+    /**
+     * @param array<string, mixed>|null $data
+     */
     public function createNotification(
         User $user,
         string $type,
@@ -191,11 +194,17 @@ readonly class NotificationService
         );
     }
 
+    /**
+     * @return \App\Entity\Notification[]
+     */
     public function getUserNotifications(int $userId, int $limit = 20): array
     {
         return $this->notificationRepository->findByUser($userId, $limit);
     }
 
+    /**
+     * @return \App\Entity\Notification[]
+     */
     public function getUnreadNotifications(int $userId): array
     {
         return $this->notificationRepository->findUnreadByUser($userId);
@@ -297,7 +306,10 @@ readonly class NotificationService
         $this->entityManager->remove($notification);
         $this->entityManager->flush();
 
-        if ($user) {
+        // $user est forcement non-null ici : le controle d'ownership plus haut a deja
+        // verifie $user === $currentUser (non-nullable), sans quoi une AccessDeniedException
+        // aurait ete levee.
+        if ($user) { // @phpstan-ignore if.alwaysTrue
             try {
                 // On notifie le client que le compteur de notifications a changé
                 $unreadCount = $this->countUnread($user->getId());
