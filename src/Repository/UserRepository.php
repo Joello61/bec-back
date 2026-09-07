@@ -279,7 +279,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
 
     /**
      * Trouve les utilisateurs par ville via leur adresse
-      * @return User[]
+     * @return User[]
      */
     public function findByVille(string $ville): array
     {
@@ -294,7 +294,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
 
     /**
      * Trouve les utilisateurs par pays via leur adresse
-      * @return User[]
+     * @return User[]
      */
     public function findByPays(string $pays): array
     {

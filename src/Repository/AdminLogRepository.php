@@ -21,7 +21,7 @@ class AdminLogRepository extends ServiceEntityRepository
 
     /**
      * Récupère les logs récents avec pagination
-      * @return array{data: AdminLog[], pagination: array{page: int, limit: int, total: int, pages: int}}
+     * @return array{data: AdminLog[], pagination: array{page: int, limit: int, total: int, pages: int}}
      */
     public function findRecentPaginated(int $page = 1, int $limit = 50): array
     {
@@ -54,7 +54,7 @@ class AdminLogRepository extends ServiceEntityRepository
 
     /**
      * Récupère les logs récents (simple)
-      * @return AdminLog[]
+     * @return AdminLog[]
      */
     public function findRecent(int $limit = 50): array
     {
@@ -69,7 +69,7 @@ class AdminLogRepository extends ServiceEntityRepository
 
     /**
      * Récupère les logs d'un admin spécifique
-      * @return AdminLog[]
+     * @return AdminLog[]
      */
     public function findByAdmin(User $admin, int $limit = 50): array
     {
@@ -84,7 +84,7 @@ class AdminLogRepository extends ServiceEntityRepository
 
     /**
      * Récupère les logs par type de cible (user, voyage, demande, etc.)
-      * @return AdminLog[]
+     * @return AdminLog[]
      */
     public function findByTargetType(string $targetType, int $limit = 50): array
     {
@@ -101,7 +101,7 @@ class AdminLogRepository extends ServiceEntityRepository
 
     /**
      * Récupère les logs par action spécifique
-      * @return AdminLog[]
+     * @return AdminLog[]
      */
     public function findByAction(string $action, int $limit = 50): array
     {
@@ -118,7 +118,7 @@ class AdminLogRepository extends ServiceEntityRepository
 
     /**
      * Récupère tous les logs concernant une cible spécifique
-      * @return AdminLog[]
+     * @return AdminLog[]
      */
     public function findByTarget(string $targetType, int $targetId): array
     {
@@ -136,8 +136,8 @@ class AdminLogRepository extends ServiceEntityRepository
 
     /**
      * Recherche dans les logs avec filtres
-      * @param array<string, mixed> $filters
-      * @return array{data: AdminLog[], pagination: array{page: int, limit: int, total: int, pages: int}}
+     * @param array<string, mixed> $filters
+     * @return array{data: AdminLog[], pagination: array{page: int, limit: int, total: int, pages: int}}
      */
     public function search(array $filters = [], int $page = 1, int $limit = 50): array
     {
@@ -234,7 +234,7 @@ class AdminLogRepository extends ServiceEntityRepository
 
     /**
      * Récupère les statistiques d'actions sur une période
-      * @return array<string, int>
+     * @return array<string, int>
      */
     public function getActionStats(\DateTime $startDate, \DateTime $endDate): array
     {
