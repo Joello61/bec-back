@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Entity\User;
 use App\Service\NotificationService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -81,7 +82,9 @@ class NotificationController extends AbstractController
     #[OA\Response(response: 200, description: 'Notification marquée comme lue')]
     public function markAsRead(int $id): JsonResponse
     {
-        $this->notificationService->markAsRead($id);
+        /** @var User $user */
+        $user = $this->getUser();
+        $this->notificationService->markAsRead($id, $user);
 
         return $this->json(['message' => 'Notification marquée comme lue']);
     }
@@ -109,7 +112,9 @@ class NotificationController extends AbstractController
     #[OA\Response(response: 204, description: 'Notification supprimée')]
     public function delete(int $id): JsonResponse
     {
-        $this->notificationService->deleteNotification($id);
+        /** @var User $user */
+        $user = $this->getUser();
+        $this->notificationService->deleteNotification($id, $user);
 
         return $this->json(null, Response::HTTP_NO_CONTENT);
     }
