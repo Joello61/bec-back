@@ -27,11 +27,19 @@ readonly class DemandeService
         private LoggerInterface $logger,
     ) {}
 
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
     public function getPaginatedDemandes(int $page, int $limit, array $filters = [], ?User $excludeUser = null): array
     {
         return $this->demandeRepository->findPaginated($page, $limit, $filters, $excludeUser);
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
     public function getPublicPaginatedDemandes(int $page, int $limit, array $filters = []): array
     {
         return $this->demandeRepository->findPublicPaginated($page, $limit, $filters);
@@ -389,6 +397,9 @@ readonly class DemandeService
 
     }
 
+    /**
+     * @return \App\Entity\Demande[]
+     */
     public function getDemandesByUser(int $userId): array
     {
         return $this->demandeRepository->findByClient($userId);
@@ -396,6 +407,7 @@ readonly class DemandeService
 
     /**
      * Trouver les voyages correspondants à une demande (avec scoring)
+     * @return array<string, mixed>[]
      */
     public function findMatchingVoyages(int $demandeId, ?User $viewer = null): array
     {
