@@ -25,7 +25,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?int $id = null;
 
     #[ORM\Column(length: 180, unique: true)]
-    #[Groups(['user:read', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'admin:user:list', 'admin:user:read'])]
+    #[Groups(['user:read', 'user:write', 'admin:user:list', 'admin:user:read'])]
     private ?string $email = null;
 
     #[ORM\Column]
@@ -44,7 +44,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $prenom = null;
 
     #[ORM\Column(length: 20, nullable: true)]
-    #[Groups(['user:read', 'user:write', 'voyage:read', 'voyage:list', 'demande:read', 'demande:list', 'admin:user:read'])]
+    #[Groups(['user:read', 'user:write', 'admin:user:read'])]
     private ?string $telephone = null;
 
     // ==================== RELATION ADRESSE ====================
