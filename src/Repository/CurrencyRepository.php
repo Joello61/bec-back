@@ -80,14 +80,26 @@ class CurrencyRepository extends ServiceEntityRepository
      */
     public function findMostUsed(int $limit = 5): array
     {
-        return $this->createQueryBuilder('c')
+        // FIELD() est une fonction MySQL, non portable sur PostgreSQL (utilise ici) et
+        // non enregistree comme fonction DQL personnalisee - remplacee par un CASE WHEN,
+        // supporte nativement par DQL, pour reproduire le meme ordre de priorite fixe.
+        $popular = ['EUR', 'USD', 'XAF', 'CAD', 'GBP'];
+
+        $qb = $this->createQueryBuilder('c')
             ->where('c.isActive = :active')
             ->andWhere('c.code IN (:popular)')
             ->setParameter('active', true)
-            ->setParameter('popular', ['EUR', 'USD', 'XAF', 'CAD', 'GBP'])
-            ->orderBy('FIELD(c.code, :order)', 'ASC')
-            ->setParameter('order', 'EUR,USD,XAF,CAD,GBP')
-            ->setMaxResults($limit)
+            ->setParameter('popular', $popular)
+            ->setMaxResults($limit);
+
+        $orderExpr = 'CASE';
+        foreach ($popular as $index => $code) {
+            $orderExpr .= sprintf(' WHEN c.code = :order%d THEN %d', $index, $index);
+            $qb->setParameter('order' . $index, $code);
+        }
+        $orderExpr .= ' ELSE ' . count($popular) . ' END';
+
+        return $qb->orderBy($orderExpr, 'ASC')
             ->getQuery()
             ->getResult();
     }
