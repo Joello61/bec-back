@@ -18,6 +18,9 @@ readonly class MatchingService
         private VisibilityService $visibilityService
     ) {}
 
+    /**
+     * @return Voyage[]
+     */
     public function findMatchingVoyages(Demande $demande, ?User $viewer = null): array
     {
         $voyages = $this->voyageRepository->findMatchingDemande(
@@ -32,6 +35,9 @@ readonly class MatchingService
         return $this->visibilityService->filterVisibleVoyages($voyages, $viewer);
     }
 
+    /**
+     * @return Demande[]
+     */
     public function findMatchingDemandes(Voyage $voyage, ?User $viewer = null): array
     {
         $demandes = $this->demandeRepository->findMatchingVoyage(
@@ -84,6 +90,9 @@ readonly class MatchingService
         return $score;
     }
 
+    /**
+     * @return array<string, mixed>[]
+     */
     public function findBestMatchesVoyages(Demande $demande, ?User $viewer = null, int $limit = 5): array
     {
         $voyages = $this->findMatchingVoyages($demande, $viewer);
@@ -107,6 +116,7 @@ readonly class MatchingService
      * (un voyage vers ses demandes correspondantes). findMatchingDemandes() seule
      * ne renvoie que des Demande brutes, sans score - VoyageController::matchingDemandes()
      * attend des tuples {demande, score}, exactement comme matchingVoyages() ci-dessus.
+     * @return array<string, mixed>[]
      */
     public function findBestMatchesDemandes(Voyage $voyage, ?User $viewer = null, int $limit = 5): array
     {
