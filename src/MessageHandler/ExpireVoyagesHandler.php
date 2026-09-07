@@ -24,8 +24,11 @@ final readonly class ExpireVoyagesHandler
         $today = new \DateTime();
         $today->setTime(0, 0, 0);
 
-        $expiredVoyages = $this->voyageRepository->findExpiredVoyages($today);
-        $totalCount = count($expiredVoyages);
+        $expiredVoyageIds = array_map(
+            static fn ($voyage) => $voyage->getId(),
+            $this->voyageRepository->findExpiredVoyages($today)
+        );
+        $totalCount = count($expiredVoyageIds);
 
         if ($totalCount === 0) {
             $this->logger->info('Aucun voyage à expirer');
@@ -37,18 +40,28 @@ final readonly class ExpireVoyagesHandler
         $processed = 0;
         $errors = 0;
         $batchSize = $message->batchSize ?? 100;
-        $batches = array_chunk($expiredVoyages, $batchSize);
+        $batches = array_chunk($expiredVoyageIds, $batchSize);
 
-        foreach ($batches as $batchIndex => $batch) {
-            foreach ($batch as $voyage) {
+        foreach ($batches as $batchIndex => $batchIds) {
+            foreach ($batchIds as $voyageId) {
                 try {
+                    // Recharge l'entite depuis l'EntityManager courant : apres le clear()
+                    // du lot precedent, une entite issue du findExpiredVoyages() initial
+                    // est detachee. La persist() d'une entite detachee (avec un id deja
+                    // existant) est traitee par Doctrine comme un nouvel enregistrement,
+                    // ce qui echoue via son association voyageur non configuree en
+                    // cascade persist - reproduit et confirme par test (Lot 12).
+                    $voyage = $this->voyageRepository->find($voyageId);
+                    if ($voyage === null) {
+                        continue;
+                    }
+
                     $voyage->setStatut('expire');
-                    $this->entityManager->persist($voyage);
                     $processed++;
                 } catch (\Exception $e) {
                     $errors++;
                     $this->logger->error('Erreur expiration voyage', [
-                        'voyage_id' => $voyage->getId(),
+                        'voyage_id' => $voyageId,
                         'error' => $e->getMessage()
                     ]);
                 }
@@ -58,7 +71,7 @@ final readonly class ExpireVoyagesHandler
             $this->entityManager->clear();
 
             $this->logger->info("Lot {$batchIndex} traité", [
-                'batch_size' => count($batch),
+                'batch_size' => count($batchIds),
                 'total_processed' => $processed
             ]);
         }
