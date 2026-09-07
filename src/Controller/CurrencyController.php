@@ -10,6 +10,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api/currencies', name: 'api_currencies_')]
 class CurrencyController extends AbstractController
@@ -230,11 +231,12 @@ class CurrencyController extends AbstractController
     }
 
     /**
-     * Met à jour les taux de change (Admin ou Cron)
+     * Met à jour les taux de change (Admin)
      *
      * @return JsonResponse
      */
     #[Route('/update-rates', name: 'update_rates', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function updateRates(): JsonResponse
     {
         try {
