@@ -8,6 +8,9 @@ use App\Entity\Favori;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends ServiceEntityRepository<Favori>
+ */
 class FavoriRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -15,6 +18,9 @@ class FavoriRepository extends ServiceEntityRepository
         parent::__construct($registry, Favori::class);
     }
 
+    /**
+     * @return Favori[]
+     */
     public function findByUser(int $userId): array
     {
         return $this->createQueryBuilder('f')
@@ -28,6 +34,9 @@ class FavoriRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * @return Favori[]
+     */
     public function findVoyagesByUser(int $userId): array
     {
         return $this->createQueryBuilder('f')
@@ -42,6 +51,9 @@ class FavoriRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * @return Favori[]
+     */
     public function findDemandesByUser(int $userId): array
     {
         return $this->createQueryBuilder('f')

@@ -6,6 +6,9 @@ use App\Entity\RefreshToken;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends ServiceEntityRepository<RefreshToken>
+ */
 class RefreshTokenRepository extends ServiceEntityRepository
 {
 
@@ -17,6 +20,7 @@ class RefreshTokenRepository extends ServiceEntityRepository
     /**
      * Trouve tous les tokens non expirés (simplification pour la validation).
      * Attention : Peut être lourd si beaucoup de tokens.
+      * @return RefreshToken[]
      */
     public function findAllRecent(): array
     {

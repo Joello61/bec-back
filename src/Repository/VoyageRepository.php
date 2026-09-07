@@ -9,6 +9,9 @@ use App\Entity\Voyage;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * @extends ServiceEntityRepository<Voyage>
+ */
 class VoyageRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -16,6 +19,10 @@ class VoyageRepository extends ServiceEntityRepository
         parent::__construct($registry, Voyage::class);
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     * @return array{data: Voyage[], pagination: array{page: int, limit: int, total: int, pages: int}}
+     */
     public function findPublicPaginated(int $page = 1, int $limit = 10, array $filters = []): array
     {
         $offset = ($page - 1) * $limit;
@@ -75,6 +82,10 @@ class VoyageRepository extends ServiceEntityRepository
         ];
     }
 
+    /**
+     * @param array<string, mixed> $filters
+     * @return array{data: Voyage[], pagination: array{page: int, limit: int, total: int, pages: int}}
+     */
     public function findPaginated(int $page = 1, int $limit = 10, array $filters = [], ?User $excludeUser = null): array
     {
         $offset = ($page - 1) * $limit;
@@ -166,6 +177,9 @@ class VoyageRepository extends ServiceEntityRepository
         ];
     }
 
+    /**
+     * @return Voyage[]
+     */
     public function findByVoyageur(int $voyageurId): array
     {
         return $this->createQueryBuilder('v')
@@ -176,6 +190,9 @@ class VoyageRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * @return Voyage[]
+     */
     public function findActifs(): array
     {
         return $this->createQueryBuilder('v')
@@ -194,6 +211,9 @@ class VoyageRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * @return Voyage[]
+     */
     public function findMatchingDemande(string $villeDepart, string $villeArrivee, ?\DateTimeInterface $dateDepart = null, ?int $excludeUserId = null): array
     {
         $qb = $this->createQueryBuilder('v')
@@ -228,6 +248,8 @@ class VoyageRepository extends ServiceEntityRepository
 
     /**
      * Liste TOUS les voyages (pour admin) sans filtre de visibilité
+      * @param array<string, mixed> $filters
+      * @return array{data: Voyage[], pagination: array{page: int, limit: int, total: int, pages: int}}
      */
     public function findAllPaginatedAdmin(int $page, int $limit, array $filters = []): array
     {
@@ -320,6 +342,9 @@ class VoyageRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
+    /**
+     * @return Voyage[]
+     */
     public function findExpiredVoyages(\DateTimeInterface $today): array
     {
         return $this->createQueryBuilder('v')
