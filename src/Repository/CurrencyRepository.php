@@ -44,14 +44,17 @@ class CurrencyRepository extends ServiceEntityRepository
      */
     public function findByCountry(string $countryCode): ?Currency
     {
-        return $this->createQueryBuilder('c')
-            ->where('JSON_CONTAINS(c.countries, :country) = 1')
-            ->andWhere('c.isActive = :active')
-            ->setParameter('country', json_encode(strtoupper($countryCode)))
-            ->setParameter('active', true)
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
+        // countries est de type `json` (pas jsonb) : pas d'operateur PostgreSQL de
+        // containment, et JSON_CONTAINS() (beberlei/doctrineextensions) est une
+        // fonction MySQL non enregistree comme fonction DQL sur ce projet - resolu
+        // via une requete SQL native parametree, meme pattern que UserRepository::
+        // findAllPaginatedAdmin pour le filtre par role (Lot 9).
+        $id = $this->getEntityManager()->getConnection()->fetchOne(
+            'SELECT id FROM currencies WHERE countries::text LIKE :country AND is_active = true LIMIT 1',
+            ['country' => '%"' . strtoupper($countryCode) . '"%']
+        );
+
+        return $id ? $this->find($id) : null;
     }
 
     /**
@@ -77,14 +80,26 @@ class CurrencyRepository extends ServiceEntityRepository
      */
     public function findMostUsed(int $limit = 5): array
     {
-        return $this->createQueryBuilder('c')
+        // FIELD() est une fonction MySQL, non portable sur PostgreSQL (utilise ici) et
+        // non enregistree comme fonction DQL personnalisee - remplacee par un CASE WHEN,
+        // supporte nativement par DQL, pour reproduire le meme ordre de priorite fixe.
+        $popular = ['EUR', 'USD', 'XAF', 'CAD', 'GBP'];
+
+        $qb = $this->createQueryBuilder('c')
             ->where('c.isActive = :active')
             ->andWhere('c.code IN (:popular)')
             ->setParameter('active', true)
-            ->setParameter('popular', ['EUR', 'USD', 'XAF', 'CAD', 'GBP'])
-            ->orderBy('FIELD(c.code, :order)', 'ASC')
-            ->setParameter('order', 'EUR,USD,XAF,CAD,GBP')
-            ->setMaxResults($limit)
+            ->setParameter('popular', $popular)
+            ->setMaxResults($limit);
+
+        $orderExpr = 'CASE';
+        foreach ($popular as $index => $code) {
+            $orderExpr .= sprintf(' WHEN c.code = :order%d THEN %d', $index, $index);
+            $qb->setParameter('order' . $index, $code);
+        }
+        $orderExpr .= ' ELSE ' . count($popular) . ' END';
+
+        return $qb->orderBy($orderExpr, 'ASC')
             ->getQuery()
             ->getResult();
     }
