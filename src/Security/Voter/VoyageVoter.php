@@ -10,6 +10,9 @@ use App\Service\VisibilityService;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
+/**
+ * @extends Voter<string, Voyage|int|null>
+ */
 class VoyageVoter extends Voter
 {
     public const EDIT = 'VOYAGE_EDIT';
