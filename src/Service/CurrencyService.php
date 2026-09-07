@@ -59,6 +59,7 @@ readonly class CurrencyService
 
     /**
      * Détecte automatiquement la devise selon le pays
+     * @return array<string, mixed>
      */
     public function getCurrencyAndLangByCountry(string $countryName): array
     {
@@ -217,6 +218,7 @@ readonly class CurrencyService
 
     /**
      * Récupère toutes les devises actives
+     * @return \App\Entity\Currency[]
      */
     public function getAllActiveCurrencies(): array
     {
@@ -225,6 +227,7 @@ readonly class CurrencyService
 
     /**
      * Récupère les devises les plus utilisées
+     * @return \App\Entity\Currency[]
      */
     public function getMostUsedCurrencies(int $limit = 5): array
     {
@@ -255,97 +258,18 @@ readonly class CurrencyService
         return $this->currencyRepository->findByCode($code);
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     public function getCountryCodeAndLanguages(string $countryName): ?array
     {
         return $this->countryRepository->findCodeAndLangByPays($countryName);
     }
 
-    /**
-     * Convertit le nom de pays en code ISO (simpliste)
-     * À améliorer avec une vraie API de géolocalisation si nécessaire
-     */
-    private function getCountryCode(string $countryName): ?string
-    {
-        // Mapping des noms de pays courants vers codes ISO
-        $countryNameMap = [
-            // Français
-            'France' => 'FR',
-            'Cameroun' => 'CM',
-            'Cameroon' => 'CM',
-            'Canada' => 'CA',
-            'États-Unis' => 'US',
-            'Etats-Unis' => 'US',
-            'États Unis' => 'US',
-            'USA' => 'US',
-            'Belgique' => 'BE',
-            'Suisse' => 'CH',
-            'Luxembourg' => 'LU',
-            'Allemagne' => 'DE',
-            'Italie' => 'IT',
-            'Espagne' => 'ES',
-            'Portugal' => 'PT',
-            'Pays-Bas' => 'NL',
-            'Royaume-Uni' => 'GB',
-            'Angleterre' => 'GB',
-            'Gabon' => 'GA',
-            'Congo' => 'CG',
-            'Tchad' => 'TD',
-            'Centrafrique' => 'CF',
-            'Guinée Équatoriale' => 'GQ',
-            'Sénégal' => 'SN',
-            'Côte d\'Ivoire' => 'CI',
-            'Mali' => 'ML',
-            'Burkina Faso' => 'BF',
-            'Niger' => 'NE',
-            'Togo' => 'TG',
-            'Bénin' => 'BJ',
-            'Maroc' => 'MA',
-            'Algérie' => 'DZ',
-            'Tunisie' => 'TN',
-            'Nigeria' => 'NG',
-            'Kenya' => 'KE',
-            'Afrique du Sud' => 'ZA',
-
-            // Anglais
-            'Germany' => 'DE',
-            'Italy' => 'IT',
-            'Spain' => 'ES',
-            'Switzerland' => 'CH',
-            'Belgium' => 'BE',
-            'Netherlands' => 'NL',
-            'United Kingdom' => 'GB',
-            'United States' => 'US',
-            'South Africa' => 'ZA',
-            'Morocco' => 'MA',
-            'Algeria' => 'DZ',
-            'Tunisia' => 'TN',
-        ];
-
-        $normalizedName = trim($countryName);
-
-        // Recherche exacte
-        if (isset($countryNameMap[$normalizedName])) {
-            return $countryNameMap[$normalizedName];
-        }
-
-        // Recherche insensible à la casse
-        $lowerName = strtolower($normalizedName);
-        foreach ($countryNameMap as $name => $code) {
-            if (strtolower($name) === $lowerName) {
-                return $code;
-            }
-        }
-
-        // Si le nom fait 2 caractères, on suppose que c'est déjà un code
-        if (strlen($normalizedName) === 2) {
-            return strtoupper($normalizedName);
-        }
-
-        return null;
-    }
 
     /**
      * Crée une nouvelle devise (admin)
+     * @param list<string> $countries
      */
     public function createCurrency(
         string $code,
@@ -374,6 +298,7 @@ readonly class CurrencyService
 
     /**
      * Met à jour une devise existante (admin)
+     * @param list<string>|null $countries
      */
     public function updateCurrency(
         string $code,
@@ -416,6 +341,7 @@ readonly class CurrencyService
 
     /**
      * Obtient les informations de conversion pour affichage
+     * @return array<string, mixed>
      */
     public function getConversionInfo(
         float $amount,
