@@ -6,6 +6,7 @@ namespace App\Service\OAuth;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\SettingsService;
 use Doctrine\ORM\EntityManagerInterface;
 use League\OAuth2\Client\Provider\Facebook;
 use League\OAuth2\Client\Provider\FacebookUser;
@@ -14,23 +15,13 @@ use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
 readonly class FacebookAuthService
 {
-    private Facebook $facebookProvider;
-
     public function __construct(
         private EntityManagerInterface $entityManager,
         private UserRepository $userRepository,
         private LoggerInterface $logger,
-        string $facebookAppId,
-        string $facebookAppSecret,
-        string $facebookRedirectUri
-    ) {
-        $this->facebookProvider = new Facebook([
-            'clientId' => $facebookAppId,
-            'clientSecret' => $facebookAppSecret,
-            'redirectUri' => $facebookRedirectUri,
-            'graphApiVersion' => 'v18.0',
-        ]);
-    }
+        private SettingsService $settingsService,
+        private Facebook $facebookProvider,
+    ) {}
 
     /**
      * Génère l'URL d'autorisation Facebook
@@ -134,6 +125,8 @@ readonly class FacebookAuthService
 
             $this->entityManager->persist($user);
             $this->entityManager->flush();
+
+            $this->settingsService->createDefaultSettings($user);
 
             $this->logger->info('Nouvel utilisateur créé via Facebook', [
                 'user_id' => $user->getId(),

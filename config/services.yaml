@@ -65,26 +65,35 @@ services:
             $defaultCurrency: '%app.default_currency%'
 
     # ==================== CONFIGURATION TWILIO ====================
+    # Client Twilio injecte comme service dedie (au lieu d'etre instancie en dur dans le
+    # constructeur de TwilioService) - permet de le remplacer par un double en test
+    # (Phase 4b, Lot 2 du plan de correction).
+    Twilio\Rest\Client:
+        arguments:
+            - '%env(TWILIO_ACCOUNT_SID)%'
+            - '%env(TWILIO_AUTH_TOKEN)%'
+
     App\Service\TwilioService:
         arguments:
             $logger: '@logger'
-            $twilioAccountSid: '%env(TWILIO_ACCOUNT_SID)%'
-            $twilioAuthToken: '%env(TWILIO_AUTH_TOKEN)%'
             $twilioPhoneNumber: '%env(TWILIO_PHONE_NUMBER)%'
 
-    # GoogleAuthService
-    App\Service\OAuth\GoogleAuthService:
+    # Providers OAuth2 injectes comme services dedies (au lieu d'etre instancies en dur
+    # dans le constructeur de Google/FacebookAuthService) - meme raison que Twilio ci-dessus.
+    League\OAuth2\Client\Provider\Google:
         arguments:
-            $googleClientId: '%google.client_id%'
-            $googleClientSecret: '%google.client_secret%'
-            $googleRedirectUri: '%google.redirect_uri%'
+            -
+                clientId: '%google.client_id%'
+                clientSecret: '%google.client_secret%'
+                redirectUri: '%google.redirect_uri%'
 
-    # FacebookAuthService
-    App\Service\OAuth\FacebookAuthService:
+    League\OAuth2\Client\Provider\Facebook:
         arguments:
-            $facebookAppId: '%facebook.app_id%'
-            $facebookAppSecret: '%facebook.app_secret%'
-            $facebookRedirectUri: '%facebook.redirect_uri%'
+            -
+                clientId: '%facebook.app_id%'
+                clientSecret: '%facebook.app_secret%'
+                redirectUri: '%facebook.redirect_uri%'
+                graphApiVersion: 'v18.0'
 
     App\Service\TopicBuilder:
         arguments:
