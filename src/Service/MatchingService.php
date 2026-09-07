@@ -102,5 +102,27 @@ readonly class MatchingService
         return array_slice($matches, 0, $limit);
     }
 
+    /**
+     * Équivalent de findBestMatchesVoyages() pour la direction inverse
+     * (un voyage vers ses demandes correspondantes). findMatchingDemandes() seule
+     * ne renvoie que des Demande brutes, sans score - VoyageController::matchingDemandes()
+     * attend des tuples {demande, score}, exactement comme matchingVoyages() ci-dessus.
+     */
+    public function findBestMatchesDemandes(Voyage $voyage, ?User $viewer = null, int $limit = 5): array
+    {
+        $demandes = $this->findMatchingDemandes($voyage, $viewer);
 
+        $matches = [];
+        foreach ($demandes as $demande) {
+            $matches[] = [
+                'demande' => $demande,
+                'score' => $this->calculateMatchScore($voyage, $demande)
+            ];
+        }
+
+        // Trier par score décroissant
+        usort($matches, fn($a, $b) => $b['score'] <=> $a['score']);
+
+        return array_slice($matches, 0, $limit);
+    }
 }
