@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional;
 
-use App\Entity\Address;
 use App\Entity\Avis;
 use App\Entity\User;
+use App\Tests\Support\JwtAuthenticationTrait;
+use App\Tests\Support\UserFactoryTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
-use Symfony\Component\BrowserKit\Cookie;
 
 /**
  * Phase 2 du plan de correction (bec-docs/docs/plan-correction/plan-correction-cobage.md) :
@@ -20,6 +20,9 @@ use Symfony\Component\BrowserKit\Cookie;
  */
 class UserControllerTest extends WebTestCase
 {
+    use UserFactoryTrait;
+    use JwtAuthenticationTrait;
+
     private KernelBrowser $client;
     private EntityManagerInterface $em;
     private JWTTokenManagerInterface $jwtManager;
@@ -148,28 +151,6 @@ class UserControllerTest extends WebTestCase
         self::assertSame(0.0, (float) $noRatingItem['noteAvisMoyen'], 'aucun avis ne doit valoir 0, jamais la moyenne d\'un autre utilisateur de la page');
     }
 
-    private function createUser(string $emailPrefix, string $ville = 'Douala'): User
-    {
-        $user = new User();
-        $user->setEmail($emailPrefix . '-' . uniqid() . '@example.test');
-        $user->setNom('Test');
-        $user->setPrenom($emailPrefix);
-        $user->setPassword('irrelevant');
-
-        $address = new Address();
-        $address->setPays('Cameroun');
-        $address->setVille($ville);
-        $address->setAdresseLigne1('12 rue secrète');
-        $address->setUser($user);
-        $user->setAddress($address);
-
-        $this->em->persist($user);
-        $this->em->persist($address);
-        $this->em->flush();
-
-        return $user;
-    }
-
     private function rate(User $auteur, User $cible, int $note): void
     {
         $avis = new Avis();
@@ -178,12 +159,6 @@ class UserControllerTest extends WebTestCase
         $avis->setNote($note);
         $this->em->persist($avis);
         $this->em->flush();
-    }
-
-    private function authenticateAs(User $user): void
-    {
-        $token = $this->jwtManager->create($user);
-        $this->client->getCookieJar()->set(new Cookie('bagage_token', $token, null, '/', 'localhost', false, false));
     }
 
     private function findById(array $items, int $id): array
