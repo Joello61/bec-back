@@ -362,7 +362,7 @@ readonly class DemandeService
             );
 
             // 2 Notifie directement l’auteur (si besoin)
-            if (isset($demande) && $demande->getClient()) {
+            if ($demande->getClient()) {
                 $this->notifier->publishToUser(
                     $demande->getClient(),
                     [
@@ -463,6 +463,7 @@ readonly class DemandeService
 
     /**
      * Convertir les montants d'une demande dans une devise cible
+     * @return array<string, mixed>
      */
     public function convertDemandeAmounts(Demande $demande, string $targetCurrency): array
     {
