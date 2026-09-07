@@ -249,8 +249,8 @@ class DemandeRepository extends ServiceEntityRepository
 
     /**
      * Liste TOUTES les demandes (pour admin) sans filtre de visibilité
-      * @param array<string, mixed> $filters
-      * @return array{data: Demande[], pagination: array{page: int, limit: int, total: int, pages: int}}
+     * @param array<string, mixed> $filters
+     * @return array{data: Demande[], pagination: array{page: int, limit: int, total: int, pages: int}}
      */
     public function findAllPaginatedAdmin(int $page, int $limit, array $filters = []): array
     {

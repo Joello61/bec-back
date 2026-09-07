@@ -54,7 +54,7 @@ class ConversationRepository extends ServiceEntityRepository
 
     /**
      * Récupère toutes les conversations d'un utilisateur avec leur dernier message et le nombre de non lus
-      * @return Conversation[]
+     * @return Conversation[]
      */
     public function findByUserWithDetails(User $user): array
     {

@@ -20,7 +20,7 @@ class CountryRepository extends ServiceEntityRepository
 
     /**
      * Récupère tous les pays triés par nom français (ou anglais si non dispo)
-      * @return Country[]
+     * @return Country[]
      */
     public function findAllSorted(): array
     {
@@ -51,7 +51,7 @@ class CountryRepository extends ServiceEntityRepository
 
     /**
      * Recherche de pays par nom (partiel)
-      * @return Country[]
+     * @return Country[]
      */
     public function searchByName(string $query, int $limit = 20): array
     {
@@ -70,7 +70,7 @@ class CountryRepository extends ServiceEntityRepository
 
     /**
      * Récupère les pays par continent
-      * @return Country[]
+     * @return Country[]
      */
     public function findByContinent(string $continent): array
     {
@@ -103,7 +103,7 @@ class CountryRepository extends ServiceEntityRepository
 
     /**
      * Récupère les pays africains
-      * @return Country[]
+     * @return Country[]
      */
     public function findAfricanCountries(): array
     {

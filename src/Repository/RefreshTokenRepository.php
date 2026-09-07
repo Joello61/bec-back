@@ -20,7 +20,7 @@ class RefreshTokenRepository extends ServiceEntityRepository
     /**
      * Trouve tous les tokens non expirés (simplification pour la validation).
      * Attention : Peut être lourd si beaucoup de tokens.
-      * @return RefreshToken[]
+     * @return RefreshToken[]
      */
     public function findAllRecent(): array
     {

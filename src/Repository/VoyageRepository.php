@@ -248,8 +248,8 @@ class VoyageRepository extends ServiceEntityRepository
 
     /**
      * Liste TOUS les voyages (pour admin) sans filtre de visibilité
-      * @param array<string, mixed> $filters
-      * @return array{data: Voyage[], pagination: array{page: int, limit: int, total: int, pages: int}}
+     * @param array<string, mixed> $filters
+     * @return array{data: Voyage[], pagination: array{page: int, limit: int, total: int, pages: int}}
      */
     public function findAllPaginatedAdmin(int $page, int $limit, array $filters = []): array
     {

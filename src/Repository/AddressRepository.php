@@ -44,7 +44,7 @@ class AddressRepository extends ServiceEntityRepository
 
     /**
      * Trouve les adresses créées entre deux dates
-      * @return Address[]
+     * @return Address[]
      */
     public function findCreatedBetween(\DateTimeInterface $start, \DateTimeInterface $end): array
     {
@@ -59,7 +59,7 @@ class AddressRepository extends ServiceEntityRepository
 
     /**
      * Trouve les adresses par ville
-      * @return Address[]
+     * @return Address[]
      */
     public function findByVille(string $ville): array
     {
@@ -72,7 +72,7 @@ class AddressRepository extends ServiceEntityRepository
 
     /**
      * Trouve les adresses par pays
-      * @return Address[]
+     * @return Address[]
      */
     public function findByPays(string $pays): array
     {
