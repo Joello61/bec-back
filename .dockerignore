@@ -8,6 +8,12 @@ var/log/*
 !var/log/.gitkeep
 vendor/
 node_modules/
+# .env (sans suffixe) contient des secrets réels en local (jamais committé, cf.
+# .gitignore) - sans cette exclusion, "COPY . ." le copierait dans une couche
+# d'image Docker ; écraser /app/.env plus tard dans le même stage (cp .env.dist
+# .env) ne suffit pas à l'effacer de l'historique des couches, qui reste
+# inspectable (docker history, extraction de couche) même dans l'image finale.
+.env
 .env.local
 .env.*.local
 .env.dev
