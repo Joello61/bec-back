@@ -45,7 +45,7 @@ readonly class MercureTokenService
             }
         }
 
-        // ➕ Ajout des topics personnalisés
+        // Ajout des topics personnalisés
         $subscribe = array_merge($subscribe, $extraTopics);
 
         // 3. Assurer l'unicité des topics

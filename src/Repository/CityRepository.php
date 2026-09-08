@@ -22,7 +22,7 @@ class CityRepository extends ServiceEntityRepository
     /**
      * Recherche de villes par pays avec autocomplete
      * Trie par population décroissante pour afficher les plus grandes villes en premier
-     * ✅ CORRECTION : Recherche case-insensitive avec LOWER()
+     * CORRECTION : Recherche case-insensitive avec LOWER()
      * @return City[]
      */
     public function searchByCountryAndName(
@@ -30,7 +30,7 @@ class CityRepository extends ServiceEntityRepository
         string $query,
         int $limit = 50
     ): array {
-        $query = strtolower($query); // ✅ Convertir en minuscule
+        $query = strtolower($query); // Convertir en minuscule
 
         return $this->createQueryBuilder('c')
             ->where('c.country = :country')
@@ -45,7 +45,7 @@ class CityRepository extends ServiceEntityRepository
 
     /**
      * Recherche de villes par code pays (ISO 3166-1 alpha-2)
-     * ✅ CORRECTION : Recherche case-insensitive avec LOWER()
+     * CORRECTION : Recherche case-insensitive avec LOWER()
      * @return City[]
      */
     public function searchByCountryCodeAndName(
@@ -53,7 +53,7 @@ class CityRepository extends ServiceEntityRepository
         string $query,
         int $limit = 50
     ): array {
-        $query = strtolower($query); // ✅ Convertir en minuscule
+        $query = strtolower($query); // Convertir en minuscule
 
         return $this->createQueryBuilder('c')
             ->innerJoin('c.country', 'co')
@@ -116,11 +116,11 @@ class CityRepository extends ServiceEntityRepository
 
     /**
      * Recherche de ville par nom exact et pays
-     * ✅ CORRECTION : Recherche case-insensitive avec LOWER()
+     * CORRECTION : Recherche case-insensitive avec LOWER()
      */
     public function findByNameAndCountry(string $name, Country $country): ?City
     {
-        $name = strtolower($name); // ✅ Convertir en minuscule
+        $name = strtolower($name); // Convertir en minuscule
 
         return $this->createQueryBuilder('c')
             ->where('c.country = :country')
@@ -159,12 +159,12 @@ class CityRepository extends ServiceEntityRepository
 
     /**
      * Recherche globale (tous pays confondus) - pour debug/admin
-     * ✅ CORRECTION : Case-insensitive + addSelect('co')
+     * CORRECTION : Case-insensitive + addSelect('co')
      * @return City[]
      */
     public function searchGlobal(string $query, int $limit = 50): array
     {
-        $query = strtolower($query); // ✅ Convertir en minuscule
+        $query = strtolower($query); // Convertir en minuscule
 
         return $this->createQueryBuilder('c')
             ->innerJoin('c.country', 'co')

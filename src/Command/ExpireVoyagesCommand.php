@@ -49,7 +49,7 @@ class ExpireVoyagesCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $batchSize = (int) $input->getOption('batch-size');
 
-        $io->title('🕐 Expiration automatique des voyages');
+        $io->title('Expiration automatique des voyages');
         $io->text('Recherche des voyages à expirer...');
 
         $today = new \DateTime();
@@ -65,7 +65,7 @@ class ExpireVoyagesCommand extends Command
                 return Command::SUCCESS;
             }
 
-            $io->text("📊 {$totalCount} voyage(s) à expirer");
+            $io->text("{$totalCount} voyage(s) à expirer");
             $io->newLine();
 
             // Traitement par lots
@@ -161,8 +161,8 @@ class ExpireVoyagesCommand extends Command
 
             // Résumé
             $io->success([
-                "✅ {$processed} voyage(s) expiré(s)",
-                $errors > 0 ? "❌ {$errors} erreur(s)" : '0 erreur',
+                "{$processed} voyage(s) expiré(s)",
+                $errors > 0 ? "{$errors} erreur(s)" : '0 erreur',
             ]);
 
             $this->logger->info('Expiration des voyages terminée', [
