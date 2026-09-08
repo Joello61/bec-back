@@ -13,6 +13,7 @@ use App\DTO\ResetPasswordDTO;
 use App\DTO\VerifyEmailDTO;
 use App\DTO\VerifyPhoneDTO;
 use App\Entity\User;
+use App\OpenApi\Schema\OAuthAuthorizationResponse;
 use App\Repository\UserRepository;
 use App\Service\AuthService;
 use App\Service\CookieManager;
@@ -475,12 +476,7 @@ class AuthController extends AbstractController
     #[OA\Response(
         response: 200,
         description: 'URL d\'autorisation',
-        content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'authUrl', type: 'string'),
-                new OA\Property(property: 'state', type: 'string')
-            ]
-        )
+        content: new OA\JsonContent(ref: new Model(type: OAuthAuthorizationResponse::class))
     )]
     public function googleAuth(Request $request): JsonResponse
     {
@@ -519,12 +515,7 @@ class AuthController extends AbstractController
     #[OA\Response(
         response: 200,
         description: 'URL d\'autorisation',
-        content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'authUrl', type: 'string'),
-                new OA\Property(property: 'state', type: 'string')
-            ]
-        )
+        content: new OA\JsonContent(ref: new Model(type: OAuthAuthorizationResponse::class))
     )]
     public function facebookAuth(Request $request): JsonResponse
     {
