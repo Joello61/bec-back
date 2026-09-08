@@ -140,6 +140,41 @@ class AddressServiceTest extends TestCase
         self::assertSame('75002', $address->getCodePostal());
     }
 
+    public function testCreateAddressSucceedsWithoutATimezoneWhenTheCountryIsNotFound(): void
+    {
+        // Regression : countryRepository->findOneBy() peut renvoyer null (pays non
+        // seede/orthographe non reconnue) - createAddress() ne doit pas planter en
+        // appelant getId() sur ce null, la detection de fuseau horaire doit simplement
+        // etre sautee (CurrencyService gere deja ce cas cote devise, avec repli sur EUR).
+        // Mock/service locaux (plutot que $this->service) : setUp() stub deja
+        // countryRepository->findOneBy() pour renvoyer un Country valide.
+        $user = $this->userWithSettings(1);
+        $addressRepository = $this->createMock(AddressRepository::class);
+        $addressRepository->method('findByUser')->willReturn(null);
+        $currencyService = $this->createMock(CurrencyService::class);
+        $currencyService->method('getCurrencyAndLangByCountry')->willReturn(['currency' => 'EUR', 'languages' => 'fr-FR']);
+        $geoDataService = $this->createMock(GeoDataService::class);
+        $geoDataService->expects(self::never())->method('getTimeZoneByCityAndPays');
+        $countryRepository = $this->createMock(CountryRepository::class);
+        $countryRepository->method('findOneBy')->willReturn(null);
+
+        $service = new AddressService(
+            $this->em,
+            $addressRepository,
+            $currencyService,
+            new NullLogger(),
+            $geoDataService,
+            $countryRepository,
+            $this->notifier,
+        );
+
+        $address = $service->createAddress($user, $this->africanData(pays: 'Paysimaginaire'));
+
+        self::assertSame('Bonapriso', $address->getQuartier());
+        // setTimezone() n'est jamais appele : le fuseau horaire par defaut de UserSettings reste inchange.
+        self::assertSame('Africa/Douala', $user->getSettings()->getTimezone());
+    }
+
     // ==================== updateAddress ====================
 
     public function testUpdateAddressRejectsWhenTheSixMonthConstraintApplies(): void
