@@ -100,7 +100,7 @@ class DemandeRepository extends ServiceEntityRepository
             ->leftJoin('u.settings', 's')
             ->addSelect('u', 's')
             // ==================== FILTRER PAR VISIBILITÉ ====================
-            ->where('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->where('s.privacy.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('visible', true)
             ->orderBy('d.createdAt', 'DESC')
             ->setFirstResult($offset)
@@ -128,7 +128,7 @@ class DemandeRepository extends ServiceEntityRepository
             ->leftJoin('d.client', 'u')
             ->leftJoin('u.settings', 's')
             // ==================== MÊME FILTRE POUR LE COUNT ====================
-            ->where('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->where('s.privacy.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('visible', true);
 
         if ($excludeUser && !in_array('ROLE_ADMIN', $excludeUser->getRoles(), true)) {
@@ -183,7 +183,7 @@ class DemandeRepository extends ServiceEntityRepository
             ->addSelect('u', 's')
             ->where('d.statut = :statut')
             // ==================== FILTRER PAR VISIBILITÉ ====================
-            ->andWhere('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->andWhere('s.privacy.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('statut', 'en_recherche')
             ->setParameter('visible', true)
             ->orderBy('d.createdAt', 'DESC')
@@ -204,7 +204,7 @@ class DemandeRepository extends ServiceEntityRepository
             ->andWhere('d.villeDepart LIKE :villeDepart')
             ->andWhere('d.villeArrivee LIKE :villeArrivee')
             // ==================== FILTRER PAR VISIBILITÉ ====================
-            ->andWhere('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->andWhere('s.privacy.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('statut', 'en_recherche')
             ->setParameter('villeDepart', '%' . $villeDepart . '%')
             ->setParameter('villeArrivee', '%' . $villeArrivee . '%')
