@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\DTO\CompleteProfileDTO;
+use App\DTO\DeleteAccountDTO;
 use App\DTO\UpdateAddressDTO;
 use App\DTO\UpdateUserDTO;
 use App\Entity\User;
@@ -12,6 +13,8 @@ use App\Repository\UserRepository;
 use App\Service\AddressService;
 use App\Service\AvatarService;
 use App\Service\AvisService;
+use App\Service\CookieManager;
+use App\Service\UserService;
 use App\Service\UserStatsService;
 use App\Service\VerificationService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -44,6 +47,8 @@ class UserController extends AbstractController
         private readonly ValidatorInterface $validator,
         private readonly AvatarService $avatarService,
         private readonly AvisService $avisService,
+        private readonly UserService $userService,
+        private readonly CookieManager $cookieManager,
     ) {}
 
     // ==================== COMPLÉTER PROFIL (MODIFIÉ) ====================
@@ -515,6 +520,36 @@ class UserController extends AbstractController
         $this->entityManager->flush();
 
         return $this->json($user, Response::HTTP_OK, [], ['groups' => ['user:read']]);
+    }
+
+    #[Route('/me', name: 'delete_me', methods: ['DELETE'])]
+    #[IsGranted('ROLE_USER')]
+    #[OA\Delete(
+        path: '/api/users/me',
+        summary: 'Supprimer son propre compte (soft-delete/anonymisation RGPD)',
+        security: [['cookieAuth' => []]],
+        requestBody: new OA\RequestBody(
+            required: false,
+            content: new OA\JsonContent(ref: new Model(type: DeleteAccountDTO::class))
+        )
+    )]
+    #[OA\Response(response: 200, description: 'Compte supprimé')]
+    #[OA\Response(response: 400, description: 'Mot de passe incorrect ou compte administrateur')]
+    public function deleteMyAccount(
+        #[MapRequestPayload] DeleteAccountDTO $dto
+    ): JsonResponse {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $this->userService->verifySelfDeletionRequest($user, $dto->currentPassword);
+        $this->userService->anonymizeAndSoftDelete($user);
+
+        $response = $this->json([
+            'success' => true,
+            'message' => 'Votre compte a été supprimé',
+        ], Response::HTTP_OK);
+
+        return $this->cookieManager->clearAuthCookies($response);
     }
 
     #[Route('/search', name: 'search', methods: ['GET'])]
