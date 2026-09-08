@@ -28,6 +28,9 @@ class DemandeRepository extends ServiceEntityRepository
         $offset = ($page - 1) * $limit;
 
         $qb = $this->createQueryBuilder('d')
+            ->leftJoin('d.client', 'u')
+            ->leftJoin('u.settings', 's')
+            ->addSelect('u', 's')
             ->orderBy('d.createdAt', 'DESC')
             ->andWhere('d.statut = :statut')
             ->setParameter('statut', 'en_recherche')
