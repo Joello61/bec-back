@@ -328,11 +328,15 @@ class AdminUserController extends AbstractController
 
     /**
      * Supprimer un utilisateur (RGPD)
+     *
+     * Soft-delete/anonymisation : le compte n'est pas physiquement supprimé, ses données
+     * personnelles sont anonymisées (email, nom, téléphone...) et son historique
+     * (messages/avis reçus par des tiers) reste visible.
      */
     #[Route('/{id}', name: 'delete', requirements: ['id' => '\d+'], methods: ['DELETE'])]
     #[OA\Delete(
         path: '/api/admin/users/{id}',
-        summary: 'Supprimer définitivement un utilisateur',
+        summary: 'Supprimer un utilisateur (soft-delete/anonymisation RGPD)',
         security: [['cookieAuth' => []]]
     )]
     #[OA\Parameter(
