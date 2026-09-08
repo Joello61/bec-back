@@ -63,4 +63,35 @@ class UserRepositoryTest extends KernelTestCase
 
         self::assertGreaterThanOrEqual(2, $count);
     }
+
+    // ==================== exclusion des comptes soft-deleted (Phase 5) ====================
+
+    public function testFindPaginatedExcludesASoftDeletedUser(): void
+    {
+        $active = $this->createUser('repo-user-paginated-active');
+        $deleted = $this->createUser('repo-user-paginated-deleted');
+        $deleted->setDeletedAt(new \DateTimeImmutable());
+        $this->em->flush();
+
+        $result = $this->userRepository->findPaginated(1, 100);
+
+        $ids = array_map(fn ($u) => $u->getId(), $result['data']);
+        self::assertContains($active->getId(), $ids);
+        self::assertNotContains($deleted->getId(), $ids);
+    }
+
+    public function testSearchExcludesASoftDeletedUser(): void
+    {
+        $prefix = 'repo-user-search-' . uniqid();
+        $active = $this->createUser($prefix . '-active');
+        $deleted = $this->createUser($prefix . '-deleted');
+        $deleted->setDeletedAt(new \DateTimeImmutable());
+        $this->em->flush();
+
+        $result = $this->userRepository->search($prefix);
+
+        $ids = array_map(fn ($u) => $u->getId(), $result);
+        self::assertContains($active->getId(), $ids);
+        self::assertNotContains($deleted->getId(), $ids);
+    }
 }
