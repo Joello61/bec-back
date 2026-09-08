@@ -94,7 +94,7 @@ class SignalementRepository extends ServiceEntityRepository
 
         $countQb = $this->createQueryBuilder('s')
             ->select('COUNT(s.id)')
-            ->where('s.signaleur = :user')  // ← AJOUT
+            ->where('s.signaleur = :user')  // <- AJOUT
             ->setParameter('user', $user);;
 
         if ($statut) {

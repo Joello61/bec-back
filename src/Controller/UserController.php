@@ -136,7 +136,7 @@ class UserController extends AbstractController
                 return $this->json([
                     'success' => true,
                     'message' => 'Profil complété. Un code de vérification a été envoyé par SMS.',
-                    'smsVerificationRequired' => true, // ⬅️ IMPORTANT pour le frontend
+                    'smsVerificationRequired' => true, // <- IMPORTANT pour le frontend
                     'user' => [
                         'id' => $user->getId(),
                         'telephone' => $user->getTelephone(),
@@ -166,7 +166,7 @@ class UserController extends AbstractController
 
         } else {
             // MODE DEV/STAGING : Auto-vérifier le téléphone (SKIP SMS)
-            $user->setTelephoneVerifie(true); // ⬅️ AUTO-VÉRIFICATION
+            $user->setTelephoneVerifie(true); // <- AUTO-VÉRIFICATION
             $this->entityManager->flush();
 
             $this->logger->info('SMS verification SKIPPED (dev mode)', [
@@ -178,11 +178,11 @@ class UserController extends AbstractController
             return $this->json([
                 'success' => true,
                 'message' => 'Profil complété avec succès.',
-                'smsVerificationRequired' => false, // ⬅️ IMPORTANT pour le frontend
+                'smsVerificationRequired' => false, // <- IMPORTANT pour le frontend
                 'user' => [
                     'id' => $user->getId(),
                     'telephone' => $user->getTelephone(),
-                    'telephoneVerifie' => $user->isTelephoneVerifie(), // ⬅️ true
+                    'telephoneVerifie' => $user->isTelephoneVerifie(), // <- true
                     'address' => [
                         'pays' => $user->getAddress()->getPays(),
                         'ville' => $user->getAddress()->getVille(),
@@ -190,7 +190,7 @@ class UserController extends AbstractController
                         'adresseLigne1' => $user->getAddress()->getAdresseLigne1(),
                         'codePostal' => $user->getAddress()->getCodePostal(),
                     ],
-                    'isProfileComplete' => $user->isProfileComplete(), // ⬅️ true
+                    'isProfileComplete' => $user->isProfileComplete(), // <- true
                 ]
             ]);
         }

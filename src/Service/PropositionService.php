@@ -93,7 +93,7 @@ readonly class PropositionService
             ->setVoyageur($voyage->getVoyageur())
             ->setPrixParKilo((string) $dto->prixParKilo)
             ->setCommissionProposeePourUnBagage((string) $dto->commissionProposeePourUnBagage)
-            ->setCurrency($currency) // ⬅️ Toujours la devise de la demande
+            ->setCurrency($currency) // <- Toujours la devise de la demande
             ->setMessage($dto->message)
             ->setStatut('en_attente');
 
@@ -219,7 +219,7 @@ readonly class PropositionService
             $proposition->setStatut('acceptee');
             $proposition->setReponduAt(new \DateTimeImmutable());
 
-            // Conversion DECIMAL → float
+            // Conversion DECIMAL -> float
             $poidsDisponible = (float) $voyage->getPoidsDisponibleRestant();
             $poidsDemande = (float) $demande->getPoidsEstime();
 
@@ -361,7 +361,7 @@ readonly class PropositionService
                     EventType::VOYAGE_UPDATED
                 );
 
-                // 2️⃣ Notifie le flux global des demandes (par cohérence des statuts)
+                // 2⃣ Notifie le flux global des demandes (par cohérence des statuts)
                 $this->notifier->publishDemandes(
                     [
                         'title' => 'Demande mise à jour',

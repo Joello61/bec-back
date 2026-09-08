@@ -18,7 +18,7 @@ class VoyageVoter extends Voter
     public const EDIT = 'VOYAGE_EDIT';
     public const DELETE = 'VOYAGE_DELETE';
     public const VIEW = 'VOYAGE_VIEW';
-    public const CREATE = 'VOYAGE_CREATE'; // ⬅️ NOUVEAU
+    public const CREATE = 'VOYAGE_CREATE'; // <- NOUVEAU
 
     public function __construct(
         private readonly VisibilityService $visibilityService
