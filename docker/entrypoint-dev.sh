@@ -13,6 +13,15 @@ composer install --no-interaction --prefer-dist
 # --skip-if-exists la rend idempotente sans écraser une paire déjà générée.
 php bin/console lexik:jwt:generate-keypair --skip-if-exists
 
+# Le volume nommé "postgres_data" (bec-infra/docker-compose.yml) peut être neuf (premier
+# démarrage, ou après un `docker compose down -v`) sans qu'aucune migration n'ait encore
+# tourné - constaté en pratique : "worker"/"scheduler" démarraient en boucle de crash sur
+# "relation messenger_messages does not exist" (la table du transport Messenger n'existe
+# que via ces migrations), avant même d'atteindre le code applicatif qui en dépend.
+# Idempotente (Doctrine ne rejoue jamais une migration déjà appliquée), donc sans risque
+# sur une base déjà à jour.
+php bin/console doctrine:migrations:migrate --no-interaction
+
 # Les services "worker" et "scheduler" (bec-infra/docker-compose.yml) partagent la même
 # image et le même bind-mount source que ce conteneur : ils n'ont pas besoin de refaire
 # composer install/génération de clés JWT (dont ils n'ont de toute façon pas l'usage) -
