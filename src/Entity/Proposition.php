@@ -20,12 +20,12 @@ class Proposition
     #[Groups(['proposition:read', 'proposition:list'])]
     private ?int $id = null;
 
-    #[ORM\ManyToOne(targetEntity: Voyage::class)]
+    #[ORM\ManyToOne(targetEntity: Voyage::class, inversedBy: 'propositions')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['proposition:read', 'proposition:list'])]
     private ?Voyage $voyage = null;
 
-    #[ORM\ManyToOne(targetEntity: Demande::class)]
+    #[ORM\ManyToOne(targetEntity: Demande::class, inversedBy: 'propositions')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     #[Groups(['proposition:read', 'proposition:list'])]
     private ?Demande $demande = null;
