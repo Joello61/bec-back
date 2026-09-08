@@ -7,6 +7,7 @@ namespace App\Repository;
 use App\Entity\User;
 use App\Entity\Voyage;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -17,6 +18,31 @@ class VoyageRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, Voyage::class);
+    }
+
+    /**
+     * Filtres ville depart/arrivee/date communs a findPublicPaginated/findPaginated/
+     * findAllPaginatedAdmin, appliques a l'identique sur la requete principale et sur
+     * son COUNT - le statut et le join de visibilite restent geres par chaque methode
+     * appelante, leur logique differant reellement entre elles.
+     * @param array<string, mixed> $filters
+     */
+    private function applyFilters(QueryBuilder $qb, array $filters): void
+    {
+        if (!empty($filters['villeDepart'])) {
+            $qb->andWhere('v.villeDepart LIKE :villeDepart')
+                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
+        }
+
+        if (!empty($filters['villeArrivee'])) {
+            $qb->andWhere('v.villeArrivee LIKE :villeArrivee')
+                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
+        }
+
+        if (!empty($filters['dateDepart'])) {
+            $qb->andWhere('v.dateDepart >= :dateDepart')
+                ->setParameter('dateDepart', new \DateTime($filters['dateDepart']));
+        }
     }
 
     /**
@@ -37,20 +63,7 @@ class VoyageRepository extends ServiceEntityRepository
             ->setFirstResult($offset)
             ->setMaxResults($limit);
 
-        if (!empty($filters['villeDepart'])) {
-            $qb->andWhere('v.villeDepart LIKE :villeDepart')
-                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
-        }
-
-        if (!empty($filters['villeArrivee'])) {
-            $qb->andWhere('v.villeArrivee LIKE :villeArrivee')
-                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
-        }
-
-        if (!empty($filters['dateDepart'])) {
-            $qb->andWhere('v.dateDepart >= :dateDepart')
-                ->setParameter('dateDepart', new \DateTime($filters['dateDepart']));
-        }
+        $this->applyFilters($qb, $filters);
 
         $voyages = $qb->getQuery()->getResult();
 
@@ -59,18 +72,7 @@ class VoyageRepository extends ServiceEntityRepository
             ->andWhere('v.statut = :statut')
             ->setParameter('statut', 'actif');
 
-        if (!empty($filters['villeDepart'])) {
-            $countQb->andWhere('v.villeDepart LIKE :villeDepart')
-                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
-        }
-        if (!empty($filters['villeArrivee'])) {
-            $countQb->andWhere('v.villeArrivee LIKE :villeArrivee')
-                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
-        }
-        if (!empty($filters['dateDepart'])) {
-            $countQb->andWhere('v.dateDepart >= :dateDepart')
-                ->setParameter('dateDepart', new \DateTime($filters['dateDepart']));
-        }
+        $this->applyFilters($countQb, $filters);
 
         $total = $countQb->getQuery()->getSingleScalarResult();
 
@@ -109,20 +111,7 @@ class VoyageRepository extends ServiceEntityRepository
                 ->setParameter('excludedUser', $excludeUser);
         }
 
-        if (!empty($filters['villeDepart'])) {
-            $qb->andWhere('v.villeDepart LIKE :villeDepart')
-                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
-        }
-
-        if (!empty($filters['villeArrivee'])) {
-            $qb->andWhere('v.villeArrivee LIKE :villeArrivee')
-                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
-        }
-
-        if (!empty($filters['dateDepart'])) {
-            $qb->andWhere('v.dateDepart >= :dateDepart')
-                ->setParameter('dateDepart', new \DateTime($filters['dateDepart']));
-        }
+        $this->applyFilters($qb, $filters);
 
         if (!empty($filters['statut'])) {
             $qb->andWhere('v.statut = :statut')
@@ -147,18 +136,8 @@ class VoyageRepository extends ServiceEntityRepository
                 ->setParameter('excludedUser', $excludeUser);
         }
 
-        if (!empty($filters['villeDepart'])) {
-            $countQb->andWhere('v.villeDepart LIKE :villeDepart')
-                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
-        }
-        if (!empty($filters['villeArrivee'])) {
-            $countQb->andWhere('v.villeArrivee LIKE :villeArrivee')
-                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
-        }
-        if (!empty($filters['dateDepart'])) {
-            $countQb->andWhere('v.dateDepart >= :dateDepart')
-                ->setParameter('dateDepart', new \DateTime($filters['dateDepart']));
-        }
+        $this->applyFilters($countQb, $filters);
+
         if (!empty($filters['statut'])) {
             $countQb->andWhere('v.statut = :statut')
                 ->setParameter('statut', $filters['statut']);
@@ -268,20 +247,7 @@ class VoyageRepository extends ServiceEntityRepository
 
         // Pas de filtre showInSearchResults pour admin
 
-        if (!empty($filters['villeDepart'])) {
-            $qb->andWhere('v.villeDepart LIKE :villeDepart')
-                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
-        }
-
-        if (!empty($filters['villeArrivee'])) {
-            $qb->andWhere('v.villeArrivee LIKE :villeArrivee')
-                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
-        }
-
-        if (!empty($filters['dateDepart'])) {
-            $qb->andWhere('v.dateDepart >= :dateDepart')
-                ->setParameter('dateDepart', new \DateTime($filters['dateDepart']));
-        }
+        $this->applyFilters($qb, $filters);
 
         if (!empty($filters['statut'])) {
             $qb->andWhere('v.statut = :statut')
@@ -293,18 +259,8 @@ class VoyageRepository extends ServiceEntityRepository
         $countQb = $this->createQueryBuilder('v')
             ->select('COUNT(v.id)');
 
-        if (!empty($filters['villeDepart'])) {
-            $countQb->andWhere('v.villeDepart LIKE :villeDepart')
-                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
-        }
-        if (!empty($filters['villeArrivee'])) {
-            $countQb->andWhere('v.villeArrivee LIKE :villeArrivee')
-                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
-        }
-        if (!empty($filters['dateDepart'])) {
-            $countQb->andWhere('v.dateDepart >= :dateDepart')
-                ->setParameter('dateDepart', new \DateTime($filters['dateDepart']));
-        }
+        $this->applyFilters($countQb, $filters);
+
         if (!empty($filters['statut'])) {
             $countQb->andWhere('v.statut = :statut')
                 ->setParameter('statut', $filters['statut']);
