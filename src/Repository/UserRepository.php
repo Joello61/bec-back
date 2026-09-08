@@ -55,6 +55,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->leftJoin('u.address', 'a')
             ->addSelect('s', 'a')
             ->where('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->andWhere('u.deletedAt IS NULL')
             ->setParameter('visible', true)
             ->orderBy('u.createdAt', 'DESC')
             ->setFirstResult($offset)
@@ -66,6 +67,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->select('COUNT(u.id)')
             ->leftJoin('u.settings', 's')
             ->where('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->andWhere('u.deletedAt IS NULL')
             ->setParameter('visible', true);
 
         $total = $countQb->getQuery()->getSingleScalarResult();
@@ -92,6 +94,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->addSelect('s', 'a')
             ->where('u.nom LIKE :query OR u.prenom LIKE :query OR u.email LIKE :query')
             ->andWhere('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->andWhere('u.deletedAt IS NULL')
             ->setParameter('query', '%' . $query . '%')
             ->setParameter('visible', true)
             ->setMaxResults(20)
@@ -163,6 +166,10 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
                 ->setParameter('banned', $filters['banned']);
         }
 
+        if (isset($filters['deleted'])) {
+            $qb->andWhere($filters['deleted'] ? 'u.deletedAt IS NOT NULL' : 'u.deletedAt IS NULL');
+        }
+
         if ($roleFilteredIds !== null) {
             $qb->andWhere('u.id IN (:roleIds)')
                 ->setParameter('roleIds', $roleFilteredIds ?: [0]);
@@ -181,6 +188,10 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         if (isset($filters['banned'])) {
             $countQb->andWhere('u.isBanned = :banned')
                 ->setParameter('banned', $filters['banned']);
+        }
+
+        if (isset($filters['deleted'])) {
+            $countQb->andWhere($filters['deleted'] ? 'u.deletedAt IS NOT NULL' : 'u.deletedAt IS NULL');
         }
 
         if ($roleFilteredIds !== null) {
