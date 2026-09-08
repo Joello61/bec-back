@@ -98,6 +98,7 @@ class AdminUserController extends AbstractController
 
         $filters = [
             'banned' => $request->query->get('banned') === 'true' ? true : ($request->query->get('banned') === 'false' ? false : null),
+            'deleted' => $request->query->get('deleted') === 'true' ? true : ($request->query->get('deleted') === 'false' ? false : null),
             'role' => $request->query->get('role'),
             'verified' => $request->query->get('verified') === 'true' ? true : ($request->query->get('verified') === 'false' ? false : null),
         ];
