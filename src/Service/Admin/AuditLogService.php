@@ -174,9 +174,20 @@ readonly class AuditLogService
             ->getQuery()
             ->getResult();
 
+        // Chargement batche de tous les admins concernes en une seule requete (au lieu
+        // d'un find() par ligne du GROUP BY ci-dessus, qui degenerait en N+1 des que
+        // plusieurs admins distincts avaient agi sur la periode).
+        $admins = $this->entityManager->getRepository(User::class)->findBy([
+            'id' => array_column($results, 'adminId'),
+        ]);
+        $adminsById = [];
+        foreach ($admins as $admin) {
+            $adminsById[$admin->getId()] = $admin;
+        }
+
         $adminsData = [];
         foreach ($results as $result) {
-            $admin = $this->entityManager->getRepository(User::class)->find($result['adminId']);
+            $admin = $adminsById[$result['adminId']] ?? null;
             if ($admin) {
                 $adminsData[] = [
                     'admin' => [
