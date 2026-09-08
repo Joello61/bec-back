@@ -549,7 +549,9 @@ class UserController extends AbstractController
             'message' => 'Votre compte a été supprimé',
         ], Response::HTTP_OK);
 
-        return $this->cookieManager->clearAuthCookies($response);
+        $this->cookieManager->clearAuthCookies($response);
+
+        return $response;
     }
 
     #[Route('/search', name: 'search', methods: ['GET'])]
