@@ -485,7 +485,7 @@ class UserController extends AbstractController
     {
         $user = $this->userRepository->find($id);
 
-        if (!$user) {
+        if (!$user || $user->getDeletedAt() !== null) {
             return $this->json(['message' => 'Utilisateur non trouvé'], Response::HTTP_NOT_FOUND);
         }
 
