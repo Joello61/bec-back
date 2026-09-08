@@ -7,6 +7,7 @@ namespace App\Repository;
 use App\Entity\Demande;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -17,6 +18,31 @@ class DemandeRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, Demande::class);
+    }
+
+    /**
+     * Filtres ville depart/arrivee/dateLimite communs a findPublicPaginated/
+     * findPaginated/findAllPaginatedAdmin, appliques a l'identique sur la requete
+     * principale et sur son COUNT - le statut et le join de visibilite restent geres
+     * par chaque methode appelante, leur logique differant reellement entre elles.
+     * @param array<string, mixed> $filters
+     */
+    private function applyFilters(QueryBuilder $qb, array $filters): void
+    {
+        if (!empty($filters['villeDepart'])) {
+            $qb->andWhere('d.villeDepart LIKE :villeDepart')
+                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
+        }
+
+        if (!empty($filters['villeArrivee'])) {
+            $qb->andWhere('d.villeArrivee LIKE :villeArrivee')
+                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
+        }
+
+        if (!empty($filters['dateLimite'])) {
+            $qb->andWhere('d.dateLimite <= :today')
+                ->setParameter('today', new \DateTime('today'));
+        }
     }
 
     /**
@@ -37,20 +63,7 @@ class DemandeRepository extends ServiceEntityRepository
             ->setFirstResult($offset)
             ->setMaxResults($limit);
 
-        if (!empty($filters['villeDepart'])) {
-            $qb->andWhere('d.villeDepart LIKE :villeDepart')
-                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
-        }
-
-        if (!empty($filters['villeArrivee'])) {
-            $qb->andWhere('d.villeArrivee LIKE :villeArrivee')
-                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
-        }
-
-        if (!empty($filters['dateLimite'])) {
-            $qb->andWhere('d.dateLimite <= :today')
-                ->setParameter('today', new \DateTime('today'));
-        }
+        $this->applyFilters($qb, $filters);
 
         $demandes = $qb->getQuery()->getResult();
 
@@ -59,19 +72,7 @@ class DemandeRepository extends ServiceEntityRepository
             ->andWhere('d.statut = :statut')
             ->setParameter('statut', 'en_recherche');
 
-        if (!empty($filters['villeDepart'])) {
-            $countQb->andWhere('d.villeDepart LIKE :villeDepart')
-                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
-        }
-        if (!empty($filters['villeArrivee'])) {
-            $countQb->andWhere('d.villeArrivee LIKE :villeArrivee')
-                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
-        }
-
-        if (!empty($filters['dateLimite'])) {
-            $countQb->andWhere('d.dateLimite <= :today')
-                ->setParameter('today', new \DateTime('today'));
-        }
+        $this->applyFilters($countQb, $filters);
 
         $total = $countQb->getQuery()->getSingleScalarResult();
 
@@ -110,20 +111,7 @@ class DemandeRepository extends ServiceEntityRepository
                 ->setParameter('excludedUser', $excludeUser);
         }
 
-        if (!empty($filters['villeDepart'])) {
-            $qb->andWhere('d.villeDepart LIKE :villeDepart')
-                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
-        }
-
-        if (!empty($filters['villeArrivee'])) {
-            $qb->andWhere('d.villeArrivee LIKE :villeArrivee')
-                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
-        }
-
-        if (!empty($filters['dateLimite'])) {
-            $qb->andWhere('d.dateLimite <= :today')
-                ->setParameter('today', new \DateTime('today'));
-        }
+        $this->applyFilters($qb, $filters);
 
         if (!empty($filters['statut'])) {
             $qb->andWhere('d.statut = :statut')
@@ -148,19 +136,7 @@ class DemandeRepository extends ServiceEntityRepository
                 ->setParameter('excludedUser', $excludeUser);
         }
 
-        if (!empty($filters['villeDepart'])) {
-            $countQb->andWhere('d.villeDepart LIKE :villeDepart')
-                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
-        }
-        if (!empty($filters['villeArrivee'])) {
-            $countQb->andWhere('d.villeArrivee LIKE :villeArrivee')
-                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
-        }
-
-        if (!empty($filters['dateLimite'])) {
-            $countQb->andWhere('d.dateLimite <= :today')
-                ->setParameter('today', new \DateTime('today'));
-        }
+        $this->applyFilters($countQb, $filters);
 
         if (!empty($filters['statut'])) {
             $countQb->andWhere('d.statut = :statut')
@@ -269,15 +245,7 @@ class DemandeRepository extends ServiceEntityRepository
 
         // Pas de filtre showInSearchResults pour admin
 
-        if (!empty($filters['villeDepart'])) {
-            $qb->andWhere('d.villeDepart LIKE :villeDepart')
-                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
-        }
-
-        if (!empty($filters['villeArrivee'])) {
-            $qb->andWhere('d.villeArrivee LIKE :villeArrivee')
-                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
-        }
+        $this->applyFilters($qb, $filters);
 
         if (!empty($filters['statut'])) {
             $qb->andWhere('d.statut = :statut')
@@ -289,14 +257,8 @@ class DemandeRepository extends ServiceEntityRepository
         $countQb = $this->createQueryBuilder('d')
             ->select('COUNT(d.id)');
 
-        if (!empty($filters['villeDepart'])) {
-            $countQb->andWhere('d.villeDepart LIKE :villeDepart')
-                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
-        }
-        if (!empty($filters['villeArrivee'])) {
-            $countQb->andWhere('d.villeArrivee LIKE :villeArrivee')
-                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
-        }
+        $this->applyFilters($countQb, $filters);
+
         if (!empty($filters['statut'])) {
             $countQb->andWhere('d.statut = :statut')
                 ->setParameter('statut', $filters['statut']);
