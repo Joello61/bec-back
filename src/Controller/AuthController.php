@@ -504,46 +504,11 @@ class AuthController extends AbstractController
     #[OA\Response(response: 302, description: 'Redirection vers le frontend')]
     public function googleCallback(Request $request): Response
     {
-        $code = $request->query->get('code');
-        $state = $request->query->get('state');
-        $storedState = $request->getSession()->get('oauth2_state');
-
-        if (!$state || $state !== $storedState) {
-            return new RedirectResponse(
-                $this->getParameter('app.frontend_url') . '/auth/login?error=csrf_failed'
-            );
-        }
-
-        if (!$code) {
-            return new RedirectResponse(
-                $this->getParameter('app.frontend_url') . '/auth/login?error=no_code'
-            );
-        }
-
-        try {
-            $user = $this->googleAuthService->authenticate($code);
-            $jwtToken = $this->jwtManager->create($user);
-            $refreshToken = $this->refreshTokenManager->createAndSaveRefreshToken($user);
-            $mercureToken = $this->mercureTokenService->generate($user);
-
-            // Création de la réponse avec redirection
-            $response = new RedirectResponse($this->getParameter('app.frontend_url') . '/auth/oauth-callback');
-
-            // Attacher TOUS les cookies d'auth en une seule ligne !
-            $this->cookieManager->attachAuthCookies(
-                $response,
-                $jwtToken,
-                $refreshToken,
-                $mercureToken
-            );
-
-            return $response;
-
-        } catch (\Exception $e) {
-            return new RedirectResponse(
-                $this->getParameter('app.frontend_url') . '/auth/login?error=' . urlencode($e->getMessage())
-            );
-        }
+        return $this->handleOAuthCallback(
+            $request,
+            'oauth2_state',
+            fn (string $code) => $this->googleAuthService->authenticate($code)
+        );
     }
 
     #[Route('/auth/facebook', name: 'facebook_auth', methods: ['GET'])]
@@ -583,9 +548,22 @@ class AuthController extends AbstractController
     #[OA\Response(response: 302, description: 'Redirection vers le frontend')]
     public function facebookCallback(Request $request): Response
     {
+        return $this->handleOAuthCallback(
+            $request,
+            'oauth2_state_fb',
+            fn (string $code) => $this->facebookAuthService->authenticate($code)
+        );
+    }
+
+    /**
+     * Factorise googleCallback()/facebookCallback() : lecture code/state, verification
+     * CSRF, authentification via le provider fourni, emission des cookies d'auth.
+     */
+    private function handleOAuthCallback(Request $request, string $stateSessionKey, callable $authenticate): Response
+    {
         $code = $request->query->get('code');
         $state = $request->query->get('state');
-        $storedState = $request->getSession()->get('oauth2_state_fb');
+        $storedState = $request->getSession()->get($stateSessionKey);
 
         if (!$state || $state !== $storedState) {
             return new RedirectResponse(
@@ -600,7 +578,7 @@ class AuthController extends AbstractController
         }
 
         try {
-            $user = $this->facebookAuthService->authenticate($code);
+            $user = $authenticate($code);
             $jwtToken = $this->jwtManager->create($user);
             $refreshToken = $this->refreshTokenManager->createAndSaveRefreshToken($user);
             $mercureToken = $this->mercureTokenService->generate($user);
