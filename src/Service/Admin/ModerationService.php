@@ -11,6 +11,7 @@ use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
 use App\Repository\VoyageRepository;
 use App\Service\NotificationService;
+use App\Service\UserService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -24,6 +25,7 @@ readonly class ModerationService
         private MessageRepository $messageRepository,
         private NotificationService $notificationService,
         private AuditLogService $auditLogService,
+        private UserService $userService,
     ) {}
 
     // ==================== GESTION DES UTILISATEURS ====================
@@ -150,6 +152,10 @@ readonly class ModerationService
 
     /**
      * Supprimer un utilisateur (RGPD)
+     *
+     * Soft-delete/anonymisation (Phase 5 du plan de correction) : le compte n'est jamais
+     * physiquement supprime, pour ne pas casser l'historique des messages/avis le concernant
+     * du point de vue des tiers (audit Backend-Qualite #2).
      */
     public function deleteUser(User $user, User $admin, string $reason): void
     {
@@ -165,7 +171,7 @@ readonly class ModerationService
         $userEmail = $user->getEmail();
         $userName = $user->getNom() . ' ' . $user->getPrenom();
 
-        // Logger AVANT de supprimer
+        // Logger AVANT l'anonymisation (email/nom reels encore disponibles)
         $this->auditLogService->logAdminAction(
             $admin,
             'delete_user',
@@ -180,9 +186,7 @@ readonly class ModerationService
             ]
         );
 
-        // Supprimer l'utilisateur (cascade supprimera les relations)
-        $this->entityManager->remove($user);
-        $this->entityManager->flush();
+        $this->userService->anonymizeAndSoftDelete($user);
     }
 
     // ==================== GESTION DES CONTENUS ====================
