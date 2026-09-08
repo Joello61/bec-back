@@ -222,12 +222,17 @@ class CityRepository extends ServiceEntityRepository
 
     public function findTimeZoneByCityAndPays(string $city, int $pays): ?string
     {
+        // (nom, pays) n'est pas garanti unique dans les donnees GeoNames importees
+        // (constate : deux entrees "Douala" pour le Cameroun) - getOneOrNullResult()
+        // seul leverait une NonUniqueResultException. setMaxResults(1) accepte ce cas :
+        // pour un meme nom de ville dans un meme pays, le fuseau horaire est le meme.
         $result = $this->createQueryBuilder('c')
             ->select('c.timezone')
             ->where('c.name = :city')
             ->andWhere('c.country = :pays')
             ->setParameter('city', $city)
             ->setParameter('pays', $pays)
+            ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
 

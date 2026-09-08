@@ -113,6 +113,32 @@ class CityRepositoryTest extends KernelTestCase
         self::assertNull($this->repository->findByNameAndCountry('Atlantide', $country));
     }
 
+    // ==================== findTimeZoneByCityAndPays : regression doublons GeoNames ====================
+
+    public function testFindTimeZoneByCityAndPaysDoesNotCrashWhenTheCityNameIsDuplicatedInTheSameCountry(): void
+    {
+        // Regression : les donnees GeoNames importees contiennent de vrais doublons
+        // (nom, pays) - constate en session sur "Douala"/Cameroun (2 entrees distinctes).
+        // getOneOrNullResult() sans setMaxResults(1) levait NonUniqueResultException.
+        $country = $this->country('C6', 'Pays-Doublon-Unique');
+        $first = $this->city($country, 'VilleDupliquee');
+        $first->setTimezone('Africa/Douala');
+        $second = $this->city($country, 'VilleDupliquee');
+        $second->setTimezone('Africa/Douala');
+        $this->em->flush();
+
+        $timezone = $this->repository->findTimeZoneByCityAndPays('VilleDupliquee', $country->getId());
+
+        self::assertSame('Africa/Douala', $timezone);
+    }
+
+    public function testFindTimeZoneByCityAndPaysReturnsNullWhenNoMatch(): void
+    {
+        $country = $this->country('C7', 'Pays-SansVille-Unique');
+
+        self::assertNull($this->repository->findTimeZoneByCityAndPays('VilleInexistante', $country->getId()));
+    }
+
     // ==================== searchGlobal : regression case-insensitive ====================
 
     public function testSearchGlobalIsCaseInsensitiveAcrossCountries(): void
