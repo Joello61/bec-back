@@ -76,7 +76,7 @@ readonly class DemandeService
             ->setPoidsEstime((string) $dto->poidsEstime)
             ->setPrixParKilo($dto->prixParKilo ? (string) $dto->prixParKilo : null)
             ->setCommissionProposeePourUnBagage($dto->commissionProposeePourUnBagage ? (string) $dto->commissionProposeePourUnBagage : null)
-            ->setCurrency($currency) // ⬅️ Toujours depuis settings
+            ->setCurrency($currency) // <- Toujours depuis settings
             ->setDescription($dto->description)
             ->setStatut('en_recherche');
 
@@ -168,7 +168,7 @@ readonly class DemandeService
             $demande->setDescription($dto->description);
         }
 
-        // ⬅️ PAS de modification de devise possible
+        // <- PAS de modification de devise possible
 
         $this->entityManager->flush();
 
@@ -205,7 +205,7 @@ readonly class DemandeService
         $this->entityManager->flush();
 
         try {
-            // 1️⃣ Notifier le flux global (utile pour le live feed, stats, etc.)
+            // 1⃣ Notifier le flux global (utile pour le live feed, stats, etc.)
             $this->notifier->publishDemandes(
                 [
                     'title' => 'Statut de demande mis à jour',
@@ -221,7 +221,7 @@ readonly class DemandeService
                 EventType::DEMANDE_STATUT_UPDATED
             );
 
-            // 2️⃣ Notifier l’auteur de la demande (si tu veux une alerte directe)
+            // 2⃣ Notifier l’auteur de la demande (si tu veux une alerte directe)
             $this->notifier->publishToUser(
                 $demande->getClient(),
                 [
@@ -237,7 +237,7 @@ readonly class DemandeService
                 EventType::DEMANDE_STATUT_UPDATED
             );
 
-            // 3️⃣ Notifier les administrateurs (rafraîchissement des stats)
+            // 3⃣ Notifier les administrateurs (rafraîchissement des stats)
             $this->notifier->publishToGroup(
                 'admin',
                 [
@@ -276,7 +276,7 @@ readonly class DemandeService
             $voyage = $proposition->getVoyage();
             $statut = $proposition->getStatut();
 
-            // Si la proposition était acceptée → libérer le poids du voyage
+            // Si la proposition était acceptée -> libérer le poids du voyage
             if ($statut === 'acceptee' && $voyage) {
                 $poidsDisponible = (float) $voyage->getPoidsDisponibleRestant();
                 $poidsDemande = (float) $demande->getPoidsEstime();
@@ -377,7 +377,7 @@ readonly class DemandeService
                 );
             }
 
-            // 3️⃣ Notifie les administrateurs (rafraîchir les stats)
+            // 3⃣ Notifie les administrateurs (rafraîchir les stats)
             $this->notifier->publishToGroup(
                 'admin',
                 [

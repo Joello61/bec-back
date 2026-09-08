@@ -15,7 +15,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 readonly class CurrencyService
 {
-    // Mapping pays → devise (codes ISO 3166-1 alpha-2 → ISO 4217)
+    // Mapping pays -> devise (codes ISO 3166-1 alpha-2 -> ISO 4217)
     private const COUNTRY_CURRENCY_MAP = [
         // Zone Euro
         'FR' => 'EUR', 'DE' => 'EUR', 'IT' => 'EUR', 'ES' => 'EUR', 'PT' => 'EUR',
@@ -109,8 +109,8 @@ readonly class CurrencyService
             return $amount; // Retourner le montant original en cas d'erreur
         }
 
-        // Conversion : montant → EUR → devise cible
-        // Exemple: 1000 XAF → EUR → USD
+        // Conversion : montant -> EUR -> devise cible
+        // Exemple: 1000 XAF -> EUR -> USD
         $amountInEur = $amount / (float) $fromRate;
         $convertedAmount = $amountInEur * (float) $toRate;
 

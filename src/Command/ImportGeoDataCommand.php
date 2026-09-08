@@ -80,7 +80,7 @@ class ImportGeoDataCommand extends Command
 
         // Nettoyage si demandé
         if ($input->getOption('clear')) {
-            if ($io->confirm('⚠️  Voulez-vous vraiment supprimer toutes les données géographiques existantes ?', false)) {
+            if ($io->confirm(' Voulez-vous vraiment supprimer toutes les données géographiques existantes ?', false)) {
                 $this->clearData($io);
             }
         }
@@ -118,8 +118,8 @@ class ImportGeoDataCommand extends Command
         $cityCount = $this->entityManager->createQuery('DELETE FROM App\Entity\City')->execute();
         $countryCount = $this->entityManager->createQuery('DELETE FROM App\Entity\Country')->execute();
 
-        $io->text("✓ $cityCount villes supprimées");
-        $io->text("✓ $countryCount pays supprimés");
+        $io->text("$cityCount villes supprimées");
+        $io->text("$countryCount pays supprimés");
     }
 
     private function importCountries(SymfonyStyle $io, string $filePath): void
@@ -181,7 +181,7 @@ class ImportGeoDataCommand extends Command
 
         $progressBar->finish();
         $io->newLine(2);
-        $io->success("✓ $count pays importés");
+        $io->success("$count pays importés");
     }
 
     private function importCities(SymfonyStyle $io, string $filePath): void
@@ -253,7 +253,7 @@ class ImportGeoDataCommand extends Command
 
         $progressBar->finish();
         $io->newLine(2);
-        $io->success("✓ $count villes importées ($skipped ignorées)");
+        $io->success("$count villes importées ($skipped ignorées)");
     }
 
     /**

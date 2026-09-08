@@ -178,7 +178,7 @@ readonly class AdminStatsService
         $traites = $this->signalementRepository->count(['statut' => 'traite']);
         $rejetes = $this->signalementRepository->count(['statut' => 'rejete']);
 
-        // ✅ CORRECTION : Signalements ce mois
+        // CORRECTION : Signalements ce mois
         $startOfMonth = new \DateTime('first day of this month 00:00:00');
         $nouveauxCeMois = $this->signalementRepository->createQueryBuilder('s')
             ->select('COUNT(s.id)')
@@ -213,7 +213,7 @@ readonly class AdminStatsService
             $dateStart = new \DateTime($dateStr . ' 00:00:00');
             $dateEnd = new \DateTime($dateStr . ' 23:59:59');
 
-            // ✅ CORRECTION : Utiliser createQueryBuilder pour les inscriptions
+            // CORRECTION : Utiliser createQueryBuilder pour les inscriptions
             $inscriptions = $this->userRepository->createQueryBuilder('u')
                 ->select('COUNT(u.id)')
                 ->where('u.createdAt >= :start')
@@ -223,7 +223,7 @@ readonly class AdminStatsService
                 ->getQuery()
                 ->getSingleScalarResult();
 
-            // ✅ CORRECTION : Utiliser createQueryBuilder pour les signalements
+            // CORRECTION : Utiliser createQueryBuilder pour les signalements
             $signalements = $this->signalementRepository->createQueryBuilder('s')
                 ->select('COUNT(s.id)')
                 ->where('s.createdAt >= :start')
@@ -294,7 +294,7 @@ readonly class AdminStatsService
             $dateStart = new \DateTime($dateStr . ' 00:00:00');
             $dateEnd = new \DateTime($dateStr . ' 23:59:59');
 
-            // ✅ CORRECTION
+            // CORRECTION
             $inscriptions = $this->userRepository->createQueryBuilder('u')
                 ->select('COUNT(u.id)')
                 ->where('u.createdAt >= :start')
