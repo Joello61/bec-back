@@ -73,12 +73,27 @@ readonly class AddressService
         $pays = $this->countryRepository->findOneBy(['nameFr' => $data['pays']]);
         $detectedCurrency = $this->currencyService->getCurrencyAndLangByCountry($data['pays'])['currency'];
         $detectedLang = $this->currencyService->getCurrencyAndLangByCountry($data['pays'])['languages'];
-        $detectedTimeZone = $this->geoDataService->getTimeZoneByCityAndPays($data['ville'], $pays->getId());
+        // $pays peut etre null si le nom de pays fourni ne correspond a aucune entree
+        // de la table countries (donnee absente/mal orthographiee) - CurrencyService gere
+        // deja ce cas cote devise (repli sur la devise par defaut, avec warning), le fuseau
+        // horaire doit degrader de la meme facon plutot que de faire planter la creation
+        // d'adresse entiere.
+        $detectedTimeZone = $pays !== null
+            ? $this->geoDataService->getTimeZoneByCityAndPays($data['ville'], $pays->getId())
+            : null;
+
+        if ($pays === null) {
+            $this->logger->warning('Pays non trouve pour la detection du fuseau horaire', [
+                'pays' => $data['pays'],
+            ]);
+        }
 
         // Mettre à jour la devise de l'utilisateur dans ses settings
         $user->getSettings()?->setDevise($detectedCurrency);
         $user->getSettings()?->setLangue($detectedLang);
-        $user->getSettings()?->setTimeZone($detectedTimeZone);
+        if ($detectedTimeZone !== null) {
+            $user->getSettings()?->setTimeZone($detectedTimeZone);
+        }
 
         $this->logger->info('Devise détectée automatiquement', [
             'user_id' => $user->getId(),
