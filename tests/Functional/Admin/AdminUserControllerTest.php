@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Admin;
 
+use App\Entity\Conversation;
+use App\Entity\Message;
 use App\Entity\User;
 use App\Tests\Support\JwtAuthenticationTrait;
 use App\Tests\Support\UserFactoryTrait;
@@ -283,6 +285,26 @@ class AdminUserControllerTest extends WebTestCase
     {
         $target = $this->createUser('admin-user-delete-ok');
         $targetId = $target->getId();
+        $targetOriginalEmail = $target->getEmail();
+        $tiers = $this->createUser('admin-user-delete-ok-tiers');
+
+        // Un message envoye par la cible a un tiers doit rester lisible apres suppression
+        // (audit Backend-Qualite #2 : l'historique de conversation d'un tiers ne doit pas
+        // disparaitre avec le compte de son interlocuteur).
+        $conversation = new Conversation();
+        $conversation->setParticipant1($target);
+        $conversation->setParticipant2($tiers);
+        $this->em->persist($conversation);
+
+        $message = new Message();
+        $message->setConversation($conversation);
+        $message->setExpediteur($target);
+        $message->setDestinataire($tiers);
+        $message->setContenu('Bonjour, ceci est un message de test');
+        $this->em->persist($message);
+        $this->em->flush();
+        $messageId = $message->getId();
+
         $this->authenticateAs($this->admin('admin-user-delete-ok-admin'));
 
         $this->client->request(
@@ -293,7 +315,18 @@ class AdminUserControllerTest extends WebTestCase
         );
 
         self::assertResponseIsSuccessful();
-        self::assertNull($this->em->getRepository(User::class)->find($targetId));
+
+        $this->em->clear();
+
+        $anonymized = $this->em->getRepository(User::class)->find($targetId);
+        self::assertNotNull($anonymized, 'Le compte ne doit pas etre physiquement supprime');
+        self::assertNotSame($targetOriginalEmail, $anonymized->getEmail());
+        self::assertNotNull($anonymized->getDeletedAt());
+        self::assertNull($anonymized->getPassword());
+
+        $persistedMessage = $this->em->getRepository(Message::class)->find($messageId);
+        self::assertNotNull($persistedMessage, 'Le message reste visible pour le tiers destinataire');
+        self::assertSame('Bonjour, ceci est un message de test', $persistedMessage->getContenu());
     }
 
     // ==================== activity / admin-logs ====================
