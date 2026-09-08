@@ -4,11 +4,24 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use App\Entity\Settings\NotificationPreferences;
+use App\Entity\Settings\PrivacySettings;
+use App\Entity\Settings\RgpdConsent;
+use App\Entity\Settings\SecuritySettings;
+use App\Entity\Settings\UserPreferences;
 use App\Repository\UserSettingsRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
 
+/**
+ * Regroupe 5 embeddables Doctrine par concept (notifications, confidentialite,
+ * preferences, RGPD, securite) - decoupage purement interne (audit
+ * Backend-Qualite #8, Phase 6). Le contrat JSON reste plat (aucun groupe sur
+ * les embeddables eux-memes, uniquement sur les methodes deleguantes
+ * ci-dessous) : aucun changement pour les consommateurs de l'API ni pour le
+ * schema SQL (columnPrefix: false, memes noms de colonnes qu'avant).
+ */
 #[ORM\Entity(repositoryClass: UserSettingsRepository::class)]
 #[ORM\Table(name: 'user_settings')]
 #[ORM\HasLifecycleCallbacks]
@@ -24,119 +37,20 @@ class UserSettings
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private ?User $user = null;
 
-    // ==================== NOTIFICATIONS ====================
+    #[ORM\Embedded(class: NotificationPreferences::class, columnPrefix: false)]
+    private NotificationPreferences $notifications;
 
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $emailNotificationsEnabled = true;
+    #[ORM\Embedded(class: PrivacySettings::class, columnPrefix: false)]
+    private PrivacySettings $privacy;
 
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $smsNotificationsEnabled = true;
+    #[ORM\Embedded(class: UserPreferences::class, columnPrefix: false)]
+    private UserPreferences $preferences;
 
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $pushNotificationsEnabled = true;
+    #[ORM\Embedded(class: RgpdConsent::class, columnPrefix: false)]
+    private RgpdConsent $rgpdConsent;
 
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $notifyOnNewMessage = true;
-
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $notifyOnMatchingVoyage = true;
-
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $notifyOnMatchingDemande = true;
-
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $notifyOnNewAvis = true;
-
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $notifyOnFavoriUpdate = true;
-
-    // ==================== CONFIDENTIALITÉ ====================
-
-    #[ORM\Column(type: Types::STRING, length: 20)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private string $profileVisibility = 'public'; // 'public', 'verified_only', 'private'
-
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $showPhone = true;
-
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $showEmail = false;
-
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $showStats = true;
-
-    #[ORM\Column(type: Types::STRING, length: 20)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private string $messagePermission = 'everyone'; // 'everyone', 'verified_only', 'no_one'
-
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $showInSearchResults = true;
-
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $showLastSeen = true;
-
-    // ==================== PRÉFÉRENCES ====================
-
-    #[ORM\Column(type: Types::STRING, length: 40)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private string $langue = 'fr'; // 'fr', 'en'
-
-    #[ORM\Column(type: Types::STRING, length: 3)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private string $devise = 'EUR'; // 'XAF', 'EUR', 'USD'
-
-    #[ORM\Column(type: Types::STRING, length: 50)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private string $timezone = 'Africa/Douala';
-
-    #[ORM\Column(type: Types::STRING, length: 10)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private string $dateFormat = 'dd/MM/yyyy'; // 'dd/MM/yyyy', 'MM/dd/yyyy', 'yyyy-MM-dd'
-
-    // ==================== RGPD ====================
-
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $cookiesConsent = false;
-
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $analyticsConsent = false;
-
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $marketingConsent = false;
-
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $dataShareConsent = false;
-
-    #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
-    #[Groups(['settings:read'])]
-    private ?\DateTimeInterface $consentDate = null;
-
-    // ==================== SÉCURITÉ ====================
-
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $twoFactorEnabled = false;
-
-    #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['settings:read', 'settings:write'])]
-    private bool $loginNotifications = true;
+    #[ORM\Embedded(class: SecuritySettings::class, columnPrefix: false)]
+    private SecuritySettings $security;
 
     // ==================== TIMESTAMPS ====================
 
@@ -150,6 +64,11 @@ class UserSettings
 
     public function __construct()
     {
+        $this->notifications = new NotificationPreferences();
+        $this->privacy = new PrivacySettings();
+        $this->preferences = new UserPreferences();
+        $this->rgpdConsent = new RgpdConsent();
+        $this->security = new SecuritySettings();
         $this->createdAt = new \DateTime();
         $this->updatedAt = new \DateTime();
     }
@@ -159,8 +78,6 @@ class UserSettings
     {
         $this->updatedAt = new \DateTime();
     }
-
-    // ==================== GETTERS & SETTERS ====================
 
     public function getId(): ?int
     {
@@ -178,295 +95,324 @@ class UserSettings
         return $this;
     }
 
-    // Notifications
+    // ==================== NOTIFICATIONS (delegation vers NotificationPreferences) ====================
+
+    #[Groups(['settings:read', 'settings:write'])]
     public function isEmailNotificationsEnabled(): bool
     {
-        return $this->emailNotificationsEnabled;
+        return $this->notifications->isEmailNotificationsEnabled();
     }
 
     public function setEmailNotificationsEnabled(bool $emailNotificationsEnabled): static
     {
-        $this->emailNotificationsEnabled = $emailNotificationsEnabled;
+        $this->notifications->setEmailNotificationsEnabled($emailNotificationsEnabled);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function isSmsNotificationsEnabled(): bool
     {
-        return $this->smsNotificationsEnabled;
+        return $this->notifications->isSmsNotificationsEnabled();
     }
 
     public function setSmsNotificationsEnabled(bool $smsNotificationsEnabled): static
     {
-        $this->smsNotificationsEnabled = $smsNotificationsEnabled;
+        $this->notifications->setSmsNotificationsEnabled($smsNotificationsEnabled);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function isPushNotificationsEnabled(): bool
     {
-        return $this->pushNotificationsEnabled;
+        return $this->notifications->isPushNotificationsEnabled();
     }
 
     public function setPushNotificationsEnabled(bool $pushNotificationsEnabled): static
     {
-        $this->pushNotificationsEnabled = $pushNotificationsEnabled;
+        $this->notifications->setPushNotificationsEnabled($pushNotificationsEnabled);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function isNotifyOnNewMessage(): bool
     {
-        return $this->notifyOnNewMessage;
+        return $this->notifications->isNotifyOnNewMessage();
     }
 
     public function setNotifyOnNewMessage(bool $notifyOnNewMessage): static
     {
-        $this->notifyOnNewMessage = $notifyOnNewMessage;
+        $this->notifications->setNotifyOnNewMessage($notifyOnNewMessage);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function isNotifyOnMatchingVoyage(): bool
     {
-        return $this->notifyOnMatchingVoyage;
+        return $this->notifications->isNotifyOnMatchingVoyage();
     }
 
     public function setNotifyOnMatchingVoyage(bool $notifyOnMatchingVoyage): static
     {
-        $this->notifyOnMatchingVoyage = $notifyOnMatchingVoyage;
+        $this->notifications->setNotifyOnMatchingVoyage($notifyOnMatchingVoyage);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function isNotifyOnMatchingDemande(): bool
     {
-        return $this->notifyOnMatchingDemande;
+        return $this->notifications->isNotifyOnMatchingDemande();
     }
 
     public function setNotifyOnMatchingDemande(bool $notifyOnMatchingDemande): static
     {
-        $this->notifyOnMatchingDemande = $notifyOnMatchingDemande;
+        $this->notifications->setNotifyOnMatchingDemande($notifyOnMatchingDemande);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function isNotifyOnNewAvis(): bool
     {
-        return $this->notifyOnNewAvis;
+        return $this->notifications->isNotifyOnNewAvis();
     }
 
     public function setNotifyOnNewAvis(bool $notifyOnNewAvis): static
     {
-        $this->notifyOnNewAvis = $notifyOnNewAvis;
+        $this->notifications->setNotifyOnNewAvis($notifyOnNewAvis);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function isNotifyOnFavoriUpdate(): bool
     {
-        return $this->notifyOnFavoriUpdate;
+        return $this->notifications->isNotifyOnFavoriUpdate();
     }
 
     public function setNotifyOnFavoriUpdate(bool $notifyOnFavoriUpdate): static
     {
-        $this->notifyOnFavoriUpdate = $notifyOnFavoriUpdate;
+        $this->notifications->setNotifyOnFavoriUpdate($notifyOnFavoriUpdate);
         return $this;
     }
 
-    // Confidentialité
+    // ==================== CONFIDENTIALITÉ (delegation vers PrivacySettings) ====================
+
+    #[Groups(['settings:read', 'settings:write'])]
     public function getProfileVisibility(): string
     {
-        return $this->profileVisibility;
+        return $this->privacy->getProfileVisibility();
     }
 
     public function setProfileVisibility(string $profileVisibility): static
     {
-        $this->profileVisibility = $profileVisibility;
+        $this->privacy->setProfileVisibility($profileVisibility);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function isShowPhone(): bool
     {
-        return $this->showPhone;
+        return $this->privacy->isShowPhone();
     }
 
     public function setShowPhone(bool $showPhone): static
     {
-        $this->showPhone = $showPhone;
+        $this->privacy->setShowPhone($showPhone);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function isShowEmail(): bool
     {
-        return $this->showEmail;
+        return $this->privacy->isShowEmail();
     }
 
     public function setShowEmail(bool $showEmail): static
     {
-        $this->showEmail = $showEmail;
+        $this->privacy->setShowEmail($showEmail);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function isShowStats(): bool
     {
-        return $this->showStats;
+        return $this->privacy->isShowStats();
     }
 
     public function setShowStats(bool $showStats): static
     {
-        $this->showStats = $showStats;
+        $this->privacy->setShowStats($showStats);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function getMessagePermission(): string
     {
-        return $this->messagePermission;
+        return $this->privacy->getMessagePermission();
     }
 
     public function setMessagePermission(string $messagePermission): static
     {
-        $this->messagePermission = $messagePermission;
+        $this->privacy->setMessagePermission($messagePermission);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function isShowInSearchResults(): bool
     {
-        return $this->showInSearchResults;
+        return $this->privacy->isShowInSearchResults();
     }
 
     public function setShowInSearchResults(bool $showInSearchResults): static
     {
-        $this->showInSearchResults = $showInSearchResults;
+        $this->privacy->setShowInSearchResults($showInSearchResults);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function isShowLastSeen(): bool
     {
-        return $this->showLastSeen;
+        return $this->privacy->isShowLastSeen();
     }
 
     public function setShowLastSeen(bool $showLastSeen): static
     {
-        $this->showLastSeen = $showLastSeen;
+        $this->privacy->setShowLastSeen($showLastSeen);
         return $this;
     }
 
-    // Préférences
+    // ==================== PRÉFÉRENCES (delegation vers UserPreferences) ====================
+
+    #[Groups(['settings:read', 'settings:write'])]
     public function getLangue(): string
     {
-        return $this->langue;
+        return $this->preferences->getLangue();
     }
 
     public function setLangue(string $langue): static
     {
-        $this->langue = $langue;
+        $this->preferences->setLangue($langue);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function getDevise(): string
     {
-        return $this->devise;
+        return $this->preferences->getDevise();
     }
 
     public function setDevise(string $devise): static
     {
-        $this->devise = $devise;
+        $this->preferences->setDevise($devise);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function getTimezone(): string
     {
-        return $this->timezone;
+        return $this->preferences->getTimezone();
     }
 
     public function setTimezone(string $timezone): static
     {
-        $this->timezone = $timezone;
+        $this->preferences->setTimezone($timezone);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function getDateFormat(): string
     {
-        return $this->dateFormat;
+        return $this->preferences->getDateFormat();
     }
 
     public function setDateFormat(string $dateFormat): static
     {
-        $this->dateFormat = $dateFormat;
+        $this->preferences->setDateFormat($dateFormat);
         return $this;
     }
 
-    // RGPD
+    // ==================== RGPD (delegation vers RgpdConsent) ====================
+
+    #[Groups(['settings:read', 'settings:write'])]
     public function isCookiesConsent(): bool
     {
-        return $this->cookiesConsent;
+        return $this->rgpdConsent->isCookiesConsent();
     }
 
     public function setCookiesConsent(bool $cookiesConsent): static
     {
-        $this->cookiesConsent = $cookiesConsent;
-        if ($cookiesConsent && !$this->consentDate) {
-            $this->consentDate = new \DateTime();
-        }
+        $this->rgpdConsent->setCookiesConsent($cookiesConsent);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function isAnalyticsConsent(): bool
     {
-        return $this->analyticsConsent;
+        return $this->rgpdConsent->isAnalyticsConsent();
     }
 
     public function setAnalyticsConsent(bool $analyticsConsent): static
     {
-        $this->analyticsConsent = $analyticsConsent;
+        $this->rgpdConsent->setAnalyticsConsent($analyticsConsent);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function isMarketingConsent(): bool
     {
-        return $this->marketingConsent;
+        return $this->rgpdConsent->isMarketingConsent();
     }
 
     public function setMarketingConsent(bool $marketingConsent): static
     {
-        $this->marketingConsent = $marketingConsent;
+        $this->rgpdConsent->setMarketingConsent($marketingConsent);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function isDataShareConsent(): bool
     {
-        return $this->dataShareConsent;
+        return $this->rgpdConsent->isDataShareConsent();
     }
 
     public function setDataShareConsent(bool $dataShareConsent): static
     {
-        $this->dataShareConsent = $dataShareConsent;
+        $this->rgpdConsent->setDataShareConsent($dataShareConsent);
         return $this;
     }
 
+    #[Groups(['settings:read'])]
     public function getConsentDate(): ?\DateTimeInterface
     {
-        return $this->consentDate;
+        return $this->rgpdConsent->getConsentDate();
     }
 
-    // Sécurité
+    // ==================== SÉCURITÉ (delegation vers SecuritySettings) ====================
+
+    #[Groups(['settings:read', 'settings:write'])]
     public function isTwoFactorEnabled(): bool
     {
-        return $this->twoFactorEnabled;
+        return $this->security->isTwoFactorEnabled();
     }
 
     public function setTwoFactorEnabled(bool $twoFactorEnabled): static
     {
-        $this->twoFactorEnabled = $twoFactorEnabled;
+        $this->security->setTwoFactorEnabled($twoFactorEnabled);
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
     public function isLoginNotifications(): bool
     {
-        return $this->loginNotifications;
+        return $this->security->isLoginNotifications();
     }
 
     public function setLoginNotifications(bool $loginNotifications): static
     {
-        $this->loginNotifications = $loginNotifications;
+        $this->security->setLoginNotifications($loginNotifications);
         return $this;
     }
 
-    // Timestamps
+    // ==================== TIMESTAMPS ====================
+
     public function getCreatedAt(): ?\DateTimeInterface
     {
         return $this->createdAt;
@@ -477,65 +423,30 @@ class UserSettings
         return $this->updatedAt;
     }
 
-    // ==================== HELPER METHODS ====================
+    // ==================== HELPER METHODS (delegation) ====================
 
-    /**
-     * Vérifie si l'utilisateur accepte les emails
-     */
     public function canReceiveEmails(): bool
     {
-        return $this->emailNotificationsEnabled;
+        return $this->notifications->canReceiveEmails();
     }
 
-    /**
-     * Vérifie si l'utilisateur accepte les SMS
-     */
     public function canReceiveSms(): bool
     {
-        return $this->smsNotificationsEnabled;
+        return $this->notifications->canReceiveSms();
     }
 
-    /**
-     * Vérifie si l'utilisateur accepte les notifications push
-     */
     public function canReceivePushNotifications(): bool
     {
-        return $this->pushNotificationsEnabled;
+        return $this->notifications->canReceivePushNotifications();
     }
 
-    /**
-     * Vérifie si un utilisateur peut envoyer un message
-     */
     public function canReceiveMessageFrom(User $sender): bool
     {
-        if ($this->messagePermission === 'no_one') {
-            return false;
-        }
-
-        if ($this->messagePermission === 'verified_only') {
-            return $sender->isEmailVerifie() && $sender->isTelephoneVerifie();
-        }
-
-        return true; // everyone
+        return $this->privacy->canReceiveMessageFrom($sender);
     }
 
-    /**
-     * Vérifie si le profil est visible pour un utilisateur donné
-     */
     public function isProfileVisibleFor(?User $viewer): bool
     {
-        if ($this->profileVisibility === 'public') {
-            return true;
-        }
-
-        if (!$viewer) {
-            return false;
-        }
-
-        if ($this->profileVisibility === 'verified_only') {
-            return $viewer->isEmailVerifie() && $viewer->isTelephoneVerifie();
-        }
-
-        return false; // private
+        return $this->privacy->isProfileVisibleFor($viewer);
     }
 }

@@ -156,6 +156,30 @@ class AuthControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(400);
     }
 
+    public function testVerifyEmailRejectsMalformedEmail(): void
+    {
+        $this->client->request(
+            'POST',
+            '/api/verify-email',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['email' => 'pas-un-email', 'code' => '123456'])
+        );
+
+        self::assertResponseStatusCodeSame(400);
+    }
+
+    public function testVerifyEmailRejectsMissingEmail(): void
+    {
+        $this->client->request(
+            'POST',
+            '/api/verify-email',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['code' => '123456'])
+        );
+
+        self::assertResponseStatusCodeSame(400);
+    }
+
     public function testChangePasswordRejectsWrongCurrentPassword(): void
     {
         $user = $this->createLocalUser('changepwd-wrong', 'Password123', emailVerifie: true);
@@ -217,6 +241,30 @@ class AuthControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
         $payload = json_decode($this->client->getResponse()->getContent(), true);
         self::assertTrue($payload['success']);
+    }
+
+    public function testResendVerificationRejectsMalformedEmail(): void
+    {
+        $this->client->request(
+            'POST',
+            '/api/resend-verification',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['email' => 'pas-un-email', 'type' => 'email'])
+        );
+
+        self::assertResponseStatusCodeSame(400);
+    }
+
+    public function testResendVerificationRejectsMissingEmail(): void
+    {
+        $this->client->request(
+            'POST',
+            '/api/resend-verification',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['type' => 'email'])
+        );
+
+        self::assertResponseStatusCodeSame(400);
     }
 
     public function testResetPasswordRejectsInvalidToken(): void

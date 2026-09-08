@@ -54,7 +54,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->leftJoin('u.settings', 's')
             ->leftJoin('u.address', 'a')
             ->addSelect('s', 'a')
-            ->where('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->where('s.privacy.showInSearchResults = :visible OR s.id IS NULL')
             ->andWhere('u.deletedAt IS NULL')
             ->setParameter('visible', true)
             ->orderBy('u.createdAt', 'DESC')
@@ -66,7 +66,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         $countQb = $this->createQueryBuilder('u')
             ->select('COUNT(u.id)')
             ->leftJoin('u.settings', 's')
-            ->where('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->where('s.privacy.showInSearchResults = :visible OR s.id IS NULL')
             ->andWhere('u.deletedAt IS NULL')
             ->setParameter('visible', true);
 
@@ -93,7 +93,7 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
             ->leftJoin('u.address', 'a')
             ->addSelect('s', 'a')
             ->where('u.nom LIKE :query OR u.prenom LIKE :query OR u.email LIKE :query')
-            ->andWhere('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->andWhere('s.privacy.showInSearchResults = :visible OR s.id IS NULL')
             ->andWhere('u.deletedAt IS NULL')
             ->setParameter('query', '%' . $query . '%')
             ->setParameter('visible', true)

@@ -142,6 +142,38 @@ class DemandeControllerTest extends WebTestCase
         self::assertArrayNotHasKey('telephone', $payload[0]['voyage']['voyageur']);
     }
 
+    public function testListFiltersByVilleDepart(): void
+    {
+        $viewer = $this->createUser('filter-viewer');
+        $owner = $this->createUser('filter-owner');
+        $matching = $this->createDemande($owner, 'Douala-Filtre-Unique', 'Paris');
+        $other = $this->createDemande($owner, 'Yaounde-Filtre-Unique', 'Paris');
+        $this->authenticateAs($viewer);
+
+        $this->client->request('GET', '/api/demandes?villeDepart=Douala-Filtre-Unique');
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        $ids = array_column($payload['data'], 'id');
+        self::assertContains($matching->getId(), $ids);
+        self::assertNotContains($other->getId(), $ids);
+    }
+
+    public function testPublicListFiltersByVilleDepart(): void
+    {
+        $owner = $this->createUser('filter-public-owner');
+        $matching = $this->createDemande($owner, 'Douala-Public-Unique', 'Paris');
+        $other = $this->createDemande($owner, 'Yaounde-Public-Unique', 'Paris');
+
+        $this->client->request('GET', '/api/demandes/public?villeDepart=Douala-Public-Unique');
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        $ids = array_column($payload['data'], 'id');
+        self::assertContains($matching->getId(), $ids);
+        self::assertNotContains($other->getId(), $ids);
+    }
+
     private function createDemande(User $client, string $villeDepart = 'Douala', string $villeArrivee = 'Paris'): Demande
     {
         $demande = new Demande();

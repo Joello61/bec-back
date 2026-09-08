@@ -21,3 +21,10 @@ node_modules/
 public/uploads/*
 !public/uploads/.gitkeep
 tests/
+# Meme raisonnement que .env ci-dessus : config/jwt/*.pem est gitignore (jamais
+# committe) mais peut tres bien exister physiquement sur la machine qui lance
+# "docker build" (genere localement par le stage "dev") - sans cette exclusion,
+# "COPY . ." dans le stage "build" embarquerait une vraie cle privee dans une
+# couche de l'image finale, silencieusement et independamment de toute
+# generation explicite dans le Dockerfile (audit Backend-Qualite #9, Phase 6).
+config/jwt/*.pem

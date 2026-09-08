@@ -9,6 +9,8 @@ use App\DTO\DeleteAccountDTO;
 use App\DTO\UpdateAddressDTO;
 use App\DTO\UpdateUserDTO;
 use App\Entity\User;
+use App\OpenApi\Schema\AvatarUploadResponse;
+use App\OpenApi\Schema\ProfileCompletionStatusResponse;
 use App\Repository\UserRepository;
 use App\Service\AddressService;
 use App\Service\AvatarService;
@@ -236,18 +238,7 @@ class UserController extends AbstractController
     #[OA\Response(
         response: 200,
         description: 'Avatar modifié avec succès',
-        content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'success', type: 'boolean', example: true),
-                new OA\Property(property: 'message', type: 'string', example: 'Avatar mis à jour avec succès'),
-                new OA\Property(
-                    property: 'photoUrl',
-                    type: 'string',
-                    example: '/uploads/avatars/avatar_123_photo_abc123.jpg',
-                    nullable: true
-                ),
-            ]
-        )
+        content: new OA\JsonContent(ref: new Model(type: AvatarUploadResponse::class))
     )]
     #[OA\Response(response: 400, description: 'Requête invalide')]
     public function manageAvatar(Request $request): JsonResponse
@@ -356,15 +347,7 @@ class UserController extends AbstractController
     #[OA\Response(
         response: 200,
         description: 'Statut du profil',
-        content: new OA\JsonContent(
-            properties: [
-                new OA\Property(property: 'isComplete', type: 'boolean'),
-                new OA\Property(property: 'missing', type: 'array', items: new OA\Items(type: 'string')),
-                new OA\Property(property: 'emailVerifie', type: 'boolean'),
-                new OA\Property(property: 'telephoneVerifie', type: 'boolean'),
-                new OA\Property(property: 'hasAddress', type: 'boolean'),
-            ]
-        )
+        content: new OA\JsonContent(ref: new Model(type: ProfileCompletionStatusResponse::class))
     )]
     public function profileStatus(): JsonResponse
     {
