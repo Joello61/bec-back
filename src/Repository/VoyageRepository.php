@@ -28,6 +28,9 @@ class VoyageRepository extends ServiceEntityRepository
         $offset = ($page - 1) * $limit;
 
         $qb = $this->createQueryBuilder('v')
+            ->leftJoin('v.voyageur', 'u')
+            ->leftJoin('u.settings', 's')
+            ->addSelect('u', 's')
             ->orderBy('v.createdAt', 'DESC')
             ->andWhere('v.statut = :statut')
             ->setParameter('statut', 'actif')
