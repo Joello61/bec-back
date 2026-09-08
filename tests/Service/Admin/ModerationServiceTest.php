@@ -16,6 +16,7 @@ use App\Repository\VoyageRepository;
 use App\Service\Admin\AuditLogService;
 use App\Service\Admin\ModerationService;
 use App\Service\NotificationService;
+use App\Service\UserService;
 use App\Tests\Support\EntityIdTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
@@ -39,6 +40,7 @@ class ModerationServiceTest extends TestCase
     private MessageRepository&\PHPUnit\Framework\MockObject\MockObject $messageRepository;
     private NotificationService&\PHPUnit\Framework\MockObject\MockObject $notificationService;
     private AuditLogService&\PHPUnit\Framework\MockObject\MockObject $auditLogService;
+    private UserService&\PHPUnit\Framework\MockObject\MockObject $userService;
     private ModerationService $service;
 
     protected function setUp(): void
@@ -50,6 +52,7 @@ class ModerationServiceTest extends TestCase
         $this->messageRepository = $this->createMock(MessageRepository::class);
         $this->notificationService = $this->createMock(NotificationService::class);
         $this->auditLogService = $this->createMock(AuditLogService::class);
+        $this->userService = $this->createMock(UserService::class);
 
         $this->service = new ModerationService(
             $this->em,
@@ -59,6 +62,7 @@ class ModerationServiceTest extends TestCase
             $this->messageRepository,
             $this->notificationService,
             $this->auditLogService,
+            $this->userService,
         );
     }
 
@@ -166,13 +170,13 @@ class ModerationServiceTest extends TestCase
 
     // ==================== deleteUser ====================
 
-    public function testDeleteUserLogsThenRemoves(): void
+    public function testDeleteUserLogsThenAnonymizesInsteadOfRemoving(): void
     {
         $admin = $this->user(1, ['ROLE_ADMIN']);
         $target = $this->user(2);
         $this->auditLogService->expects(self::once())->method('logAdminAction')->with($admin, 'delete_user', 'user', 2, self::isArray());
-        $this->em->expects(self::once())->method('remove')->with($target);
-        $this->em->expects(self::once())->method('flush');
+        $this->userService->expects(self::once())->method('anonymizeAndSoftDelete')->with($target);
+        $this->em->expects(self::never())->method('remove');
 
         $this->service->deleteUser($target, $admin, 'RGPD');
     }
@@ -180,7 +184,7 @@ class ModerationServiceTest extends TestCase
     public function testDeleteUserRejectsSelfDeletion(): void
     {
         $admin = $this->user(1, ['ROLE_ADMIN']);
-        $this->em->expects(self::never())->method('remove');
+        $this->userService->expects(self::never())->method('anonymizeAndSoftDelete');
 
         $this->expectException(\InvalidArgumentException::class);
         $this->service->deleteUser($admin, $admin, 'raison');
@@ -190,6 +194,7 @@ class ModerationServiceTest extends TestCase
     {
         $admin = $this->user(1, ['ROLE_ADMIN']);
         $otherAdmin = $this->user(2, ['ROLE_ADMIN']);
+        $this->userService->expects(self::never())->method('anonymizeAndSoftDelete');
 
         $this->expectException(\InvalidArgumentException::class);
         $this->service->deleteUser($otherAdmin, $admin, 'raison');
