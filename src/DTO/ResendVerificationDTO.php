@@ -8,6 +8,10 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 class ResendVerificationDTO
 {
+    #[Assert\NotBlank(message: 'Email requis')]
+    #[Assert\Email(message: 'Email invalide')]
+    public string $email;
+
     #[Assert\NotBlank(message: 'Le type est obligatoire')]
     #[Assert\Choice(
         choices: ['email', 'phone'],
