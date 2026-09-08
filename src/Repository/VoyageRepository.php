@@ -100,7 +100,7 @@ class VoyageRepository extends ServiceEntityRepository
             ->leftJoin('u.settings', 's')
             ->addSelect('u', 's')
             // ==================== FILTRER PAR VISIBILITÉ ====================
-            ->where('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->where('s.privacy.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('visible', true)
             ->orderBy('v.createdAt', 'DESC')
             ->setFirstResult($offset)
@@ -128,7 +128,7 @@ class VoyageRepository extends ServiceEntityRepository
             ->leftJoin('v.voyageur', 'u')
             ->leftJoin('u.settings', 's')
             // ==================== MÊME FILTRE POUR LE COUNT ====================
-            ->where('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->where('s.privacy.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('visible', true);
 
         if ($excludeUser && !in_array('ROLE_ADMIN', $excludeUser->getRoles(), true)) {
@@ -184,7 +184,7 @@ class VoyageRepository extends ServiceEntityRepository
             ->where('v.statut = :statut')
             ->andWhere('v.dateDepart >= :today')
             // ==================== FILTRER PAR VISIBILITÉ ====================
-            ->andWhere('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->andWhere('s.privacy.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('statut', 'actif')
             ->setParameter('today', new \DateTime())
             ->setParameter('visible', true)
@@ -206,7 +206,7 @@ class VoyageRepository extends ServiceEntityRepository
             ->andWhere('v.villeDepart LIKE :villeDepart')
             ->andWhere('v.villeArrivee LIKE :villeArrivee')
             // ==================== FILTRER PAR VISIBILITÉ ====================
-            ->andWhere('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->andWhere('s.privacy.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('statut', 'actif')
             ->setParameter('villeDepart', '%' . $villeDepart . '%')
             ->setParameter('villeArrivee', '%' . $villeArrivee . '%')
