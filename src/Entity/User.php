@@ -15,6 +15,7 @@ use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: 'users')]
+#[ORM\Index(name: 'idx_users_deleted_at', columns: ['deleted_at'])]
 #[ORM\HasLifecycleCallbacks]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
@@ -96,6 +97,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read', 'admin:user:list'])]
     private ?\DateTimeInterface $bannedAt = null;
 
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    #[Groups(['admin:user:list', 'admin:user:read'])]
+    private ?\DateTimeImmutable $deletedAt = null;
+
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Groups(['admin:user:list'])]
     private ?string $banReason = null;
@@ -109,40 +114,58 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read'])]
     private ?UserSettings $settings = null;
 
-    /** @var Collection<int, Voyage> */
-    #[ORM\OneToMany(targetEntity: Voyage::class, mappedBy: 'voyageur', cascade: ['remove'])]
+    /**
+     * Pas de cascade remove : un compte n'est jamais physiquement supprimé (soft-delete via
+     * deletedAt, cf. Phase 5 du plan de correction). Les voyages/demandes actifs de l'utilisateur
+     * sont annulés explicitement (VoyageService::deleteVoyage/DemandeService::deleteDemande) au
+     * moment de la suppression du compte, jamais retirés en cascade.
+     * @var Collection<int, Voyage>
+     */
+    #[ORM\OneToMany(targetEntity: Voyage::class, mappedBy: 'voyageur')]
     private Collection $voyages;
 
     /** @var Collection<int, Demande> */
-    #[ORM\OneToMany(targetEntity: Demande::class, mappedBy: 'client', cascade: ['remove'])]
+    #[ORM\OneToMany(targetEntity: Demande::class, mappedBy: 'client')]
     private Collection $demandes;
 
-    /** @var Collection<int, Message> */
-    #[ORM\OneToMany(targetEntity: Message::class, mappedBy: 'expediteur', cascade: ['remove'])]
+    /**
+     * Pas de cascade remove : l'historique de conversation doit rester visible pour l'autre
+     * participant après suppression du compte (cf. audit Backend-Qualité #2).
+     * @var Collection<int, Message>
+     */
+    #[ORM\OneToMany(targetEntity: Message::class, mappedBy: 'expediteur')]
     private Collection $messagesEnvoyes;
 
     /** @var Collection<int, Message> */
-    #[ORM\OneToMany(targetEntity: Message::class, mappedBy: 'destinataire', cascade: ['remove'])]
+    #[ORM\OneToMany(targetEntity: Message::class, mappedBy: 'destinataire')]
     private Collection $messagesRecus;
 
     /** @var Collection<int, Notification> */
-    #[ORM\OneToMany(targetEntity: Notification::class, mappedBy: 'user', cascade: ['remove'])]
+    #[ORM\OneToMany(targetEntity: Notification::class, mappedBy: 'user')]
     private Collection $notifications;
 
     /** @var Collection<int, Favori> */
-    #[ORM\OneToMany(targetEntity: Favori::class, mappedBy: 'user', cascade: ['remove'])]
+    #[ORM\OneToMany(targetEntity: Favori::class, mappedBy: 'user')]
     private Collection $favoris;
 
-    /** @var Collection<int, Avis> */
-    #[ORM\OneToMany(targetEntity: Avis::class, mappedBy: 'auteur', cascade: ['remove'])]
+    /**
+     * Pas de cascade remove : la réputation d'un tiers (avis reçus) ne doit pas disparaître
+     * avec le compte de l'auteur (cf. audit Backend-Qualité #2).
+     * @var Collection<int, Avis>
+     */
+    #[ORM\OneToMany(targetEntity: Avis::class, mappedBy: 'auteur')]
     private Collection $avisDonnes;
 
     /** @var Collection<int, Avis> */
-    #[ORM\OneToMany(targetEntity: Avis::class, mappedBy: 'cible', cascade: ['remove'])]
+    #[ORM\OneToMany(targetEntity: Avis::class, mappedBy: 'cible')]
     private Collection $avisRecus;
 
-    /** @var Collection<int, Signalement> */
-    #[ORM\OneToMany(targetEntity: Signalement::class, mappedBy: 'signaleur', cascade: ['remove'])]
+    /**
+     * Pas de cascade remove : un signalement reste une trace de modération utile aux admins,
+     * même après suppression du compte du signaleur.
+     * @var Collection<int, Signalement>
+     */
+    #[ORM\OneToMany(targetEntity: Signalement::class, mappedBy: 'signaleur')]
     private Collection $signalements;
 
     /** @var Collection<int, Conversation> */
@@ -576,6 +599,22 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->banReason = null;
         $this->bannedBy = null;
         return $this;
+    }
+
+    public function getDeletedAt(): ?\DateTimeImmutable
+    {
+        return $this->deletedAt;
+    }
+
+    public function setDeletedAt(?\DateTimeImmutable $deletedAt): static
+    {
+        $this->deletedAt = $deletedAt;
+        return $this;
+    }
+
+    public function isDeleted(): bool
+    {
+        return $this->deletedAt !== null;
     }
 
     /**
