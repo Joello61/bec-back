@@ -7,6 +7,7 @@ namespace App\Repository;
 use App\Entity\Demande;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -20,20 +21,14 @@ class DemandeRepository extends ServiceEntityRepository
     }
 
     /**
+     * Filtres ville depart/arrivee/dateLimite communs a findPublicPaginated/
+     * findPaginated/findAllPaginatedAdmin, appliques a l'identique sur la requete
+     * principale et sur son COUNT - le statut et le join de visibilite restent geres
+     * par chaque methode appelante, leur logique differant reellement entre elles.
      * @param array<string, mixed> $filters
-     * @return array{data: Demande[], pagination: array{page: int, limit: int, total: int, pages: int}}
      */
-    public function findPublicPaginated(int $page = 1, int $limit = 10, array $filters = []): array
+    private function applyFilters(QueryBuilder $qb, array $filters): void
     {
-        $offset = ($page - 1) * $limit;
-
-        $qb = $this->createQueryBuilder('d')
-            ->orderBy('d.createdAt', 'DESC')
-            ->andWhere('d.statut = :statut')
-            ->setParameter('statut', 'en_recherche')
-            ->setFirstResult($offset)
-            ->setMaxResults($limit);
-
         if (!empty($filters['villeDepart'])) {
             $qb->andWhere('d.villeDepart LIKE :villeDepart')
                 ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
@@ -48,6 +43,27 @@ class DemandeRepository extends ServiceEntityRepository
             $qb->andWhere('d.dateLimite <= :today')
                 ->setParameter('today', new \DateTime('today'));
         }
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array{data: Demande[], pagination: array{page: int, limit: int, total: int, pages: int}}
+     */
+    public function findPublicPaginated(int $page = 1, int $limit = 10, array $filters = []): array
+    {
+        $offset = ($page - 1) * $limit;
+
+        $qb = $this->createQueryBuilder('d')
+            ->leftJoin('d.client', 'u')
+            ->leftJoin('u.settings', 's')
+            ->addSelect('u', 's')
+            ->orderBy('d.createdAt', 'DESC')
+            ->andWhere('d.statut = :statut')
+            ->setParameter('statut', 'en_recherche')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit);
+
+        $this->applyFilters($qb, $filters);
 
         $demandes = $qb->getQuery()->getResult();
 
@@ -56,19 +72,7 @@ class DemandeRepository extends ServiceEntityRepository
             ->andWhere('d.statut = :statut')
             ->setParameter('statut', 'en_recherche');
 
-        if (!empty($filters['villeDepart'])) {
-            $countQb->andWhere('d.villeDepart LIKE :villeDepart')
-                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
-        }
-        if (!empty($filters['villeArrivee'])) {
-            $countQb->andWhere('d.villeArrivee LIKE :villeArrivee')
-                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
-        }
-
-        if (!empty($filters['dateLimite'])) {
-            $countQb->andWhere('d.dateLimite <= :today')
-                ->setParameter('today', new \DateTime('today'));
-        }
+        $this->applyFilters($countQb, $filters);
 
         $total = $countQb->getQuery()->getSingleScalarResult();
 
@@ -96,7 +100,7 @@ class DemandeRepository extends ServiceEntityRepository
             ->leftJoin('u.settings', 's')
             ->addSelect('u', 's')
             // ==================== FILTRER PAR VISIBILITÉ ====================
-            ->where('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->where('s.privacy.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('visible', true)
             ->orderBy('d.createdAt', 'DESC')
             ->setFirstResult($offset)
@@ -107,20 +111,7 @@ class DemandeRepository extends ServiceEntityRepository
                 ->setParameter('excludedUser', $excludeUser);
         }
 
-        if (!empty($filters['villeDepart'])) {
-            $qb->andWhere('d.villeDepart LIKE :villeDepart')
-                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
-        }
-
-        if (!empty($filters['villeArrivee'])) {
-            $qb->andWhere('d.villeArrivee LIKE :villeArrivee')
-                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
-        }
-
-        if (!empty($filters['dateLimite'])) {
-            $qb->andWhere('d.dateLimite <= :today')
-                ->setParameter('today', new \DateTime('today'));
-        }
+        $this->applyFilters($qb, $filters);
 
         if (!empty($filters['statut'])) {
             $qb->andWhere('d.statut = :statut')
@@ -137,7 +128,7 @@ class DemandeRepository extends ServiceEntityRepository
             ->leftJoin('d.client', 'u')
             ->leftJoin('u.settings', 's')
             // ==================== MÊME FILTRE POUR LE COUNT ====================
-            ->where('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->where('s.privacy.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('visible', true);
 
         if ($excludeUser && !in_array('ROLE_ADMIN', $excludeUser->getRoles(), true)) {
@@ -145,19 +136,7 @@ class DemandeRepository extends ServiceEntityRepository
                 ->setParameter('excludedUser', $excludeUser);
         }
 
-        if (!empty($filters['villeDepart'])) {
-            $countQb->andWhere('d.villeDepart LIKE :villeDepart')
-                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
-        }
-        if (!empty($filters['villeArrivee'])) {
-            $countQb->andWhere('d.villeArrivee LIKE :villeArrivee')
-                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
-        }
-
-        if (!empty($filters['dateLimite'])) {
-            $countQb->andWhere('d.dateLimite <= :today')
-                ->setParameter('today', new \DateTime('today'));
-        }
+        $this->applyFilters($countQb, $filters);
 
         if (!empty($filters['statut'])) {
             $countQb->andWhere('d.statut = :statut')
@@ -204,7 +183,7 @@ class DemandeRepository extends ServiceEntityRepository
             ->addSelect('u', 's')
             ->where('d.statut = :statut')
             // ==================== FILTRER PAR VISIBILITÉ ====================
-            ->andWhere('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->andWhere('s.privacy.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('statut', 'en_recherche')
             ->setParameter('visible', true)
             ->orderBy('d.createdAt', 'DESC')
@@ -225,7 +204,7 @@ class DemandeRepository extends ServiceEntityRepository
             ->andWhere('d.villeDepart LIKE :villeDepart')
             ->andWhere('d.villeArrivee LIKE :villeArrivee')
             // ==================== FILTRER PAR VISIBILITÉ ====================
-            ->andWhere('s.showInSearchResults = :visible OR s.id IS NULL')
+            ->andWhere('s.privacy.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('statut', 'en_recherche')
             ->setParameter('villeDepart', '%' . $villeDepart . '%')
             ->setParameter('villeArrivee', '%' . $villeArrivee . '%')
@@ -266,15 +245,7 @@ class DemandeRepository extends ServiceEntityRepository
 
         // Pas de filtre showInSearchResults pour admin
 
-        if (!empty($filters['villeDepart'])) {
-            $qb->andWhere('d.villeDepart LIKE :villeDepart')
-                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
-        }
-
-        if (!empty($filters['villeArrivee'])) {
-            $qb->andWhere('d.villeArrivee LIKE :villeArrivee')
-                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
-        }
+        $this->applyFilters($qb, $filters);
 
         if (!empty($filters['statut'])) {
             $qb->andWhere('d.statut = :statut')
@@ -286,14 +257,8 @@ class DemandeRepository extends ServiceEntityRepository
         $countQb = $this->createQueryBuilder('d')
             ->select('COUNT(d.id)');
 
-        if (!empty($filters['villeDepart'])) {
-            $countQb->andWhere('d.villeDepart LIKE :villeDepart')
-                ->setParameter('villeDepart', '%' . $filters['villeDepart'] . '%');
-        }
-        if (!empty($filters['villeArrivee'])) {
-            $countQb->andWhere('d.villeArrivee LIKE :villeArrivee')
-                ->setParameter('villeArrivee', '%' . $filters['villeArrivee'] . '%');
-        }
+        $this->applyFilters($countQb, $filters);
+
         if (!empty($filters['statut'])) {
             $countQb->andWhere('d.statut = :statut')
                 ->setParameter('statut', $filters['statut']);
