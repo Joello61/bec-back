@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\DTO;
 
+use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -79,6 +80,7 @@ class CompleteProfileDTO
         mimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
         mimeTypesMessage: 'Formats acceptés : JPEG, PNG, WebP uniquement'
     )]
+    #[OA\Property(type: 'string', format: 'binary', nullable: true)]
     public ?UploadedFile $photo = null;
 
 
