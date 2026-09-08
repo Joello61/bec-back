@@ -85,9 +85,15 @@ RUN composer dump-autoload --no-dev --optimize --classmap-authoritative
 # par ce fichier - il ne sert qu'à amorcer ce warmup au moment du build.
 RUN cp .env.dist .env || true
 
-RUN mkdir -p config/jwt \
-    && php bin/console lexik:jwt:generate-keypair --skip-if-exists 2>/dev/null || true
-
+# Aucune paire de cles JWT n'est generee ici (audit Backend-Qualite #9, Phase 6) :
+# "cache:clear"/"cache:warmup" ci-dessous n'en ont pas besoin (verifie par un
+# build reel sans cette etape - LexikJWTAuthenticationBundle ne lit le fichier
+# de cle qu'au moment ou un token est effectivement signe/verifie, jamais au
+# warmup du conteneur DI). Generer une cle ici la ferait figer dans une couche
+# de l'image finale ("COPY . ." + "COPY --from=build" du stage "prod")
+# - inacceptable pour une cle privee, meme "juste pour le build". La vraie
+# paire est generee au demarrage du conteneur par docker/entrypoint-prod.sh,
+# sur le volume nomme "jwt_keys" (voir ce script pour le detail).
 RUN APP_SECRET=dummysecretforthebuild \
     TRUSTED_PROXIES=127.0.0.1 \
     APP_ENV=prod APP_DEBUG=0 php bin/console cache:clear \
