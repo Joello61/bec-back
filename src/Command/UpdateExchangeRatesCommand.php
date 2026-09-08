@@ -27,14 +27,14 @@ class UpdateExchangeRatesCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
 
-        $io->title('💱 Mise à jour des taux de change');
+        $io->title('Mise à jour des taux de change');
 
         try {
             $io->section('Récupération des taux depuis Exchange Rate API...');
 
             $this->currencyService->updateExchangeRates();
 
-            $io->success('✅ Taux de change mis à jour avec succès !');
+            $io->success('Taux de change mis à jour avec succès !');
 
             $io->info([
                 'Les taux sont mis en cache pendant 24h',

@@ -49,7 +49,7 @@ class ExpireDemandesCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $batchSize = (int) $input->getOption('batch-size');
 
-        $io->title('🕐 Expiration automatique des demandes');
+        $io->title('Expiration automatique des demandes');
         $io->text('Recherche des demandes à expirer...');
 
         $today = new \DateTime();
@@ -65,7 +65,7 @@ class ExpireDemandesCommand extends Command
                 return Command::SUCCESS;
             }
 
-            $io->text("📊 {$totalCount} demande(s) à expirer");
+            $io->text("{$totalCount} demande(s) à expirer");
             $io->newLine();
 
             // Traitement par lots
@@ -108,7 +108,7 @@ class ExpireDemandesCommand extends Command
                         EventType::DEMANDE_EXPIRED
                     );
 
-                    // 2️⃣ Notifie le propriétaire de la demande
+                    // 2⃣ Notifie le propriétaire de la demande
                     $this->notifier->publishToUser(
                         $demande->getClient(),
                         [
@@ -154,8 +154,8 @@ class ExpireDemandesCommand extends Command
 
             // Résumé
             $io->success([
-                "✅ {$processed} demande(s) expirée(s)",
-                $errors > 0 ? "❌ {$errors} erreur(s)" : '0 erreur',
+                "{$processed} demande(s) expirée(s)",
+                $errors > 0 ? "{$errors} erreur(s)" : '0 erreur',
             ]);
 
             $this->logger->info('Expiration des demandes terminée', [

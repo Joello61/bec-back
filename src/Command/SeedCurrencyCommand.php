@@ -38,7 +38,7 @@ class SeedCurrencyCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
 
-        $io->title('🌍 Seeding des devises');
+        $io->title('Seeding des devises');
 
         try {
             // Option pour tout supprimer d'abord
@@ -58,7 +58,7 @@ class SeedCurrencyCommand extends Command
             $io->section('Insertion des devises...');
             $this->currencySeeder->seed();
 
-            $io->success('✅ Devises insérées avec succès !');
+            $io->success('Devises insérées avec succès !');
 
             $io->info([
                 'Devises principales : EUR, USD, CAD, GBP, CHF',

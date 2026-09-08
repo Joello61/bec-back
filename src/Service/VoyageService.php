@@ -218,7 +218,7 @@ readonly class VoyageService
                 EventType::VOYAGE_UPDATED
             );
 
-            // 2️⃣ Notification directe au voyageur (propriétaire du voyage)
+            // 2⃣ Notification directe au voyageur (propriétaire du voyage)
             $this->notifier->publishToUser(
                 $voyage->getVoyageur(),
                 [
@@ -234,7 +234,7 @@ readonly class VoyageService
                 EventType::VOYAGE_UPDATED
             );
 
-            // 3️⃣ Optionnel : notification aux admins (pour stats/dashboard)
+            // 3⃣ Optionnel : notification aux admins (pour stats/dashboard)
             $this->notifier->publishToGroup(
                 'admin',
                 [
@@ -310,7 +310,7 @@ readonly class VoyageService
                     break;
             }
 
-            // 1️⃣ Publication globale (flux voyages)
+            // 1⃣ Publication globale (flux voyages)
             $this->notifier->publishVoyages(
                 [
                     'title' => $title,
@@ -321,7 +321,7 @@ readonly class VoyageService
                 $eventType
             );
 
-            // 2️⃣ Notification directe au voyageur
+            // 2⃣ Notification directe au voyageur
             $this->notifier->publishToUser(
                 $voyage->getVoyageur(),
                 [
@@ -333,7 +333,7 @@ readonly class VoyageService
                 $eventType
             );
 
-            // 3️⃣ Notification groupe admin (pour rafraîchir stats ou logs)
+            // 3⃣ Notification groupe admin (pour rafraîchir stats ou logs)
             $this->notifier->publishToGroup(
                 'admin',
                 [
@@ -410,7 +410,7 @@ Votre demande est de nouveau en recherche d’un voyageur.",
                 );
 
                 try {
-                    // 1️⃣ Notifie le client que sa proposition est annulée
+                    // 1⃣ Notifie le client que sa proposition est annulée
                     $this->notifier->publishToUser(
                         $client,
                         [
@@ -426,7 +426,7 @@ Votre demande est de nouveau en recherche d’un voyageur.",
                         EventType::PROPOSITION_CANCELLED
                     );
 
-                    // 2️⃣ Notifie le flux global des demandes (topic public `/topics/demandes`)
+                    // 2⃣ Notifie le flux global des demandes (topic public `/topics/demandes`)
                     $this->notifier->publishDemandes(
                         [
                             'title' => 'Demande mise à jour',
@@ -440,7 +440,7 @@ Votre demande est de nouveau en recherche d’un voyageur.",
                         EventType::DEMANDE_STATUT_UPDATED
                     );
 
-                    // 3️⃣ (Optionnel) Notifie les administrateurs pour les stats
+                    // 3⃣ (Optionnel) Notifie les administrateurs pour les stats
                     $this->notifier->publishToGroup(
                         'admin',
                         [
@@ -471,7 +471,7 @@ Votre demande est de nouveau en recherche d’un voyageur.",
         $this->entityManager->flush();
 
         try {
-            // 1️⃣ Notifie le flux global des voyages (topic public)
+            // 1⃣ Notifie le flux global des voyages (topic public)
             $this->notifier->publishVoyages(
                 [
                     'title' => 'Voyage annulé',
@@ -485,7 +485,7 @@ Votre demande est de nouveau en recherche d’un voyageur.",
                 EventType::VOYAGE_CANCELLED
             );
 
-            // 2️⃣ Notifie le voyageur concerné
+            // 2⃣ Notifie le voyageur concerné
             $this->notifier->publishToUser(
                 $voyage->getVoyageur(),
                 [
@@ -500,7 +500,7 @@ Votre demande est de nouveau en recherche d’un voyageur.",
                 EventType::VOYAGE_CANCELLED
             );
 
-            // 3️⃣ Notifie les administrateurs pour rafraîchir les statistiques
+            // 3⃣ Notifie les administrateurs pour rafraîchir les statistiques
             $this->notifier->publishToGroup(
                 'admin',
                 [

@@ -18,7 +18,7 @@ class DemandeVoter extends Voter
     public const EDIT = 'DEMANDE_EDIT';
     public const DELETE = 'DEMANDE_DELETE';
     public const VIEW = 'DEMANDE_VIEW';
-    public const CREATE = 'DEMANDE_CREATE'; // ⬅️ NOUVEAU
+    public const CREATE = 'DEMANDE_CREATE'; // <- NOUVEAU
 
     public function __construct(
         private readonly VisibilityService $visibilityService
