@@ -260,22 +260,10 @@ class AuthController extends AbstractController
     #[OA\Response(response: 200, description: 'Email vérifié avec succès')]
     #[OA\Response(response: 400, description: 'Code invalide ou expiré')]
     public function verifyEmail(
-        #[MapRequestPayload] VerifyEmailDTO $dto,
-        Request $request
+        #[MapRequestPayload(validationFailedStatusCode: Response::HTTP_BAD_REQUEST)] VerifyEmailDTO $dto
     ): JsonResponse {
-        // Récupérer l'email depuis le body
-        $data = json_decode($request->getContent(), true);
-        $email = $data['email'] ?? null;
-
-        if (!$email) {
-            return $this->json([
-                'success' => false,
-                'message' => 'Email requis'
-            ], Response::HTTP_BAD_REQUEST);
-        }
-
         // Trouver l'utilisateur par email (pas encore authentifié)
-        $user = $this->userRepository->findOneBy(['email' => $email]);
+        $user = $this->userRepository->findOneBy(['email' => $dto->email]);
 
         if (!$user) {
             return $this->json([
@@ -352,23 +340,11 @@ class AuthController extends AbstractController
     )]
     #[OA\Response(response: 200, description: 'Code renvoyé avec succès')]
     public function resendVerification(
-        #[MapRequestPayload] ResendVerificationDTO $dto,
-        RateLimiterFactoryInterface $verificationLimiter,
-        Request $request
+        #[MapRequestPayload(validationFailedStatusCode: Response::HTTP_BAD_REQUEST)] ResendVerificationDTO $dto,
+        RateLimiterFactoryInterface $verificationLimiter
     ): JsonResponse {
-        // Récupérer l'email depuis le body
-        $data = json_decode($request->getContent(), true);
-        $email = $data['email'] ?? null;
-
-        if (!$email) {
-            return $this->json([
-                'success' => false,
-                'message' => 'Email requis'
-            ], Response::HTTP_BAD_REQUEST);
-        }
-
         // Trouver l'utilisateur
-        $user = $this->userRepository->findOneBy(['email' => $email]);
+        $user = $this->userRepository->findOneBy(['email' => $dto->email]);
 
         if (!$user) {
             // Ne pas révéler si l'utilisateur existe

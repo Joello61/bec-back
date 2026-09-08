@@ -8,6 +8,10 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 class VerifyEmailDTO
 {
+    #[Assert\NotBlank(message: 'Email requis')]
+    #[Assert\Email(message: 'Email invalide')]
+    public string $email;
+
     #[Assert\NotBlank(message: 'Le code est obligatoire')]
     #[Assert\Length(
         exactly: 6,
