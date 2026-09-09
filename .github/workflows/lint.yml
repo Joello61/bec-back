@@ -106,12 +106,19 @@ jobs:
       # "messenger_messages" (transport Symfony Messenger, pas une entité Doctrine
       # mappée) génère un faux positif permanent sur les index/séquences de cette table -
       # exclu explicitement du filtre, constaté en écrivant ce contrôle (pas supposé).
+      #
+      # La vérification ne regarde que le contenu de up() (pas le fichier entier) : DBAL
+      # 3.x (notre version, ^3.10.6) a un faux positif connu et documenté sur PostgreSQL
+      # (doctrine/migrations#1415) qui ajoute systématiquement un up() vide + un down()
+      # contenant "CREATE SCHEMA public", même sans aucune dérive réelle - corrigé
+      # uniquement à partir de DBAL 4.0 (doctrine/migrations#1463, non applicable ici).
+      # Une vraie dérive de mapping Doctrine produit toujours du contenu dans up().
       - name: Check for missing Doctrine migrations
         run: |
           php bin/console doctrine:migrations:diff --no-interaction \
             --filter-expression='#^(?!messenger_messages).*$#'
           LATEST_MIGRATION=$(ls -t migrations/Version*.php | head -1)
-          if grep -q 'addSql' "$LATEST_MIGRATION"; then
+          if sed -n '/function up(/,/function down(/p' "$LATEST_MIGRATION" | grep -q 'addSql'; then
             echo "::error::Dérive de schéma détectée - une migration manque pour un changement de mapping Doctrine :"
             cat "$LATEST_MIGRATION"
             exit 1
