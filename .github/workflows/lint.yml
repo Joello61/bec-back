@@ -1,0 +1,156 @@
+name: CI
+
+# Patron repris de factu_sentinel (.github/workflows/lint.yml, même stack Symfony/PHP-FPM),
+# adapté à Cobage : pas de ClamAV/Redis/Mustang (absents de ce projet), PHPStan (niveau 6,
+# déjà configuré localement depuis la Phase 6 du plan de correction, jamais exécuté en CI
+# jusqu'ici), et un contrôle propre à Cobage - détection de dérive de schéma Doctrine.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend-lint:
+    name: Backend (PHP)
+    runs-on: ubuntu-latest
+    env:
+      # dbname_suffix (config/packages/doctrine.yaml, when@test) transforme ceci en
+      # "bagage_express_test" pour la connexion réellement utilisée par la suite de tests.
+      DATABASE_URL: 'postgresql://cobage:cobage@localhost:5432/bagage_express?serverVersion=18&charset=utf8'
+      APP_ENV: test
+      # KernelTestCase (phpunit) lit KERNEL_CLASS depuis l'environnement - normalement
+      # fourni par .env.test, gitignoré et donc absent d'un checkout CI (même piège que
+      # APP_DEBUG ci-dessous).
+      KERNEL_CLASS: 'App\Kernel'
+      # .env/.env.test sont gitignorés (jamais présents sur un checkout CI) : Symfony
+      # Dotenv retombe alors sur .env.dist, qui fixe APP_DEBUG=0 - sans cette valeur
+      # explicite, "cache:warmup --env=dev" tourne en debug=false et génère
+      # App_KernelDevContainer.xml au lieu du App_KernelDevDebugContainer.xml attendu
+      # par phpstan-symfony (constaté en CI, jamais reproductible en local où .env,
+      # non versionné, ne fixe pas APP_DEBUG et laisse Symfony le déduire à true).
+      APP_DEBUG: '1'
+      APP_SECRET: 'ci-dummy-secret'
+      # Nécessaire uniquement à la génération des clés JWT ci-dessous - vérifié
+      # empiriquement (908 tests) que la suite ne requiert aucune autre variable
+      # d'environnement (OAuth, Twilio, Mercure...), la quasi-totalité des services
+      # externes étant remplacés par des doubles de test.
+      JWT_PASSPHRASE: 'ci-dummy-passphrase'
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: cobage
+          POSTGRES_PASSWORD: cobage
+          POSTGRES_DB: bagage_express
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cobage -d bagage_express"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: apcu
+          # APCu est desactivee par defaut en SAPI CLI - meme piege deja rencontre et
+          # documente dans le Dockerfile (base stage) pour cette meme raison.
+          ini-values: apc.enable_cli=1
+          coverage: none
+
+      - name: Validate composer.json / composer.lock
+        run: composer validate --strict --no-check-publish
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      # CLAUDE.md section 16 - aucun scan de dépendances n'existait avant cette phase.
+      # Bloquant par défaut dès qu'une advisory est trouvée, aucun seuil personnalisé
+      # (comportement natif de la commande).
+      - name: Audit dependencies (composer audit)
+        run: composer audit
+
+      - name: Generate JWT keypair
+        run: php bin/console lexik:jwt:generate-keypair --skip-if-exists
+
+      # phpstan-symfony (phpstan.neon, containerXmlPath) introspecte les types de service
+      # depuis le conteneur compilé de l'environnement dev - jamais généré sur un checkout
+      # neuf, contrairement à un conteneur de développement local où cette commande a déjà
+      # tourné au moins une fois (constaté en session : PHPStan échouait ici en CI avec
+      # "Container ... does not exist").
+      - name: Warm up dev container (required by phpstan-symfony)
+        run: php bin/console cache:warmup --env=dev
+
+      - name: Lint PHP syntax
+        run: find src -type f -name '*.php' -print0 | xargs -0 -n1 -P "$(nproc)" php -l
+
+      # Phase 6 du plan de correction (phpstan.neon, niveau 6) - jamais exécuté en CI
+      # jusqu'ici malgré sa présence locale. --memory-limit : la limite CLI par défaut
+      # (128M) ne suffit pas aux workers parallèles sur ce projet (constaté en session,
+      # "PHPStan process crashed because it reached configured PHP memory limit").
+      - name: Static analysis (PHPStan)
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=512M
+
+      - name: Create test database
+        run: php bin/console doctrine:database:create --if-not-exists
+
+      - name: Run migrations
+        run: php bin/console doctrine:migrations:migrate --no-interaction
+
+      # Ajout propre à Cobage, absent du patron factu_sentinel (CLAUDE.md section 8 :
+      # "Toute modification de schéma passe par une migration Doctrine") - empêche un
+      # changement de mapping Doctrine mergé sans sa migration correspondante.
+      # "messenger_messages" (transport Symfony Messenger, pas une entité Doctrine
+      # mappée) génère un faux positif permanent sur les index/séquences de cette table -
+      # exclu explicitement du filtre, constaté en écrivant ce contrôle (pas supposé).
+      #
+      # La vérification ne regarde que le contenu de up() (pas le fichier entier) : DBAL
+      # 3.x (notre version, ^3.10.6) a un faux positif connu et documenté sur PostgreSQL
+      # (doctrine/migrations#1415) qui ajoute systématiquement un up() vide + un down()
+      # contenant "CREATE SCHEMA public", même sans aucune dérive réelle - corrigé
+      # uniquement à partir de DBAL 4.0 (doctrine/migrations#1463, non applicable ici).
+      # Une vraie dérive de mapping Doctrine produit toujours du contenu dans up().
+      - name: Check for missing Doctrine migrations
+        run: |
+          php bin/console doctrine:migrations:diff --no-interaction \
+            --filter-expression='#^(?!messenger_messages).*$#'
+          LATEST_MIGRATION=$(ls -t migrations/Version*.php | head -1)
+          if sed -n '/function up(/,/function down(/p' "$LATEST_MIGRATION" | grep -q 'addSql'; then
+            echo "::error::Dérive de schéma détectée - une migration manque pour un changement de mapping Doctrine :"
+            cat "$LATEST_MIGRATION"
+            exit 1
+          fi
+          echo "Aucune dérive de schéma détectée."
+          rm "$LATEST_MIGRATION"
+
+      - name: Run tests
+        run: php bin/phpunit
+
+  secret-scan:
+    name: Secret scanning (gitleaks)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      # fetch-depth: 0 requis par gitleaks pour parcourir l'historique complet
+      # (documentation officielle gitleaks-action).
+      - name: Checkout (full history)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
