@@ -23,6 +23,13 @@ jobs:
       # "bagage_express_test" pour la connexion réellement utilisée par la suite de tests.
       DATABASE_URL: 'postgresql://cobage:cobage@localhost:5432/bagage_express?serverVersion=18&charset=utf8'
       APP_ENV: test
+      # .env/.env.test sont gitignorés (jamais présents sur un checkout CI) : Symfony
+      # Dotenv retombe alors sur .env.dist, qui fixe APP_DEBUG=0 - sans cette valeur
+      # explicite, "cache:warmup --env=dev" tourne en debug=false et génère
+      # App_KernelDevContainer.xml au lieu du App_KernelDevDebugContainer.xml attendu
+      # par phpstan-symfony (constaté en CI, jamais reproductible en local où .env,
+      # non versionné, ne fixe pas APP_DEBUG et laisse Symfony le déduire à true).
+      APP_DEBUG: '1'
       APP_SECRET: 'ci-dummy-secret'
       # Nécessaire uniquement à la génération des clés JWT ci-dessous - vérifié
       # empiriquement (908 tests) que la suite ne requiert aucune autre variable
