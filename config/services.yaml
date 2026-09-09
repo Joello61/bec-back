@@ -3,8 +3,10 @@ parameters:
     # du container (Symfony teste sinon un enumNode avec une chaîne vide).
     env(JWT_COOKIE_SAMESITE): 'lax'
 
+    # Chemin public des avatars - relatif en dev/test (adaptateur Flysystem local, servi
+    # par le nginx-pont), surchargé en production par l'URL publique du bucket R2 (Phase D1,
+    # config/packages/flysystem.yaml) - jamais de code différent entre environnements.
     app.upload_public_path: '/uploads/avatars'
-    app.uploads_directory: '%kernel.project_dir%/public/%env(UPLOADS_DIR)%'
     app.max_file_size: '%env(int:MAX_FILE_SIZE)%'
     app.frontend_url: '%env(FRONTEND_URL)%'
 
@@ -109,13 +111,20 @@ services:
 
     App\Service\AvatarService:
         arguments:
-            $uploadDirectory: '%app.uploads_directory%'
             $uploadPublicPath: '%app.upload_public_path%'
             $maxFileSize: '%app.max_file_size%'
 
     App\Controller\:
         resource: '../src/Controller/'
         tags: ['controller.service_arguments']
+
+    App\Controller\GetMetricsController:
+        arguments:
+            $metricsScrapeToken: '%env(METRICS_SCRAPE_TOKEN)%'
+
+    App\Service\Tracer:
+        arguments:
+            $tempoOtlpEndpoint: '%env(TEMPO_OTLP_ENDPOINT)%'
 
     # JWT Cookie Authenticator
     App\Security\JWTCookieAuthenticator:
@@ -141,3 +150,30 @@ services:
     App\EventListener\BannedUserListener:
         tags:
         - { name: kernel.event_listener, event: kernel.request, priority: 10 }
+
+    App\Monolog\RequestIdProcessor:
+        tags: ['monolog.processor']
+
+when@prod:
+    parameters:
+        # URL publique du bucket R2 (domaine R2.dev ou domaine personnalisé Cloudflare) -
+        # remplace le chemin relatif de dev/test (config/packages/flysystem.yaml, écart D1
+        # "Avatars : bascule vers Cloudflare R2").
+        app.upload_public_path: '%env(R2_PUBLIC_URL)%'
+
+    services:
+        # Client S3 pointé sur Cloudflare R2 (API compatible S3) - "region: auto" et
+        # "use_path_style_endpoint: true" sont les valeurs documentées par Cloudflare pour
+        # ce cas précis, à revérifier sur la documentation officielle R2 en implémentation
+        # réelle (CLAUDE.md section 2).
+        app.r2_client:
+            class: Aws\S3\S3Client
+            arguments:
+                -
+                    version: 'latest'
+                    region: 'auto'
+                    endpoint: '%env(resolve:R2_ENDPOINT)%'
+                    use_path_style_endpoint: true
+                    credentials:
+                        key: '%env(R2_ACCESS_KEY_ID)%'
+                        secret: '%env(R2_SECRET_ACCESS_KEY)%'

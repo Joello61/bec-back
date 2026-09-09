@@ -35,7 +35,22 @@ RUN apk add --no-cache \
     libzip-dev \
     git \
     unzip \
-    && docker-php-ext-install intl pdo pdo_pgsql opcache zip
+    $PHPIZE_DEPS \
+    && docker-php-ext-install intl pdo pdo_pgsql opcache zip \
+    # apcu (PECL, pas une extension core) : stockage des métriques Prometheus
+    # (artprima/prometheus-metrics-bundle), mémoire partagée entre les workers
+    # PHP-FPM d'un même conteneur - pas de Redis sur ce projet (Phase D1).
+    && pecl install apcu \
+    && docker-php-ext-enable apcu \
+    && apk del $PHPIZE_DEPS
+
+# APCu est désactivé par défaut pour le SAPI CLI (comportement natif de l'extension) -
+# sans ceci, "php bin/phpunit" (qui boote le même kernel que PHP-FPM) ne pourrait jamais
+# exercer le stockage des métriques Prometheus dans ses tests fonctionnels. Sans effet en
+# production (Prometheus scrape uniquement via PHP-FPM, jamais via CLI).
+# Nom de fichier aligné sur le glob "docker-php-ext-*.ini" déjà utilisé par le stage
+# "prod" ci-dessous pour copier la configuration des extensions depuis "build".
+RUN { echo 'apc.enable_cli = 1'; } > /usr/local/etc/php/conf.d/docker-php-ext-apcu-cli.ini
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 

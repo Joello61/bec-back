@@ -1,0 +1,11 @@
+# Phase D1 (bec-docs/docs/deploiement/deploiement-cobage.md). Storage "apcu", pas Redis
+# (absent de ce projet - Messenger utilise le transport Doctrine) : un seul conteneur
+# "backend" sans scaling horizontal, la mémoire partagée entre les workers PHP-FPM d'un
+# même conteneur suffit, sans ajouter un service supplémentaire à sécuriser/surveiller.
+artprima_prometheus_metrics:
+    namespace: cobage
+    storage:
+        type: apcu
+    # Route de scrape jamais mesurée elle-même (bruit inutile, un scrape toutes les
+    # 15-30s n'apporte rien à observer sur lui-même).
+    ignored_routes: ['metrics_scrape']
