@@ -63,6 +63,9 @@ jobs:
         with:
           php-version: '8.3'
           extensions: apcu
+          # APCu est desactivee par defaut en SAPI CLI - meme piege deja rencontre et
+          # documente dans le Dockerfile (base stage) pour cette meme raison.
+          ini-values: apc.enable_cli=1
           coverage: none
 
       - name: Validate composer.json / composer.lock
