@@ -1,0 +1,128 @@
+name: Deploy
+
+# Patron repris de factu_sentinel (.github/workflows/deploy.yml) : l'image est construite
+# et testée une seule fois en CI, jamais reconstruite sur le serveur ("l'image testée doit
+# être exactement l'image déployée"). Contrairement à factu_sentinel (monorepo), Cobage a
+# 4 dépôts distincts - ce pipeline ne construit et ne déploie QUE le backend
+# (backend/worker/scheduler, qui partagent la même image), jamais le frontend. Le
+# déploiement cible le dépôt `bec-infra` (fichiers Compose/nginx) déjà cloné sur le
+# serveur, qui suit sa propre branche main indépendamment du SHA applicatif déployé ici.
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-push:
+    name: Build and push image (GHCR)
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      # ref explicite sur le commit réellement testé par le workflow "CI" déclencheur -
+      # jamais "main" (qui a pu avancer depuis) ni le SHA implicite de cet événement.
+      - name: Checkout tested commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Compute image metadata
+        id: meta
+        run: |
+          IMAGE_BASE="${REGISTRY}/$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          echo "image=${IMAGE_BASE}:${SHA:0:12}" >> "$GITHUB_OUTPUT"
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build and push backend
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: prod
+          push: true
+          tags: ${{ steps.meta.outputs.image }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+
+  # Automatique après le build - pas de validation manuelle à cette étape (le garde-fou
+  # réel est "Required reviewers" sur l'environnement "production" ci-dessous).
+  deploy-staging:
+    name: Deploy to staging
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # Secrets d'environnement GitHub "staging" (Settings > Environments), jamais des
+      # secrets de dépôt partagés - mêmes noms que le job "production" ci-dessous, résolus
+      # différemment selon l'environnement déclaré par ce job. Voir docker/deploy/README.md
+      # pour la liste complète à créer.
+      - name: Deploy over SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          BACKEND_IMAGE: ${{ needs.build-and-push.outputs.image }}
+          # Projet Infisical "Cobage" (Phase D3) - identifiant non sensible, constant quel
+          # que soit l'environnement (secret de dépôt, pas de secret d'environnement).
+          INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_PROJECT_ID }}
+          # Identité machine Universal Auth Infisical dédiée à "staging" - accès en
+          # lecture seule, limité à l'environnement Infisical "staging" du projet
+          # "Cobage", jamais partagée avec "production".
+          INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
+          INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+        run: docker/deploy/ssh-deploy.sh staging
+
+  # "environment: production" seul ne suffirait pas à empêcher un déploiement accidentel -
+  # la protection réelle vient de la règle "Required reviewers" configurée sur
+  # l'environnement GitHub "production" (Settings > Environments, jamais configurable
+  # depuis ce fichier YAML seul - voir docker/deploy/README.md).
+  deploy-production:
+    name: Deploy to production
+    needs: [build-and-push, deploy-staging]
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Deploy over SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          BACKEND_IMAGE: ${{ needs.build-and-push.outputs.image }}
+          INFISICAL_PROJECT_ID: ${{ secrets.INFISICAL_PROJECT_ID }}
+          # Identité machine Universal Auth Infisical dédiée à "production".
+          INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
+          INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET }}
+        run: docker/deploy/ssh-deploy.sh production
