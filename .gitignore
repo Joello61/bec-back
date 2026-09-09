@@ -1,4 +1,8 @@
 
+# Aide IDE auto-generee (Symfony 7.4, config PHP) - change a chaque cache:clear selon
+# l'environnement, inutile ici (config exclusivement en YAML, aucun fichier config/*.php).
+/config/reference.php
+
 ###> symfony/framework-bundle ###
 /.env
 /.env.dev
