@@ -79,9 +79,13 @@ source image-tags.env
 
 export BACKEND_IMAGE="$BACKEND_IMAGE"
 # FRONTEND_IMAGE peut être vide au tout premier déploiement (aucun déploiement frontend
-# encore effectué sur ce serveur) - sans impact ici, "--no-deps" ci-dessous ne demande
-# jamais à Compose d'instancier le service "frontend" à partir de cette valeur.
-export FRONTEND_IMAGE="\${FRONTEND_IMAGE:-}"
+# encore effectué sur ce serveur) - un placeholder syntaxiquement valide est nécessaire
+# malgré tout : Docker Compose refuse de valider TOUT le fichier fusionné (même en ne
+# ciblant que "backend"/"worker"/"scheduler" via "--no-deps") si un seul service déclaré
+# ailleurs (ici "frontend") a une valeur d'image vide - "invalid compose project",
+# constaté en pratique (2026-09-09). Jamais réellement tiré tant que "frontend" ne fait
+# pas partie des services explicitement ciblés par une commande Compose.
+export FRONTEND_IMAGE="\${FRONTEND_IMAGE:-ghcr.io/joello61/bec-front:bootstrap-placeholder}"
 
 cat > image-tags.env <<IMAGETAGS
 BACKEND_IMAGE=\$BACKEND_IMAGE
@@ -107,12 +111,30 @@ export INFISICAL_TOKEN
 echo "=== Récupération de l'image backend ==="
 docker compose --env-file image-tags.env \$COMPOSE_FILES pull backend worker scheduler
 
+# "backend"/"worker"/"scheduler" dépendent de "postgres"/"mercure", jamais démarrés par
+# aucun des deux pipelines applicatifs (ni celui-ci, ni "bec-frontend/ssh-deploy.sh", qui
+# ne connaît que "frontend") - au tout premier déploiement d'un environnement, ni l'un ni
+# l'autre n'existe encore ("invalid compose project" plus haut une fois contourné, puis
+# échec de connexion "could not translate host name postgres", constaté en pratique,
+# 2026-09-09). "up -d" (sans "--no-deps", idempotent) plutôt qu'une étape manuelle
+# ponctuelle : ne recrée jamais un service déjà démarré et inchangé, donc sans effet sur
+# les déploiements suivants une fois ces deux services réellement démarrés une première
+# fois. "nginx" reste volontairement exclu d'ici : il dépend à la fois de "backend" ET de
+# "frontend", que ce pipeline ne connaît pas côté frontend - bootstrap de "nginx" traité
+# comme une étape manuelle ponctuelle du runbook (bec-docs, D6.1), jamais automatisée
+# dans un pipeline mono-application.
+echo "=== S'assurer que postgres/mercure tournent (idempotent) ==="
+infisical run --projectId="$INFISICAL_PROJECT_ID" --env="$ENVIRONMENT" -- \
+  docker compose --env-file image-tags.env \$COMPOSE_FILES up -d postgres mercure
+
 echo "=== Démarrage des nouveaux conteneurs (backend/worker/scheduler uniquement) ==="
-# "--no-deps" : ne recrée jamais "frontend"/"postgres"/"mercure"/"nginx" à partir de ce
-# pipeline - seul le pipeline bec-frontend touche "frontend". "--remove-orphans" est
-# volontairement omis ici (limité aux 3 services listés, jamais un "up" global qui
-# purgerait un service retiré d'un fichier Compose - ce nettoyage reste la responsabilité
-# d'un déploiement qui recharge l'ensemble de la stack, pas d'un déploiement partiel).
+# "--no-deps" : ne recrée jamais "frontend"/"nginx" à partir de ce pipeline - seul le
+# pipeline bec-frontend touche "frontend" ; "nginx" est démarré une fois pour toutes en
+# bootstrap (voir commentaire ci-dessus), jamais recréé par un déploiement applicatif
+# ordinaire. "--remove-orphans" est volontairement omis ici (limité aux services listés,
+# jamais un "up" global qui purgerait un service retiré d'un fichier Compose - ce
+# nettoyage reste la responsabilité d'un déploiement qui recharge l'ensemble de la stack,
+# pas d'un déploiement partiel).
 infisical run --projectId="$INFISICAL_PROJECT_ID" --env="$ENVIRONMENT" -- \
   docker compose --env-file image-tags.env \$COMPOSE_FILES up -d --no-deps backend worker scheduler
 
