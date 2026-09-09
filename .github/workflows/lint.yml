@@ -23,6 +23,10 @@ jobs:
       # "bagage_express_test" pour la connexion réellement utilisée par la suite de tests.
       DATABASE_URL: 'postgresql://cobage:cobage@localhost:5432/bagage_express?serverVersion=18&charset=utf8'
       APP_ENV: test
+      # KernelTestCase (phpunit) lit KERNEL_CLASS depuis l'environnement - normalement
+      # fourni par .env.test, gitignoré et donc absent d'un checkout CI (même piège que
+      # APP_DEBUG ci-dessous).
+      KERNEL_CLASS: 'App\Kernel'
       # .env/.env.test sont gitignorés (jamais présents sur un checkout CI) : Symfony
       # Dotenv retombe alors sur .env.dist, qui fixe APP_DEBUG=0 - sans cette valeur
       # explicite, "cache:warmup --env=dev" tourne en debug=false et génère
