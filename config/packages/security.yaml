@@ -18,6 +18,18 @@ security:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
 
+        # Doit précéder `api` ci-dessous (Symfony retient le premier firewall dont le
+        # pattern correspond, `^/api` matcherait aussi ce préfixe). Sécurité entièrement
+        # gérée par App\Controller\GetMetricsController (jeton dédié METRICS_SCRAPE_TOKEN),
+        # jamais le composant Security : l'authenticator JWT du firewall `api` (jwt: ~)
+        # tente d'authentifier toute requête portant un en-tête "Authorization: Bearer ..."
+        # avant même qu'un access_control PUBLIC_ACCESS ne soit évalué, échouant en 401 sur
+        # un jeton qui n'est pas un JWT (constaté à la vérification - même piège déjà
+        # rencontré et documenté par factu_sentinel).
+        metrics:
+            pattern: ^/api/metrics
+            security: false
+
         # Firewall pour l'API
         api:
             pattern: ^/api
@@ -58,6 +70,8 @@ security:
         - { path: ^/api/voyages/public, roles: PUBLIC_ACCESS }
         - { path: ^/api/geo/cities/top100, roles: PUBLIC_ACCESS }
         - { path: ^/api/geo/cities/search-global, roles: PUBLIC_ACCESS }
+        # Pas de règle PUBLIC_ACCESS ici pour /api/metrics : le firewall dédié
+        # `metrics` (security: false, ci-dessus) ne consulte jamais access_control.
 
         # Documentation admin
         - { path: ^/api/doc, roles: ROLE_ADMIN }

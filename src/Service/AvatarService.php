@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Service;
 
-use Symfony\Component\HttpFoundation\File\Exception\FileException;
+use League\Flysystem\FilesystemException;
+use League\Flysystem\FilesystemOperator;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\String\Slugger\SluggerInterface;
-use Psr\Log\LoggerInterface;
 
 class AvatarService
 {
@@ -18,7 +20,8 @@ class AvatarService
     ];
 
     public function __construct(
-        private readonly string $uploadDirectory,
+        #[Target('avatars.storage')]
+        private readonly FilesystemOperator $storage,
         private readonly string $uploadPublicPath,
         private readonly float $maxFileSize,
         private readonly SluggerInterface $slugger,
@@ -58,18 +61,24 @@ class AvatarService
             $extension
         );
 
+        $stream = fopen($file->getPathname(), 'r');
+
         try {
-            $file->move($this->uploadDirectory, $newFilename);
+            $this->storage->writeStream($newFilename, $stream);
             $this->logger->info('Avatar uploadé avec succès', [
                 'user_id' => $userId,
                 'filename' => $newFilename
             ]);
-        } catch (FileException $e) {
+        } catch (FilesystemException $e) {
             $this->logger->error('Erreur lors de l\'upload de l\'avatar', [
                 'user_id' => $userId,
                 'error' => $e->getMessage()
             ]);
             throw new \RuntimeException('Impossible d\'uploader le fichier');
+        } finally {
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
         }
 
         // Retourner l'URL publique
@@ -77,7 +86,7 @@ class AvatarService
     }
 
     /**
-     * Supprime un ancien avatar du filesystem
+     * Supprime un ancien avatar du stockage
      */
     public function deleteAvatar(?string $photoUrl): void
     {
@@ -87,18 +96,17 @@ class AvatarService
 
         // Extraire le nom du fichier de l'URL
         $filename = basename($photoUrl);
-        $filepath = $this->uploadDirectory . '/' . $filename;
 
-        if (file_exists($filepath)) {
-            try {
-                unlink($filepath);
+        try {
+            if ($this->storage->fileExists($filename)) {
+                $this->storage->delete($filename);
                 $this->logger->info('Avatar supprimé', ['file' => $filename]);
-            } catch (\Exception $e) {
-                $this->logger->warning('Impossible de supprimer l\'avatar', [
-                    'file' => $filename,
-                    'error' => $e->getMessage()
-                ]);
             }
+        } catch (FilesystemException $e) {
+            $this->logger->warning('Impossible de supprimer l\'avatar', [
+                'file' => $filename,
+                'error' => $e->getMessage()
+            ]);
         }
     }
 }
