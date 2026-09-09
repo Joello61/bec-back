@@ -51,11 +51,17 @@ when@prod:
                 path: "%kernel.logs_dir%/%kernel.environment%.log"
                 level: debug
 
-            # Log des erreurs vers STDERR pour CapRover / Docker logs
+            # STDERR (collecté par Alloy -> Loki, Phase D1) : "level: debug" ici, pas
+            # "error" - le filtrage réel du bruit vient déjà de "main" (fingers_crossed,
+            # action_level: error) plus haut, qui ne déclenche ce handler que lorsqu'une
+            # erreur survient. Une fois déclenché, tout le contexte bufferisé (pas
+            # seulement la ligne d'erreur elle-même) doit atteindre Loki pour être utile
+            # au diagnostic - "level: error" ici le filtrait une seconde fois et ne
+            # laissait passer que l'erreur, sans le contexte l'ayant précédée.
             stderr:
                 type: stream
                 path: php://stderr
-                level: error
+                level: debug
                 formatter: monolog.formatter.json
 
             # Console (utile pour commandes cron ou messenger)
