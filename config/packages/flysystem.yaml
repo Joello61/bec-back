@@ -1,0 +1,20 @@
+# Phase D1 (bec-docs/docs/deploiement/deploiement-cobage.md) : stockage des avatars
+# derrière une interface de stockage plutôt qu'un accès disque direct (App\Service\
+# AvatarService) - dev/test gardent l'adaptateur local (aucun changement de comportement),
+# la production bascule sur un adaptateur S3 pointé sur un bucket Cloudflare R2 (compatible
+# S3), purement par configuration - jamais par du code différent entre environnements.
+flysystem:
+    storages:
+        avatars.storage:
+            adapter: 'local'
+            options:
+                directory: '%kernel.project_dir%/public/uploads/avatars'
+
+when@prod:
+    flysystem:
+        storages:
+            avatars.storage:
+                adapter: 'aws'
+                options:
+                    client: 'app.r2_client'
+                    bucket: '%env(R2_BUCKET)%'

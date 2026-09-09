@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Service;
 
 use App\Service\AvatarService;
+use League\Flysystem\Filesystem;
+use League\Flysystem\FilesystemOperator;
+use League\Flysystem\Local\LocalFilesystemAdapter;
+use League\Flysystem\UnableToWriteFile;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -40,10 +44,15 @@ class AvatarServiceTest extends TestCase
         }
     }
 
-    private function service(float $maxFileSize = 5 * 1024 * 1024): AvatarService
+    private function storage(?string $directory = null): FilesystemOperator
+    {
+        return new Filesystem(new LocalFilesystemAdapter($directory ?? $this->uploadDir));
+    }
+
+    private function service(float $maxFileSize = 5 * 1024 * 1024, ?FilesystemOperator $storage = null): AvatarService
     {
         return new AvatarService(
-            $this->uploadDir,
+            $storage ?? $this->storage(),
             '/uploads/avatars',
             $maxFileSize,
             new AsciiSlugger(),
@@ -130,19 +139,16 @@ class AvatarServiceTest extends TestCase
 
     public function testUploadAvatarThrowsARuntimeExceptionWhenTheDestinationCannotBeCreated(): void
     {
-        // Un fichier regulier occupe deja le chemin cible : mkdir() echoue meme en root.
-        $blockedPath = sys_get_temp_dir() . '/avatar-blocked-' . uniqid();
-        file_put_contents($blockedPath, 'obstacle');
-        $service = new AvatarService($blockedPath, '/uploads/avatars', 5 * 1024 * 1024, new AsciiSlugger(), $this->logger);
+        $failingStorage = $this->createStub(FilesystemOperator::class);
+        $failingStorage->method('writeStream')->willThrowException(
+            UnableToWriteFile::atLocation('avatar.jpg', 'erreur simulée pour ce test')
+        );
+        $service = $this->service(storage: $failingStorage);
         $file = $this->uploadedJpeg();
         $this->logger->expects(self::once())->method('error');
 
-        try {
-            $this->expectException(\RuntimeException::class);
-            $service->uploadAvatar($file, 1);
-        } finally {
-            @unlink($blockedPath);
-        }
+        $this->expectException(\RuntimeException::class);
+        $service->uploadAvatar($file, 1);
     }
 
     // ==================== deleteAvatar ====================
