@@ -12,6 +12,7 @@ use App\Entity\Voyage;
 use App\Repository\AvisRepository;
 use App\Repository\DemandeRepository;
 use App\Repository\MessageRepository;
+use App\Repository\UserRepository;
 use App\Repository\VoyageRepository;
 use App\Service\Admin\AuditLogService;
 use App\Service\Admin\ModerationService;
@@ -41,6 +42,7 @@ class ModerationServiceTest extends TestCase
     private NotificationService&\PHPUnit\Framework\MockObject\MockObject $notificationService;
     private AuditLogService&\PHPUnit\Framework\MockObject\MockObject $auditLogService;
     private UserService&\PHPUnit\Framework\MockObject\MockObject $userService;
+    private UserRepository&\PHPUnit\Framework\MockObject\MockObject $userRepository;
     private ModerationService $service;
 
     protected function setUp(): void
@@ -53,6 +55,10 @@ class ModerationServiceTest extends TestCase
         $this->notificationService = $this->createMock(NotificationService::class);
         $this->auditLogService = $this->createMock(AuditLogService::class);
         $this->userService = $this->createMock(UserService::class);
+        $this->userRepository = $this->createMock(UserRepository::class);
+        // Par defaut, plusieurs admins existent (aucun garde-fou "dernier admin" a
+        // declencher) - les tests dedies a ce garde-fou surchargent explicitement.
+        $this->userRepository->method('countByRole')->with('ROLE_ADMIN')->willReturn(2);
 
         $this->service = new ModerationService(
             $this->em,
@@ -63,6 +69,7 @@ class ModerationServiceTest extends TestCase
             $this->notificationService,
             $this->auditLogService,
             $this->userService,
+            $this->userRepository,
         );
     }
 
@@ -166,6 +173,40 @@ class ModerationServiceTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
         $this->service->updateUserRoles($target, ['ROLE_SUPERUSER'], $admin);
+    }
+
+    public function testUpdateUserRolesRejectsRemovingTheLastAdmin(): void
+    {
+        $admin = $this->user(1, ['ROLE_ADMIN']);
+        $target = $this->user(2, ['ROLE_ADMIN']);
+        $this->userRepository = $this->createMock(UserRepository::class);
+        $this->userRepository->method('countByRole')->with('ROLE_ADMIN')->willReturn(1);
+        $this->service = new ModerationService(
+            $this->em,
+            $this->voyageRepository,
+            $this->demandeRepository,
+            $this->avisRepository,
+            $this->messageRepository,
+            $this->notificationService,
+            $this->auditLogService,
+            $this->userService,
+            $this->userRepository,
+        );
+        $this->em->expects(self::never())->method('flush');
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->service->updateUserRoles($target, ['ROLE_USER'], $admin);
+    }
+
+    public function testUpdateUserRolesAllowsRemovingAnAdminRoleWhenAnotherAdminRemains(): void
+    {
+        $admin = $this->user(1, ['ROLE_ADMIN']);
+        $target = $this->user(2, ['ROLE_ADMIN']);
+        // countByRole('ROLE_ADMIN') -> 2 par defaut (setUp) : au moins un autre admin subsiste.
+
+        $this->service->updateUserRoles($target, ['ROLE_USER'], $admin);
+
+        self::assertSame(['ROLE_USER'], $target->getRoles());
     }
 
     // ==================== deleteUser ====================
