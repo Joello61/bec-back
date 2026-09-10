@@ -26,6 +26,7 @@ readonly class ModerationService
         private NotificationService $notificationService,
         private AuditLogService $auditLogService,
         private UserService $userService,
+        private UserRepository $userRepository,
     ) {}
 
     // ==================== GESTION DES UTILISATEURS ====================
@@ -121,6 +122,18 @@ readonly class ModerationService
             if (!in_array($role, $validRoles)) {
                 throw new \InvalidArgumentException("Rôle invalide : {$role}");
             }
+        }
+
+        // Garde-fou explicite : retirer ROLE_ADMIN au dernier administrateur du systeme est
+        // deja impossible en pratique via cette methode (un admin ne peut pas modifier ses
+        // propres roles, cf. plus haut - il faudrait donc qu'un admin retire ce role a un
+        // AUTRE admin qui serait pourtant le dernier, ce qui suppose deja 2+ admins). Rendu
+        // explicite plutot que de reposer sur cet effet de bord non intentionnel.
+        if (in_array('ROLE_ADMIN', $oldRoles, true)
+            && !in_array('ROLE_ADMIN', $roles, true)
+            && $this->userRepository->countByRole('ROLE_ADMIN') <= 1
+        ) {
+            throw new \InvalidArgumentException('Impossible de retirer le rôle administrateur du dernier administrateur du système');
         }
 
         $user->setRoles($roles);
