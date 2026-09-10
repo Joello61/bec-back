@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Scheduler;
 
+use App\Message\ExpireBansMessage;
 use App\Message\ExpireDemandesMessage;
 use App\Message\ExpireVoyagesMessage;
 use App\Scheduler\ExpirationScheduleProvider;
@@ -13,7 +14,7 @@ use Symfony\Component\Scheduler\RecurringMessage;
 
 /**
  * Phase 4b, Lot 12 (bec-docs/docs/plan-correction/plan-correction-cobage.md) : verifie que
- * les deux cron d'expiration sont bien enregistres, avec la bonne expression et le bon
+ * les cron d'expiration sont bien enregistres, avec la bonne expression et le bon
  * message associe - une erreur ici (mauvaise expression, message manquant) ne serait
  * jamais detectee autrement qu'en observant l'absence d'expiration en production.
  */
@@ -31,11 +32,11 @@ class ExpirationScheduleProviderTest extends TestCase
         return iterator_to_array($recurringMessage->getMessages($context));
     }
 
-    public function testScheduleRegistersExactlyTwoRecurringMessages(): void
+    public function testScheduleRegistersExactlyThreeRecurringMessages(): void
     {
         $schedule = (new ExpirationScheduleProvider())->getSchedule();
 
-        self::assertCount(2, $schedule->getRecurringMessages());
+        self::assertCount(3, $schedule->getRecurringMessages());
     }
 
     public function testVoyagesExpirationRunsDailyAtTwoAm(): void
@@ -64,5 +65,19 @@ class ExpirationScheduleProviderTest extends TestCase
 
         self::assertNotFalse($demandeEntry, 'aucun RecurringMessage ne porte ExpireDemandesMessage');
         self::assertStringContainsString('30 2 * * *', (string) $demandeEntry->getTrigger());
+    }
+
+    public function testBansExpirationRunsHourly(): void
+    {
+        $schedule = (new ExpirationScheduleProvider())->getSchedule();
+        $recurringMessages = $schedule->getRecurringMessages();
+
+        $banEntry = current(array_filter(
+            $recurringMessages,
+            fn (RecurringMessage $rm) => $this->messagesFor($rm)[0] instanceof ExpireBansMessage
+        ));
+
+        self::assertNotFalse($banEntry, 'aucun RecurringMessage ne porte ExpireBansMessage');
+        self::assertStringContainsString('every 1 hour', (string) $banEntry->getTrigger());
     }
 }
