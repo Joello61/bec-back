@@ -64,11 +64,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $bio = null;
 
     #[ORM\Column]
-    #[Groups(['user:read', 'admin:user:list'])]
+    #[Groups(['user:read', 'admin:user:list', 'admin:user:read'])]
     private bool $emailVerifie = false;
 
     #[ORM\Column]
-    #[Groups(['user:read', 'admin:user:list'])]
+    #[Groups(['user:read', 'admin:user:list', 'admin:user:read'])]
     private bool $telephoneVerifie = false;
 
     // Champs OAuth
@@ -90,15 +90,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?\DateTimeInterface $updatedAt = null;
 
     #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
-    #[Groups(['user:read', 'admin:user:list'])]
+    #[Groups(['user:read', 'admin:user:list', 'admin:user:read'])]
     private bool $isBanned = false;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
-    #[Groups(['user:read', 'admin:user:list'])]
+    #[Groups(['user:read', 'admin:user:list', 'admin:user:read'])]
     private ?\DateTimeInterface $bannedAt = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
-    #[Groups(['user:read', 'admin:user:list'])]
+    #[Groups(['user:read', 'admin:user:list', 'admin:user:read'])]
     private ?\DateTimeInterface $bannedUntil = null;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
@@ -106,12 +106,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?\DateTimeImmutable $deletedAt = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
-    #[Groups(['admin:user:list'])]
+    #[Groups(['admin:user:list', 'admin:user:read'])]
     private ?string $banReason = null;
 
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
-    #[Groups(['admin:user:list'])]
+    #[Groups(['admin:user:list', 'admin:user:read'])]
     private ?User $bannedBy = null;
 
     #[ORM\OneToOne(targetEntity: UserSettings::class, mappedBy: 'user', cascade: ['persist', 'remove'])]

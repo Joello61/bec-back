@@ -7,6 +7,7 @@ namespace App\Tests\Functional\Admin;
 use App\Entity\Conversation;
 use App\Entity\Message;
 use App\Entity\User;
+use App\Service\Admin\ModerationService;
 use App\Tests\Support\JwtAuthenticationTrait;
 use App\Tests\Support\UserFactoryTrait;
 use Doctrine\ORM\EntityManagerInterface;
@@ -122,6 +123,27 @@ class AdminUserControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
         $payload = json_decode($this->client->getResponse()->getContent(), true);
         self::assertSame($target->getId(), $payload['id']);
+    }
+
+    public function testShowExposesBanAndVerificationStatus(): void
+    {
+        // Regression Phase 7b-B (decouverte en ecrivant e2e/admin.spec.ts) : le groupe de
+        // serialisation 'admin:user:read' n'exposait ni isBanned/bannedAt/banReason ni
+        // emailVerifie/telephoneVerifie - la page de detail admin affichait toujours "Actif"
+        // et le bouton "Bannir", meme sur un utilisateur reellement banni.
+        $target = $this->createUser('admin-user-show-ban-fields');
+        $admin = $this->admin('admin-user-show-ban-fields-admin');
+        static::getContainer()->get(ModerationService::class)->banUser($target, $admin, 'raison de test');
+        $this->authenticateAs($admin);
+
+        $this->client->request('GET', '/api/admin/users/' . $target->getId());
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertTrue($payload['isBanned']);
+        self::assertSame('raison de test', $payload['banReason']);
+        self::assertArrayHasKey('emailVerifie', $payload);
+        self::assertArrayHasKey('telephoneVerifie', $payload);
     }
 
     // ==================== ban ====================
