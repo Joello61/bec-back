@@ -50,6 +50,14 @@ class BannedUserListener
             return;
         }
 
+        // Bannissement temporaire arrive a echeance : effet immediat ici (avant meme le
+        // nettoyage asynchrone de isBanned par ModerationService::expireBan(), planifie
+        // via ExpirationScheduleProvider) - ne jamais faire attendre un utilisateur jusqu'au
+        // prochain passage du scheduler pour recuperer l'acces.
+        if ($user->isBanExpired()) {
+            return;
+        }
+
         // Autoriser l'accès à la route de logout
         $path = $request->getPathInfo();
         if (str_contains($path, '/logout') || str_contains($path, '/api/logout')) {

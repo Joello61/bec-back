@@ -34,7 +34,7 @@ readonly class ModerationService
     /**
      * Bannir un utilisateur
      */
-    public function banUser(User $user, User $admin, string $reason): void
+    public function banUser(User $user, User $admin, string $reason, ?\DateTimeInterface $bannedUntil = null): void
     {
         if ($user->getId() === $admin->getId()) {
             throw new \InvalidArgumentException('Un administrateur ne peut pas se bannir lui-même');
@@ -45,7 +45,7 @@ readonly class ModerationService
         }
 
         // Bannir l'utilisateur
-        $user->ban($admin, $reason);
+        $user->ban($admin, $reason, $bannedUntil);
 
         $this->entityManager->flush();
 
@@ -62,7 +62,41 @@ readonly class ModerationService
                 'reason' => $reason,
                 'email' => $user->getEmail(),
                 'nom' => $user->getNom() . ' ' . $user->getPrenom(),
+                'bannedUntil' => $bannedUntil?->format(\DateTimeInterface::ATOM),
             ]
+        );
+    }
+
+    /**
+     * Leve un bannissement temporaire arrive a echeance. Declenche par
+     * ExpireBansHandler (planifie), jamais par un admin - BannedUserListener donne deja
+     * l'effet immediat au niveau de la requete (User::isBanExpired()), cette methode ne
+     * fait que nettoyer isBanned en base. Pas d'acteur admin distinct pour un evenement
+     * systeme : l'utilisateur est journalise comme acteur de sa propre reactivation, sur
+     * le meme patron que PromoteAdminCommand/RevokeAdminCommand.
+     */
+    public function expireBan(User $user): void
+    {
+        if (!$user->isBanned() || !$user->isBanExpired()) {
+            return;
+        }
+
+        $user->unban();
+        $this->entityManager->flush();
+
+        $this->notificationService->createNotification(
+            $user,
+            'account_unbanned',
+            'Compte réactivé',
+            'Votre bannissement temporaire est arrivé à échéance. Vous pouvez à nouveau accéder à toutes les fonctionnalités.',
+        );
+
+        $this->auditLogService->logAdminAction(
+            $user,
+            'ban_expired',
+            'user',
+            $user->getId(),
+            ['email' => $user->getEmail()]
         );
     }
 
