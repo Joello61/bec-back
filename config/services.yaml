@@ -147,10 +147,6 @@ services:
         tags:
             - { name: kernel.event_listener, event: kernel.exception, priority: 10 }
 
-    App\EventListener\BannedUserListener:
-        tags:
-        - { name: kernel.event_listener, event: kernel.request, priority: 10 }
-
     App\Monolog\RequestIdProcessor:
         tags: ['monolog.processor']
 

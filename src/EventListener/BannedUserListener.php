@@ -8,22 +8,38 @@ use App\Entity\User;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpKernel\Event\RequestEvent;
+use Symfony\Component\HttpKernel\Event\ControllerArgumentsEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 
 /**
  * Listener qui bloque automatiquement les utilisateurs bannis
  * sauf sur les routes de logout
+ *
+ * Bug decouvert en session (Phase 7b-B, e2e/admin.spec.ts) : ce listener etait accroche sur
+ * KernelEvents::REQUEST (via un tag manuel dans config/services.yaml, en plus de l'attribut
+ * ci-dessous - double enregistrement redondant, retire) et lisait TokenStorageInterface a ce
+ * moment-la. Or pour le firewall "api" (stateless, authentification JWT), le token n'est
+ * authentifie que lazily, au moment ou quelque chose le consulte reellement pour la premiere
+ * fois - constate empiriquement (log temporaire) : token toujours NULL sur kernel.request,
+ * quelle que soit la priorite testee (10, 7, -100), et encore NULL sur kernel.controller. Le
+ * premier point ou le token est garanti authentifie est KernelEvents::CONTROLLER_ARGUMENTS
+ * (declenche par la resolution des arguments du controleur, notamment les attributs
+ * #[IsGranted]/#[CurrentUser] qui forcent l'authentification - IsGrantedAttributeListener
+ * s'y accroche a priority: 20, ce listener-ci a une priorite plus basse pour s'executer
+ * apres). Consequence concrete du bug : un utilisateur banni continuait de repondre 200 sur
+ * /api/me indefiniment - seul le test unitaire dedie (mock direct de TokenStorageInterface,
+ * sans dispatch reel du cycle kernel/firewall) le masquait. Regression couverte par
+ * tests/Functional/BannedUserAccessTest.php (dispatch reel, pas de mock du firewall).
  */
-#[AsEventListener(event: KernelEvents::REQUEST, priority: 10)]
+#[AsEventListener(event: KernelEvents::CONTROLLER_ARGUMENTS, priority: 0)]
 class BannedUserListener
 {
     public function __construct(
         private readonly TokenStorageInterface $tokenStorage,
     ) {}
 
-    public function __invoke(RequestEvent $event): void
+    public function __invoke(ControllerArgumentsEvent $event): void
     {
         // Ne traiter que les requêtes principales
         if (!$event->isMainRequest()) {
@@ -101,6 +117,10 @@ class BannedUserListener
             'reason' => $banReason,
         ], Response::HTTP_FORBIDDEN);
 
-        $event->setResponse($response);
+        // ControllerArgumentsEvent (contrairement a RequestEvent) n'a pas de setResponse() -
+        // court-circuiter en remplaçant le controleur par une closure qui retourne directement
+        // la reponse (patron documente pour ce type d'evenement), sans arguments a resoudre.
+        $event->setController(fn () => $response);
+        $event->setArguments([]);
     }
 }

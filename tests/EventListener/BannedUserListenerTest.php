@@ -10,15 +10,18 @@ use App\Tests\Support\EntityIdTrait;
 use App\Tests\Support\MockTokenTrait;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpKernel\Event\RequestEvent;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Event\ControllerArgumentsEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
 
 /**
- * Phase 4b, Lot 13 (bec-docs/docs/plan-correction/plan-correction-cobage.md) : unitaire pur,
- * mock TokenStorageInterface - verifie que le listener bloque bien un utilisateur banni,
- * sauf sur /logout et les routes publiques d'authentification, et laisse passer un
- * utilisateur non banni ou un appelant anonyme.
+ * Phase 4b, Lot 13 (bec-docs/docs/plan-correction/plan-correction-cobage.md), revu en Phase
+ * 7b-B (bug de timing corrige, voir BannedUserListener.php) : unitaire pur, mock
+ * TokenStorageInterface - verifie la LOGIQUE du listener (routes autorisees, expiration de
+ * bannissement temporaire) en isolation. Ne peut pas, par construction, detecter un probleme
+ * d'ordonnancement reel entre listeners/evenements - c'est le role de
+ * tests/Functional/BannedUserAccessTest.php (dispatch reel du kernel, sans mock du firewall).
  */
 class BannedUserListenerTest extends TestCase
 {
@@ -53,17 +56,33 @@ class BannedUserListenerTest extends TestCase
         return $user;
     }
 
-    private function event(string $path, ?User $user, bool $subRequest = false): RequestEvent
+    /**
+     * Le controleur "original" retourne un marqueur distinct de toute reponse produite par le
+     * listener (403) - permet de distinguer "controleur remplace" (bloque) de "controleur
+     * inchange" (laisse passer) sans dependre d'une methode hasResponse()/getResponse(), qui
+     * n'existe pas sur ControllerArgumentsEvent (contrairement a RequestEvent).
+     */
+    private function event(string $path, ?User $user, bool $subRequest = false): ControllerArgumentsEvent
     {
         $this->tokenStorage->method('getToken')->willReturn($user !== null ? $this->tokenFor($user) : null);
 
         $request = Request::create($path);
+        $originalController = static fn () => new Response('original', 200);
 
-        return new RequestEvent(
+        return new ControllerArgumentsEvent(
             $this->kernel,
+            $originalController,
+            [],
             $request,
             $subRequest ? HttpKernelInterface::SUB_REQUEST : HttpKernelInterface::MAIN_REQUEST
         );
+    }
+
+    private function resultingResponse(ControllerArgumentsEvent $event): Response
+    {
+        $controller = $event->getController();
+
+        return $controller(...$event->getArguments());
     }
 
     // ==================== blocage ====================
@@ -73,10 +92,10 @@ class BannedUserListenerTest extends TestCase
         $event = $this->event('/api/voyages', $this->bannedUser());
 
         $this->listener->__invoke($event);
+        $response = $this->resultingResponse($event);
 
-        self::assertTrue($event->hasResponse());
-        self::assertSame(403, $event->getResponse()->getStatusCode());
-        $payload = json_decode($event->getResponse()->getContent(), true);
+        self::assertSame(403, $response->getStatusCode());
+        $payload = json_decode($response->getContent(), true);
         self::assertSame('account_banned', $payload['error']);
         self::assertStringContainsString('Comportement inapproprie', $payload['message']);
     }
@@ -89,8 +108,7 @@ class BannedUserListenerTest extends TestCase
 
         $this->listener->__invoke($event);
 
-        self::assertTrue($event->hasResponse());
-        self::assertSame(403, $event->getResponse()->getStatusCode());
+        self::assertSame(403, $this->resultingResponse($event)->getStatusCode());
     }
 
     // ==================== bannissement temporaire arrive a echeance ====================
@@ -103,7 +121,7 @@ class BannedUserListenerTest extends TestCase
 
         $this->listener->__invoke($event);
 
-        self::assertFalse($event->hasResponse());
+        self::assertSame('original', $this->resultingResponse($event)->getContent());
     }
 
     // ==================== routes toujours autorisees ====================
@@ -114,7 +132,7 @@ class BannedUserListenerTest extends TestCase
 
         $this->listener->__invoke($event);
 
-        self::assertFalse($event->hasResponse());
+        self::assertSame('original', $this->resultingResponse($event)->getContent());
     }
 
     public function testAllowsABannedUserToLogin(): void
@@ -123,7 +141,7 @@ class BannedUserListenerTest extends TestCase
 
         $this->listener->__invoke($event);
 
-        self::assertFalse($event->hasResponse());
+        self::assertSame('original', $this->resultingResponse($event)->getContent());
     }
 
     public function testAllowsABannedUserToResetPassword(): void
@@ -132,7 +150,7 @@ class BannedUserListenerTest extends TestCase
 
         $this->listener->__invoke($event);
 
-        self::assertFalse($event->hasResponse());
+        self::assertSame('original', $this->resultingResponse($event)->getContent());
     }
 
     // ==================== cas passants ====================
@@ -147,7 +165,7 @@ class BannedUserListenerTest extends TestCase
 
         $this->listener->__invoke($event);
 
-        self::assertFalse($event->hasResponse());
+        self::assertSame('original', $this->resultingResponse($event)->getContent());
     }
 
     public function testAllowsAnAnonymousCaller(): void
@@ -156,7 +174,7 @@ class BannedUserListenerTest extends TestCase
 
         $this->listener->__invoke($event);
 
-        self::assertFalse($event->hasResponse());
+        self::assertSame('original', $this->resultingResponse($event)->getContent());
     }
 
     // ==================== sub-request ====================
@@ -167,6 +185,6 @@ class BannedUserListenerTest extends TestCase
 
         $this->listener->__invoke($event);
 
-        self::assertFalse($event->hasResponse());
+        self::assertSame('original', $this->resultingResponse($event)->getContent());
     }
 }
