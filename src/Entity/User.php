@@ -97,6 +97,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read', 'admin:user:list'])]
     private ?\DateTimeInterface $bannedAt = null;
 
+    #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
+    #[Groups(['user:read', 'admin:user:list'])]
+    private ?\DateTimeInterface $bannedUntil = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     #[Groups(['admin:user:list', 'admin:user:read'])]
     private ?\DateTimeImmutable $deletedAt = null;
@@ -546,6 +550,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             $this->bannedAt = null;
             $this->banReason = null;
             $this->bannedBy = null;
+            $this->bannedUntil = null;
         }
         return $this;
     }
@@ -559,6 +564,28 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         $this->bannedAt = $bannedAt;
         return $this;
+    }
+
+    /**
+     * Date de fin d'un bannissement temporaire - null pour un bannissement permanent.
+     * L'expiration reelle est verifiee en lecture (BannedUserListener, a chaque requete,
+     * effet immediat) ; le nettoyage de isBanned lui-meme est asynchrone
+     * (ModerationService::expireBan(), planifie via ExpirationScheduleProvider).
+     */
+    public function getBannedUntil(): ?\DateTimeInterface
+    {
+        return $this->bannedUntil;
+    }
+
+    public function setBannedUntil(?\DateTimeInterface $bannedUntil): static
+    {
+        $this->bannedUntil = $bannedUntil;
+        return $this;
+    }
+
+    public function isBanExpired(): bool
+    {
+        return $this->bannedUntil !== null && $this->bannedUntil <= new \DateTime();
     }
 
     public function getBanReason(): ?string
@@ -583,12 +610,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function ban(User $admin, string $reason): static
+    public function ban(User $admin, string $reason, ?\DateTimeInterface $bannedUntil = null): static
     {
         $this->isBanned = true;
         $this->bannedAt = new \DateTime();
         $this->banReason = $reason;
         $this->bannedBy = $admin;
+        $this->bannedUntil = $bannedUntil;
         return $this;
     }
 
@@ -598,6 +626,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->bannedAt = null;
         $this->banReason = null;
         $this->bannedBy = null;
+        $this->bannedUntil = null;
         return $this;
     }
 

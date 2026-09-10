@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Scheduler;
 
+use App\Message\ExpireBansMessage;
 use App\Message\ExpireDemandesMessage;
 use App\Message\ExpireVoyagesMessage;
 use Symfony\Component\Scheduler\Attribute\AsSchedule;
@@ -32,6 +33,16 @@ class ExpirationScheduleProvider implements ScheduleProviderInterface
                 RecurringMessage::cron(
                     '30 2 * * *',
                     new ExpireDemandesMessage()
+                )
+            )
+
+            // ==================== LEVEE DES BANNISSEMENTS TEMPORAIRES ====================
+            // Toutes les heures - simple nettoyage de isBanned en base, l'effet cote
+            // utilisateur est deja immediat via BannedUserListener (voir ExpireBansHandler)
+            ->add(
+                RecurringMessage::every(
+                    '1 hour',
+                    new ExpireBansMessage()
                 )
             );
     }

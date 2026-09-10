@@ -101,6 +101,18 @@ class ModerationServiceTest extends TestCase
         self::assertTrue($target->isBanned());
     }
 
+    public function testBanUserPersistsATemporaryBanUntilDate(): void
+    {
+        $admin = $this->user(1, ['ROLE_ADMIN']);
+        $target = $this->user(2);
+        $until = new \DateTime('+7 days');
+
+        $this->service->banUser($target, $admin, 'spam recurrent', $until);
+
+        self::assertTrue($target->isBanned());
+        self::assertSame($until, $target->getBannedUntil());
+    }
+
     public function testBanUserRejectsSelfTargeting(): void
     {
         $admin = $this->user(1, ['ROLE_ADMIN']);
@@ -142,6 +154,56 @@ class ModerationServiceTest extends TestCase
 
         $this->expectException(\InvalidArgumentException::class);
         $this->service->unbanUser($target, $admin);
+    }
+
+    // ==================== expireBan ====================
+
+    public function testExpireBanLiftsAnExpiredTemporaryBanAndLogs(): void
+    {
+        $admin = $this->user(1, ['ROLE_ADMIN']);
+        $target = $this->user(2);
+        $target->ban($admin, 'spam', new \DateTime('-1 hour'));
+        $this->notificationService->expects(self::once())->method('createNotification');
+        $this->auditLogService->expects(self::once())->method('logAdminAction')->with($target, 'ban_expired', 'user', 2, self::isArray());
+        $this->em->expects(self::once())->method('flush');
+
+        $this->service->expireBan($target);
+
+        self::assertFalse($target->isBanned());
+    }
+
+    public function testExpireBanIsANoopOnANonBannedUser(): void
+    {
+        $target = $this->user(2);
+        $this->em->expects(self::never())->method('flush');
+        $this->auditLogService->expects(self::never())->method('logAdminAction');
+
+        $this->service->expireBan($target);
+    }
+
+    public function testExpireBanIsANoopOnAPermanentBan(): void
+    {
+        $admin = $this->user(1, ['ROLE_ADMIN']);
+        $target = $this->user(2);
+        $target->ban($admin, 'spam'); // pas de bannedUntil : permanent
+        $this->em->expects(self::never())->method('flush');
+        $this->auditLogService->expects(self::never())->method('logAdminAction');
+
+        $this->service->expireBan($target);
+
+        self::assertTrue($target->isBanned());
+    }
+
+    public function testExpireBanIsANoopOnATemporaryBanNotYetDue(): void
+    {
+        $admin = $this->user(1, ['ROLE_ADMIN']);
+        $target = $this->user(2);
+        $target->ban($admin, 'spam', new \DateTime('+1 hour'));
+        $this->em->expects(self::never())->method('flush');
+
+        $this->service->expireBan($target);
+
+        self::assertTrue($target->isBanned());
     }
 
     // ==================== updateUserRoles ====================

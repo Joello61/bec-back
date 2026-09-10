@@ -81,6 +81,31 @@ class BannedUserListenerTest extends TestCase
         self::assertStringContainsString('Comportement inapproprie', $payload['message']);
     }
 
+    public function testBlocksAUserWithAnActiveTemporaryBan(): void
+    {
+        $user = $this->bannedUser();
+        $user->setBannedUntil(new \DateTime('+1 hour'));
+        $event = $this->event('/api/voyages', $user);
+
+        $this->listener->__invoke($event);
+
+        self::assertTrue($event->hasResponse());
+        self::assertSame(403, $event->getResponse()->getStatusCode());
+    }
+
+    // ==================== bannissement temporaire arrive a echeance ====================
+
+    public function testAllowsAUserWhoseTemporaryBanHasExpired(): void
+    {
+        $user = $this->bannedUser();
+        $user->setBannedUntil(new \DateTime('-1 minute'));
+        $event = $this->event('/api/voyages', $user);
+
+        $this->listener->__invoke($event);
+
+        self::assertFalse($event->hasResponse());
+    }
+
     // ==================== routes toujours autorisees ====================
 
     public function testAllowsABannedUserToLogout(): void

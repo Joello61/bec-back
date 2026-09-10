@@ -187,6 +187,47 @@ class AdminUserControllerTest extends WebTestCase
         self::assertTrue($target->isBanned());
     }
 
+    public function testBanUserPersistsATemporaryBanUntilDate(): void
+    {
+        $target = $this->createUser('admin-user-ban-temp');
+        $this->authenticateAs($this->admin('admin-user-ban-temp-admin'));
+        $bannedUntil = (new \DateTime('+7 days'))->format('c');
+
+        $this->client->request(
+            'POST',
+            '/api/admin/users/' . $target->getId() . '/ban',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode([
+                'reason' => 'Comportement inapproprie et repete',
+                'type' => 'temporary',
+                'bannedUntil' => $bannedUntil,
+            ])
+        );
+
+        self::assertResponseIsSuccessful();
+        $this->em->refresh($target);
+        self::assertTrue($target->isBanned());
+        self::assertNotNull($target->getBannedUntil());
+    }
+
+    public function testBanUserRejectsATemporaryTypeWithoutADate(): void
+    {
+        $target = $this->createUser('admin-user-ban-temp-missing-date');
+        $this->authenticateAs($this->admin('admin-user-ban-temp-missing-date-admin'));
+
+        $this->client->request(
+            'POST',
+            '/api/admin/users/' . $target->getId() . '/ban',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode([
+                'reason' => 'Comportement inapproprie et repete',
+                'type' => 'temporary',
+            ])
+        );
+
+        self::assertResponseStatusCodeSame(422);
+    }
+
     // ==================== unban ====================
 
     public function testUnbanUserRejectsANonBannedUser(): void

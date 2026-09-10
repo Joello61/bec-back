@@ -183,7 +183,7 @@ class AdminUserController extends AbstractController
         $admin = $this->getUser();
 
         try {
-            $this->moderationService->banUser($user, $admin, $dto->reason);
+            $this->moderationService->banUser($user, $admin, $dto->reason, $dto->bannedUntil);
 
             // Supprimer les contenus si demandé
             if ($dto->deleteContent) {
