@@ -80,6 +80,7 @@ class VoyageController extends AbstractController
     #[OA\Parameter(name: 'villeArrivee', in: 'query', schema: new OA\Schema(type: 'string'))]
     #[OA\Parameter(name: 'dateDepart', in: 'query', schema: new OA\Schema(type: 'string', format: 'date'))]
     #[OA\Parameter(name: 'statut', in: 'query', schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(name: 'search', in: 'query', description: 'Recherche sur nom/prenom/email du voyageur (moderation admin)', schema: new OA\Schema(type: 'string', maxLength: 100))]
     #[OA\Response(response: 200, description: 'Liste paginée des voyages')]
     public function list(Request $request): JsonResponse
     {
@@ -95,6 +96,7 @@ class VoyageController extends AbstractController
             'villeArrivee' => $request->query->get('villeArrivee'),
             'dateDepart' => $request->query->get('dateDepart'),
             'statut' => $request->query->get('statut'),
+            'search' => substr((string) $request->query->get('search', ''), 0, 100) ?: null,
         ];
 
         $result = $this->voyageService->getPaginatedVoyages($page, $limit, $filters, $currentUser);

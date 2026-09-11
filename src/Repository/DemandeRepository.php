@@ -43,6 +43,15 @@ class DemandeRepository extends ServiceEntityRepository
             $qb->andWhere('d.dateLimite <= :today')
                 ->setParameter('today', new \DateTime('today'));
         }
+
+        // Recherche texte libre admin (Phase 13/Lot B5, plan-correction-cobage.md) : sur le
+        // proprietaire (nom/prenom/email), pas sur les villes (deja des filtres dedies
+        // villeDepart/villeArrivee, redondant). L'alias "u" (d.client) est deja joint par
+        // les deux appelantes de applyFilters() (findPaginated/findPublicPaginated).
+        if (!empty($filters['search'])) {
+            $qb->andWhere('u.nom LIKE :search OR u.prenom LIKE :search OR u.email LIKE :search')
+                ->setParameter('search', '%' . $filters['search'] . '%');
+        }
     }
 
     /**
@@ -69,6 +78,11 @@ class DemandeRepository extends ServiceEntityRepository
 
         $countQb = $this->createQueryBuilder('d')
             ->select('COUNT(d.id)')
+            // "u" jamais utilise par un filtre reel ici (route publique, jamais de
+            // parametre "search") - joint quand meme pour que applyFilters() reste valide
+            // dans les deux QueryBuilder qu'elle recoit, meme si l'appel se fait un jour
+            // avec "search" (Phase 13/Lot B5).
+            ->leftJoin('d.client', 'u')
             ->andWhere('d.statut = :statut')
             ->setParameter('statut', 'en_recherche');
 

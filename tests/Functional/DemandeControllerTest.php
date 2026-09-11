@@ -174,6 +174,29 @@ class DemandeControllerTest extends WebTestCase
         self::assertNotContains($other->getId(), $ids);
     }
 
+    /**
+     * Recherche texte libre admin (Phase 13/Lot B5, plan-correction-cobage.md) : sur le
+     * proprietaire (nom/prenom/email), pas sur les villes - le champ frontend
+     * (demandes-clients.tsx, admin) etait jusqu'ici totalement inerte.
+     */
+    public function testListFiltersBySearchOnOwnerName(): void
+    {
+        $viewer = $this->createUser('demande-search-viewer');
+        $matchingOwner = $this->createUser('DemandeSearchOwnerUnique');
+        $otherOwner = $this->createUser('demande-search-other-owner');
+        $matching = $this->createDemande($matchingOwner);
+        $other = $this->createDemande($otherOwner);
+        $this->authenticateAs($viewer);
+
+        $this->client->request('GET', '/api/demandes?search=DemandeSearchOwnerUnique');
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        $ids = array_column($payload['data'], 'id');
+        self::assertContains($matching->getId(), $ids);
+        self::assertNotContains($other->getId(), $ids);
+    }
+
     private function createDemande(User $client, string $villeDepart = 'Douala', string $villeArrivee = 'Paris'): Demande
     {
         $demande = new Demande();
