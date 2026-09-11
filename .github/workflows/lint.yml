@@ -167,6 +167,17 @@ jobs:
       - name: Run tests
         run: php bin/phpunit
 
+  # Workflow reutilisable heberge par bec-infra (proprietaire de docker-compose.yml, la
+  # stack complete necessaire a l'E2E) - ne se declenche qu'une fois les verifications
+  # propres a ce depot vertes. Necessite la policy d'acces cross-repo de bec-infra
+  # (Settings > Actions > Access) autorisant ce depot.
+  e2e:
+    name: E2E (via bec-infra)
+    needs: [backend-analysis, backend-tests]
+    uses: Joello61/bec-infra/.github/workflows/e2e.yml@main
+    with:
+      backend_ref: ${{ github.sha }}
+
   secret-scan:
     name: Secret scanning (gitleaks)
     runs-on: ubuntu-latest
