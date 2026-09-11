@@ -6,12 +6,14 @@ namespace App\Controller\Admin;
 
 use App\DTO\Admin\DeleteContentDTO;
 use App\Entity\User;
+use App\Repository\AvisRepository;
 use App\Repository\UserRepository;
 use App\Service\Admin\ModerationService;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
@@ -25,7 +27,40 @@ class AdminModerationController extends AbstractController
     public function __construct(
         private readonly ModerationService $moderationService,
         private readonly UserRepository $userRepository,
+        private readonly AvisRepository $avisRepository,
     ) {}
+
+    /**
+     * Liste paginée des avis (modération)
+     */
+    #[Route('/avis', name: 'list_avis', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/admin/moderation/avis',
+        summary: 'Liste des avis (modération)',
+        security: [['cookieAuth' => []]]
+    )]
+    #[OA\Parameter(name: 'page', in: 'query', schema: new OA\Schema(type: 'integer', default: 1))]
+    #[OA\Parameter(name: 'limit', in: 'query', schema: new OA\Schema(type: 'integer', default: 20))]
+    #[OA\Parameter(
+        name: 'maxNote',
+        description: 'Filtrer les avis dont la note est inférieure ou égale à cette valeur',
+        in: 'query',
+        schema: new OA\Schema(type: 'integer')
+    )]
+    #[OA\Response(response: 200, description: 'Liste paginée')]
+    public function listAvis(Request $request): JsonResponse
+    {
+        $page = $request->query->getInt('page', 1);
+        $limit = min($request->query->getInt('limit', 20), 50);
+
+        $filters = array_filter([
+            'maxNote' => $request->query->get('maxNote') !== null ? $request->query->getInt('maxNote') : null,
+        ], fn($value) => $value !== null);
+
+        $result = $this->avisRepository->findAllPaginated($page, $limit, $filters);
+
+        return $this->json($result, Response::HTTP_OK, [], ['groups' => ['admin:avis:list', 'admin:user:list']]);
+    }
 
     /**
      * Supprimer un voyage
