@@ -68,8 +68,14 @@ security:
         - { path: ^/api/contacts/send, roles: PUBLIC_ACCESS }
         - { path: ^/api/demandes/public, roles: PUBLIC_ACCESS }
         - { path: ^/api/voyages/public, roles: PUBLIC_ACCESS }
-        - { path: ^/api/geo/cities/top100, roles: PUBLIC_ACCESS }
-        - { path: ^/api/geo/cities/search-global, roles: PUBLIC_ACCESS }
+        # Devises et données géographiques : donnée référentielle non sensible, jamais
+        # de PII - seules les routes de LECTURE (GET) sont publiques, les routes de
+        # mutation restent authentifiées (update-rates, en plus ROLE_ADMIN via
+        # #[IsGranted] au niveau du contrôleur). Décision actée 2026-09-11, Phase 13/Lot
+        # B3 du plan de correction (bec-docs) - subsume les deux règles plus ciblées qui
+        # existaient déjà ici (cities/top100, cities/search-global).
+        - { path: ^/api/currencies, methods: [GET], roles: PUBLIC_ACCESS }
+        - { path: ^/api/geo, methods: [GET], roles: PUBLIC_ACCESS }
         # Pas de règle PUBLIC_ACCESS ici pour /api/metrics : le firewall dédié
         # `metrics` (security: false, ci-dessus) ne consulte jamais access_control.
 

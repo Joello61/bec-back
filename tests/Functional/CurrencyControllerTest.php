@@ -21,10 +21,13 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  * appel API tiers payant. Corrige dans ce lot avec #[IsGranted('ROLE_ADMIN')]. Le test de
  * succes de updateRates n'est pas couvert ici (declenche un vrai appel reseau vers l'API
  * externe de taux de change, deja mocke via MockHttpClient dans CurrencyServiceTest au
- * Lot 5) - seule la porte d'autorisation est verifiee au niveau HTTP. Le reste du
- * controleur exige deja une authentification (pas d'entree PUBLIC_ACCESS pour
- * /api/currencies dans security.yaml) - chaque test authentifie donc un utilisateur
- * standard, sauf ceux qui testent explicitement la porte d'autorisation elle-meme.
+ * Lot 5) - seule la porte d'autorisation est verifiee au niveau HTTP.
+ *
+ * Depuis la Phase 13/Lot B3 (2026-09-11) : les routes de LECTURE (GET) sont publiques
+ * (donnee referentielle non sensible) - seules les routes de mutation (update-rates)
+ * restent authentifiees/ROLE_ADMIN. Les tests de contenu authentifient tout de meme un
+ * utilisateur standard par habitude/coherence avec le reste de la suite, mais un test
+ * dedie verifie explicitement l'acces anonyme reel pour chaque famille de route.
  */
 class CurrencyControllerTest extends WebTestCase
 {
@@ -67,6 +70,19 @@ class CurrencyControllerTest extends WebTestCase
     }
 
     // ==================== list ====================
+
+    /**
+     * Route de lecture publique depuis le Lot B3 (Phase 13 du plan de correction) -
+     * donnee referentielle non sensible, decision actee avec l'utilisateur le 2026-09-11.
+     */
+    public function testListIsAccessibleWithoutAuthentication(): void
+    {
+        $this->currency('EUR', '1', active: true);
+
+        $this->client->request('GET', '/api/currencies');
+
+        self::assertResponseIsSuccessful();
+    }
 
     public function testListReturnsOnlyActiveCurrencies(): void
     {
