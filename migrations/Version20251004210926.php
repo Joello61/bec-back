@@ -37,7 +37,6 @@ final class Version20251004210926 extends AbstractMigration
     public function down(Schema $schema): void
     {
         // this down() migration is auto-generated, please modify it to your needs
-        $this->addSql('CREATE SCHEMA public');
         $this->addSql('ALTER TABLE password_reset_tokens DROP CONSTRAINT FK_3967A216A76ED395');
         $this->addSql('DROP TABLE password_reset_tokens');
         $this->addSql('DROP TABLE verification_codes');

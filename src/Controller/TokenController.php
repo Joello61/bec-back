@@ -121,13 +121,8 @@ class TokenController extends AbstractController
     )]
     public function refreshMercureCookie(): Response
     {
-        /** @var User|null $user */
+        /** @var User $user */
         $user = $this->getUser();
-
-        // Vérifier si l'utilisateur est bien authentifié (sécurité)
-        if (!$user) {
-            return new JsonResponse(['message' => 'Authentification requise'], Response::HTTP_UNAUTHORIZED);
-        }
 
         try {
             $mercureToken = $this->mercureTokenService->generate($user);
