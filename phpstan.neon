@@ -6,6 +6,11 @@ includes:
 
 parameters:
     level: 6
+    # Chemin projet explicite (par defaut : sys_get_temp_dir(), non predictible/cachable
+    # de facon fiable d'un run CI a l'autre) - condition documentee par PHPStan lui-meme
+    # pour que resultCache.php survive entre executions via actions/cache (CI). "tmp/" et
+    # non "var/" : gitignore separe, jamais mele au cache Symfony existant.
+    tmpDir: tmp
     paths:
         - src
     symfony:
