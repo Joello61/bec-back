@@ -270,8 +270,11 @@ class VoyageRepository extends ServiceEntityRepository
 
         $voyages = $qb->getQuery()->getResult();
 
+        // "u" joint pour que applyFilters() (search sur u.nom/prenom/email, Phase 13/Lot B6)
+        // reste valide - meme piege deja corrige sur findPublicPaginated (Lot B5).
         $countQb = $this->createQueryBuilder('v')
-            ->select('COUNT(v.id)');
+            ->select('COUNT(v.id)')
+            ->leftJoin('v.voyageur', 'u');
 
         $this->applyFilters($countQb, $filters);
 
