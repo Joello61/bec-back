@@ -36,16 +36,21 @@ framework:
             limit: 30
             interval: '1 minute'
 
-# Assouplissement dev uniquement (Phase 7b-B) : la suite E2E (bec-frontend/e2e) inscrit un
-# compte reel par scenario pour s'isoler entre tests - la limite de prod (3/IP/heure)
-# suffisait a peine a la suite existante et est desormais depassee des que les nouveaux
-# scenarios (profil/settings, messagerie a 2 comptes) s'ajoutent. Ne s'applique qu'a
-# l'environnement dev (celui que bec-infra fait tourner pour l'E2E) - prod et test
-# (PHPUnit) restent inchanges. Fusionne uniquement `limit` dans l'entree `register`
+# Assouplissement dev uniquement (Phase 7b-B, releve Phase 11/Lot B) : la suite E2E
+# (bec-frontend/e2e) inscrit un compte reel par scenario pour s'isoler entre tests - la
+# limite de prod (3/IP/heure) suffisait a peine a la suite existante. Un decompte exact sur
+# la suite complete (Lot B, plan-correction-cobage.md) donne 21 inscriptions pour un passage
+# propre sans aucun retry (authenticatedPage/adminPage + registerAndLogin explicites,
+# cumules sur tous les e2e/*.spec.ts) - 20 etait deja insuffisant en pratique (constate en
+# CI : un 429 sur le retry d'un test par ailleurs sans rapport avec cette limite). Releve a
+# 50 pour laisser de la marge aux retries (playwright.config.ts, retries:2 en CI) et a la
+# croissance de la suite, sans avoir a retoucher cette valeur a chaque nouveau scenario. Ne
+# s'applique qu'a l'environnement dev (celui que bec-infra fait tourner pour l'E2E) - prod
+# et test (PHPUnit) restent inchanges. Fusionne uniquement `limit` dans l'entree `register`
 # existante (limiters nommes = noeud de configuration a cle, fusion profonde par defaut,
 # verifie dans vendor/symfony/framework-bundle/DependencyInjection/Configuration.php).
 when@dev:
     framework:
         rate_limiter:
             register:
-                limit: 20
+                limit: 50
