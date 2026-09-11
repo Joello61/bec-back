@@ -17,17 +17,17 @@ class Avis
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['avis:read', 'avis:list'])]
+    #[Groups(['avis:read', 'avis:list', 'admin:avis:list'])]
     private ?int $id = null;
 
     #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'avisDonnes')]
     #[ORM\JoinColumn(nullable: false)]
-    #[Groups(['avis:read', 'avis:list'])]
+    #[Groups(['avis:read', 'avis:list', 'admin:avis:list'])]
     private ?User $auteur = null;
 
     #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'avisRecus')]
     #[ORM\JoinColumn(nullable: false)]
-    #[Groups(['avis:read', 'avis:list'])]
+    #[Groups(['avis:read', 'avis:list', 'admin:avis:list'])]
     private ?User $cible = null;
 
     #[ORM\ManyToOne(targetEntity: Voyage::class, inversedBy: 'avis')]
@@ -36,15 +36,15 @@ class Avis
     private ?Voyage $voyage = null;
 
     #[ORM\Column(type: Types::SMALLINT)]
-    #[Groups(['avis:read', 'avis:list', 'avis:write'])]
+    #[Groups(['avis:read', 'avis:list', 'avis:write', 'admin:avis:list'])]
     private ?int $note = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
-    #[Groups(['avis:read', 'avis:write'])]
+    #[Groups(['avis:read', 'avis:write', 'admin:avis:list'])]
     private ?string $commentaire = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
-    #[Groups(['avis:read', 'avis:list'])]
+    #[Groups(['avis:read', 'avis:list', 'admin:avis:list'])]
     private ?\DateTimeInterface $createdAt = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]

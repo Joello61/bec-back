@@ -228,6 +228,65 @@ class AdminModerationControllerTest extends WebTestCase
         self::assertNull($this->em->getRepository(Demande::class)->find($demandeId));
     }
 
+    // ==================== listAvis ====================
+
+    public function testListAvisRejectsANonAdminUser(): void
+    {
+        $this->authenticateAs($this->createUser('admin-mod-avis-list-nonadmin'));
+
+        $this->client->request('GET', '/api/admin/moderation/avis');
+
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testListAvisSucceeds(): void
+    {
+        $auteur = $this->createUser('admin-mod-avis-list-auteur');
+        $cible = $this->createUser('admin-mod-avis-list-cible');
+        $this->avis($auteur, $cible);
+        $this->authenticateAs($this->admin('admin-mod-avis-list-admin'));
+
+        $this->client->request('GET', '/api/admin/moderation/avis');
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertNotEmpty($payload['data']);
+        self::assertArrayHasKey('commentaire', $payload['data'][0]);
+        self::assertArrayHasKey('auteur', $payload['data'][0]);
+        self::assertArrayHasKey('nom', $payload['data'][0]['auteur']);
+    }
+
+    public function testListAvisFiltersByMaxNote(): void
+    {
+        $auteur = $this->createUser('admin-mod-avis-filter-auteur');
+        $cible = $this->createUser('admin-mod-avis-filter-cible');
+        $lowNoteAvis = $this->avis($auteur, $cible);
+        $lowNoteAvis->setNote(1);
+        $highNoteAvis = $this->avis($auteur, $cible);
+        $highNoteAvis->setNote(5);
+        $this->em->flush();
+        $this->authenticateAs($this->admin('admin-mod-avis-filter-admin'));
+
+        $this->client->request('GET', '/api/admin/moderation/avis?maxNote=2');
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        $ids = array_column($payload['data'], 'id');
+        self::assertContains($lowNoteAvis->getId(), $ids);
+        self::assertNotContains($highNoteAvis->getId(), $ids);
+    }
+
+    public function testListAvisCapsTheLimitAtFifty(): void
+    {
+        $this->authenticateAs($this->admin('admin-mod-avis-list-cap-admin'));
+
+        $this->client->request('GET', '/api/admin/moderation/avis?limit=1000');
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertSame(50, $payload['pagination']['limit']);
+    }
+
     // ==================== deleteAvis ====================
 
     public function testDeleteAvisSucceeds(): void
