@@ -123,4 +123,36 @@ class AvisRepositoryTest extends KernelTestCase
         self::assertSame(1, $stats['distribution'][3]);
         self::assertSame(0, $stats['distribution'][1]);
     }
+
+    // ==================== findAllPaginated ====================
+
+    public function testFindAllPaginatedFiltersByMaxNote(): void
+    {
+        $auteur = $this->createUser('avisrepo-paginated-auteur');
+        $cible = $this->createUser('avisrepo-paginated-cible');
+        $lowNote = $this->avis($auteur, $cible, 1);
+        $this->avis($auteur, $cible, 5);
+
+        $result = $this->repository->findAllPaginated(1, 20, ['maxNote' => 2]);
+
+        $ids = array_map(fn (Avis $avis) => $avis->getId(), $result['data']);
+        self::assertContains($lowNote->getId(), $ids);
+        self::assertCount(1, array_filter($ids, fn ($id) => $id === $lowNote->getId()));
+    }
+
+    public function testFindAllPaginatedComputesPaginationMetadata(): void
+    {
+        $auteur = $this->createUser('avisrepo-paginated-meta-auteur');
+        $cible = $this->createUser('avisrepo-paginated-meta-cible');
+        $this->avis($auteur, $cible, 4);
+        $this->avis($auteur, $cible, 4);
+        $this->avis($auteur, $cible, 4);
+
+        $result = $this->repository->findAllPaginated(1, 2);
+
+        self::assertCount(2, $result['data']);
+        self::assertSame(1, $result['pagination']['page']);
+        self::assertSame(2, $result['pagination']['limit']);
+        self::assertGreaterThanOrEqual(3, $result['pagination']['total']);
+    }
 }

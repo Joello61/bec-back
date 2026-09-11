@@ -110,6 +110,44 @@ class AvisRepository extends ServiceEntityRepository
     }
 
     /**
+     * @param array<string, mixed> $filters
+     * @return array{data: Avis[], pagination: array{page: int, limit: int, total: int, pages: int}}
+     */
+    public function findAllPaginated(int $page, int $limit, array $filters = []): array
+    {
+        $offset = ($page - 1) * $limit;
+
+        $qb = $this->createQueryBuilder('a')
+            ->leftJoin('a.auteur', 'auteur')
+            ->leftJoin('a.cible', 'cible')
+            ->addSelect('auteur', 'cible')
+            ->orderBy('a.createdAt', 'DESC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit);
+
+        $countQb = $this->createQueryBuilder('a')
+            ->select('COUNT(a.id)');
+
+        if (isset($filters['maxNote'])) {
+            $qb->andWhere('a.note <= :maxNote')->setParameter('maxNote', $filters['maxNote']);
+            $countQb->andWhere('a.note <= :maxNote')->setParameter('maxNote', $filters['maxNote']);
+        }
+
+        $data = $qb->getQuery()->getResult();
+        $total = (int) $countQb->getQuery()->getSingleScalarResult();
+
+        return [
+            'data' => $data,
+            'pagination' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'pages' => (int) ceil($total / $limit),
+            ],
+        ];
+    }
+
+    /**
      * @return array{total: int, average: float, distribution: array<int, int>}
      */
     public function getStatsByUser(int $userId): array
