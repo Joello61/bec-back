@@ -15,6 +15,7 @@ use App\Repository\MessageRepository;
 use App\Repository\SignalementRepository;
 use App\Repository\UserRepository;
 use App\Repository\VoyageRepository;
+use App\Service\Admin\AuditLogService;
 use App\Service\RealtimeNotifier;
 use App\Service\SignalementService;
 use App\Tests\Support\EntityIdTrait;
@@ -40,6 +41,7 @@ class SignalementServiceTest extends TestCase
     private MessageRepository&\PHPUnit\Framework\MockObject\MockObject $messageRepository;
     private UserRepository&\PHPUnit\Framework\MockObject\MockObject $userRepository;
     private RealtimeNotifier&\PHPUnit\Framework\MockObject\MockObject $notifier;
+    private AuditLogService&\PHPUnit\Framework\MockObject\MockObject $auditLogService;
     private SignalementService $service;
 
     protected function setUp(): void
@@ -51,6 +53,7 @@ class SignalementServiceTest extends TestCase
         $this->messageRepository = $this->createMock(MessageRepository::class);
         $this->userRepository = $this->createMock(UserRepository::class);
         $this->notifier = $this->createMock(RealtimeNotifier::class);
+        $this->auditLogService = $this->createMock(AuditLogService::class);
 
         $this->service = new SignalementService(
             $this->em,
@@ -61,6 +64,7 @@ class SignalementServiceTest extends TestCase
             $this->userRepository,
             $this->notifier,
             new NullLogger(),
+            $this->auditLogService,
         );
     }
 
@@ -165,7 +169,7 @@ class SignalementServiceTest extends TestCase
         $this->signalementRepository->method('find')->willReturn(null);
 
         $this->expectException(NotFoundHttpException::class);
-        $this->service->processSignalement(999, 'traite', null);
+        $this->service->processSignalement(999, 'traite', null, $this->user(99));
     }
 
     public function testProcessSignalementRejectsAnInvalidStatus(): void
@@ -175,17 +179,18 @@ class SignalementServiceTest extends TestCase
         $this->signalementRepository->method('find')->willReturn($signalement);
 
         $this->expectException(BadRequestHttpException::class);
-        $this->service->processSignalement(1, 'statut-invalide', null);
+        $this->service->processSignalement(1, 'statut-invalide', null, $this->user(99));
     }
 
     public function testProcessSignalementMarksAsHandled(): void
     {
         $signalement = new Signalement();
         $signalement->setSignaleur($this->user(1));
+        $this->setEntityId($signalement, 10);
         $this->signalementRepository->method('find')->willReturn($signalement);
         $this->em->expects(self::once())->method('flush');
 
-        $result = $this->service->processSignalement(1, 'traite', 'resolu');
+        $result = $this->service->processSignalement(1, 'traite', 'resolu', $this->user(99));
 
         self::assertSame('traite', $result->getStatut());
         self::assertSame('resolu', $result->getReponseAdmin());
@@ -195,11 +200,49 @@ class SignalementServiceTest extends TestCase
     {
         $signalement = new Signalement();
         $signalement->setSignaleur($this->user(1));
+        $this->setEntityId($signalement, 11);
         $this->signalementRepository->method('find')->willReturn($signalement);
 
-        $result = $this->service->processSignalement(1, 'rejete', 'non fonde');
+        $result = $this->service->processSignalement(1, 'rejete', 'non fonde', $this->user(99));
 
         self::assertSame('rejete', $result->getStatut());
+    }
+
+    /**
+     * Bug de production : traiter un signalement n'ecrivait aucune entree AdminLog,
+     * contrairement a ban/unban/delete_* - approve_signalement/reject_signalement
+     * n'existaient que comme libelles morts dans AdminLog::getActionLabel() (cf.
+     * plan-correction-cobage.md, Phase 13/Lot B2).
+     */
+    public function testProcessSignalementLogsAnApproveAction(): void
+    {
+        $signalement = new Signalement();
+        $signalement->setSignaleur($this->user(1));
+        $signalement->setMotif('spam');
+        $this->setEntityId($signalement, 42);
+        $this->signalementRepository->method('find')->willReturn($signalement);
+        $admin = $this->user(99);
+
+        $this->auditLogService->expects(self::once())
+            ->method('logAdminAction')
+            ->with($admin, 'approve_signalement', 'signalement', 42, self::isArray());
+
+        $this->service->processSignalement(1, 'traite', 'resolu', $admin);
+    }
+
+    public function testProcessSignalementLogsARejectAction(): void
+    {
+        $signalement = new Signalement();
+        $signalement->setSignaleur($this->user(1));
+        $this->setEntityId($signalement, 43);
+        $this->signalementRepository->method('find')->willReturn($signalement);
+        $admin = $this->user(99);
+
+        $this->auditLogService->expects(self::once())
+            ->method('logAdminAction')
+            ->with($admin, 'reject_signalement', 'signalement', 43, self::isArray());
+
+        $this->service->processSignalement(1, 'rejete', 'non fonde', $admin);
     }
 
     // ==================== countPending ====================
