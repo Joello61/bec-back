@@ -48,6 +48,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # shivammathur/setup-php recompile APCu (seule extension hors coeur PHP demandee ici)
+      # a chaque run sans ce cache - dedie a ce job (le seul qui en a l'usage reel, PHPStan
+      # ci-dessous ; backend-tests ci-dessous a sa propre etape identique, apcu.enable_cli
+      # n'etant utile qu'a l'execution, pas a l'analyse statique elle-meme, mais partager le
+      # meme "extensions:"/setup-php rend le cache directement reutilisable entre les deux).
+      - name: Setup PHP extensions cache environment
+        id: php-ext-cache
+        uses: shivammathur/cache-extensions@v1
+        with:
+          php-version: '8.3'
+          extensions: apcu
+          key: v1
+
+      - name: Cache PHP extensions
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.php-ext-cache.outputs.dir }}
+          key: ${{ steps.php-ext-cache.outputs.key }}
+          restore-keys: ${{ steps.php-ext-cache.outputs.key }}
+
       - name: Set up PHP 8.3
         uses: shivammathur/setup-php@v2
         with:
@@ -85,12 +105,32 @@ jobs:
       - name: Lint PHP syntax
         run: find src -type f -name '*.php' -print0 | xargs -0 -n1 -P "$(nproc)" php -l
 
+      # resultCache.php (phpstan.neon, tmpDir: tmp) : restore/save separes plutot qu'un
+      # simple actions/cache (qui ne met jamais a jour une cle existante) - cle unique par
+      # run (run_id) + restore-keys en secours pour repartir du cache le plus recent,
+      # patron documente par PHPStan lui-meme (result-cache CI gotchas). Taille modeste ici
+      # (161 fichiers dans src/, tres en-dessous du seuil ou un faux negatif connu
+      # (phpstan/phpstan#11166, ~2000 fichiers) a ete rapporte avec ce meme patron de cache.
+      - name: Restore PHPStan result cache
+        uses: actions/cache/restore@v4
+        with:
+          path: tmp
+          key: phpstan-result-cache-${{ github.run_id }}
+          restore-keys: phpstan-result-cache-
+
       # Phase 6 du plan de correction (phpstan.neon, niveau 6) - jamais exécuté en CI
       # jusqu'ici malgré sa présence locale. --memory-limit : la limite CLI par défaut
       # (128M) ne suffit pas aux workers parallèles sur ce projet (constaté en session,
       # "PHPStan process crashed because it reached configured PHP memory limit").
       - name: Static analysis (PHPStan)
         run: vendor/bin/phpstan analyse --no-progress --memory-limit=512M
+
+      - name: Save PHPStan result cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: tmp
+          key: phpstan-result-cache-${{ github.run_id }}
 
   backend-tests:
     name: Backend (PHP) - Tests
@@ -117,6 +157,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      # Meme cle que backend-analysis ci-dessus (memes version PHP/extensions) - reutilise
+      # directement le meme cache d'extensions compilees plutot que d'en creer un second.
+      - name: Setup PHP extensions cache environment
+        id: php-ext-cache
+        uses: shivammathur/cache-extensions@v1
+        with:
+          php-version: '8.3'
+          extensions: apcu
+          key: v1
+
+      - name: Cache PHP extensions
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.php-ext-cache.outputs.dir }}
+          key: ${{ steps.php-ext-cache.outputs.key }}
+          restore-keys: ${{ steps.php-ext-cache.outputs.key }}
 
       - name: Set up PHP 8.3
         uses: shivammathur/setup-php@v2
