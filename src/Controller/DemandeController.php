@@ -79,6 +79,7 @@ class DemandeController extends AbstractController
     #[OA\Parameter(name: 'villeArrivee', in: 'query', schema: new OA\Schema(type: 'string'))]
     #[OA\Parameter(name: 'statut', in: 'query', schema: new OA\Schema(type: 'string'))]
     #[OA\Parameter(name: 'dateLimite', in: 'query', schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(name: 'search', in: 'query', description: 'Recherche sur nom/prenom/email du client (moderation admin)', schema: new OA\Schema(type: 'string', maxLength: 100))]
     #[OA\Response(response: 200, description: 'Liste paginée')]
     public function list(Request $request): JsonResponse
     {
@@ -94,6 +95,7 @@ class DemandeController extends AbstractController
             'villeArrivee' => $request->query->get('villeArrivee'),
             'statut' => $request->query->get('statut'),
             'dateLimite' => $request->query->get('dateLimite'),
+            'search' => substr((string) $request->query->get('search', ''), 0, 100) ?: null,
         ];
 
         $result = $this->demandeService->getPaginatedDemandes($page, $limit, $filters, $currentUser);
