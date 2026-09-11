@@ -158,6 +158,29 @@ class VoyageControllerTest extends WebTestCase
         self::assertNotContains($other->getId(), $ids);
     }
 
+    /**
+     * Recherche texte libre admin (Phase 13/Lot B5, plan-correction-cobage.md) : sur le
+     * proprietaire (nom/prenom/email), pas sur les villes - le champ frontend
+     * (voyages-client.tsx, admin) etait jusqu'ici totalement inerte.
+     */
+    public function testListFiltersBySearchOnOwnerName(): void
+    {
+        $viewer = $this->createUser('search-viewer');
+        $matchingOwner = $this->createUser('SearchOwnerUnique');
+        $otherOwner = $this->createUser('search-other-owner');
+        $matching = $this->createVoyage($matchingOwner);
+        $other = $this->createVoyage($otherOwner);
+        $this->authenticateAs($viewer);
+
+        $this->client->request('GET', '/api/voyages?search=SearchOwnerUnique');
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        $ids = array_column($payload['data'], 'id');
+        self::assertContains($matching->getId(), $ids);
+        self::assertNotContains($other->getId(), $ids);
+    }
+
     public function testPublicListFiltersByVilleDepart(): void
     {
         $owner = $this->createUser('filter-public-owner');
