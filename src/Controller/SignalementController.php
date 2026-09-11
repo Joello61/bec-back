@@ -140,7 +140,10 @@ class SignalementController extends AbstractController
             throw new BadRequestHttpException('Statut invalide. Valeurs possibles : traite ou rejete.');
         }
 
-        $signalement = $this->signalementService->processSignalement($id, $statut, $reponseAdmin);
+        /** @var User $admin */
+        $admin = $this->getUser();
+
+        $signalement = $this->signalementService->processSignalement($id, $statut, $reponseAdmin, $admin);
 
         return $this->json(
             $signalement,

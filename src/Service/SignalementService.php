@@ -8,6 +8,7 @@ use App\DTO\CreateSignalementDTO;
 use App\Entity\Signalement;
 use App\Entity\User;
 use App\Repository\{SignalementRepository, VoyageRepository, DemandeRepository, MessageRepository, UserRepository};
+use App\Service\Admin\AuditLogService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -24,7 +25,8 @@ readonly class SignalementService
         private MessageRepository $messageRepository,
         private UserRepository $userRepository,
         private RealtimeNotifier $notifier,
-        private LoggerInterface $logger
+        private LoggerInterface $logger,
+        private AuditLogService $auditLogService,
     ) {}
 
     public function createSignalement(CreateSignalementDTO $dto, User $signaleur): Signalement
@@ -81,7 +83,7 @@ readonly class SignalementService
         return $signalement;
     }
 
-    public function processSignalement(int $id, string $statut, ?string $reponseAdmin): Signalement
+    public function processSignalement(int $id, string $statut, ?string $reponseAdmin, User $admin): Signalement
     {
         $signalement = $this->signalementRepository->find($id);
         if (!$signalement) {
@@ -94,6 +96,17 @@ readonly class SignalementService
 
         $signalement->setStatut($statut)->setReponseAdmin($reponseAdmin);
         $this->entityManager->flush();
+
+        $this->auditLogService->logAdminAction(
+            $admin,
+            $statut === 'traite' ? 'approve_signalement' : 'reject_signalement',
+            'signalement',
+            $signalement->getId(),
+            [
+                'motif' => $signalement->getMotif(),
+                'reponseAdmin' => $reponseAdmin,
+            ]
+        );
 
         try {
             $eventType = $statut === 'traite' ? EventType::SIGNALEMENT_HANDLED : EventType::SIGNALEMENT_REJECTED;
