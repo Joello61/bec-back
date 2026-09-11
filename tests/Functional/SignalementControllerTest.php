@@ -6,6 +6,7 @@ namespace App\Tests\Functional;
 
 use App\Entity\Signalement;
 use App\Entity\User;
+use App\Repository\AdminLogRepository;
 use App\Tests\Support\JwtAuthenticationTrait;
 use App\Tests\Support\UserFactoryTrait;
 use Doctrine\ORM\EntityManagerInterface;
@@ -226,6 +227,32 @@ class SignalementControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
         $payload = json_decode($this->client->getResponse()->getContent(), true);
         self::assertSame('traite', $payload['statut']);
+    }
+
+    /**
+     * Bug de production : traiter un signalement n'ecrivait aucune entree AdminLog -
+     * approve_signalement/reject_signalement n'existaient que comme libelles morts
+     * (cf. plan-correction-cobage.md, Phase 13/Lot B2).
+     */
+    public function testProcessLogsAnAdminAction(): void
+    {
+        $signaleur = $this->createUser('signalement-process-log-signaleur');
+        $signale = $this->createUser('signalement-process-log-cible');
+        $signalement = $this->signalement($signaleur, $signale);
+        $this->authenticateAs($this->admin());
+
+        $this->client->request(
+            'PATCH',
+            '/api/signalements/' . $signalement->getId() . '/traiter',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['statut' => 'traite', 'reponseAdmin' => 'Contenu retire'])
+        );
+
+        self::assertResponseIsSuccessful();
+
+        $logs = static::getContainer()->get(AdminLogRepository::class)->findByTarget('signalement', $signalement->getId());
+        self::assertCount(1, $logs);
+        self::assertSame('approve_signalement', $logs[0]->getAction());
     }
 
     // ==================== pendingCount (admin) ====================
