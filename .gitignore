@@ -16,6 +16,11 @@
 /vendor/
 ###< symfony/framework-bundle ###
 
+###> phpstan/phpstan ###
+# tmpDir (phpstan.neon) - resultCache.php, mis en cache en CI (voir lint.yml).
+/tmp/
+###< phpstan/phpstan ###
+
 ###> phpunit/phpunit ###
 /phpunit.xml
 /.phpunit.cache/
