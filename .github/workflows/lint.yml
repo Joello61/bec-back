@@ -174,7 +174,7 @@ jobs:
   e2e:
     name: E2E (via bec-infra)
     needs: [backend-analysis, backend-tests]
-    uses: Joello61/bec-infra/.github/workflows/e2e.yml@4e4bf1984673bfe71c11f72f9998a44bf524477e
+    uses: Joello61/bec-infra/.github/workflows/e2e.yml@main
     with:
       backend_ref: ${{ github.sha }}
 
