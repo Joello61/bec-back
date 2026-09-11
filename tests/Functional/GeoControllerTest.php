@@ -64,11 +64,18 @@ class GeoControllerTest extends WebTestCase
 
     // ==================== countries ====================
 
-    public function testCountriesRequiresAuthentication(): void
+    /**
+     * Route de lecture publique depuis le Lot B3 (bec-docs/docs/plan-correction/plan-correction-cobage.md,
+     * Phase 13) - donnee referentielle non sensible, decision actee avec l'utilisateur
+     * le 2026-09-11.
+     */
+    public function testCountriesIsAccessibleWithoutAuthentication(): void
     {
+        $this->country('FR', 'France');
+
         $this->client->request('GET', '/api/geo/countries');
 
-        self::assertResponseStatusCodeSame(403);
+        self::assertResponseIsSuccessful();
     }
 
     public function testCountriesReturnsThePersistedCountries(): void
