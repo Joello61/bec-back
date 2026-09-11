@@ -77,7 +77,7 @@ readonly class PropositionService
             throw new BadRequestHttpException('Vous avez déjà fait une proposition pour ce voyage');
         }
 
-        if (($voyage->getPoidsDisponible() - $demande->getPoidsEstime()) <= 0) {
+        if (((float) $voyage->getPoidsDisponibleRestant() - $demande->getPoidsEstime()) < 0) {
             throw new BadRequestHttpException('Le voyage n\'a plus de place disponible');
         }
 

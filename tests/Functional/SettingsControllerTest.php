@@ -88,6 +88,45 @@ class SettingsControllerTest extends WebTestCase
         self::assertTrue($payload['showEmail']);
     }
 
+    /**
+     * Bug de production : UpdateSettingsDTO n'avait aucune propriete "devise" - PATCH
+     * /api/settings ignorait silencieusement ce champ malgre PreferencesSettingsForm.tsx
+     * qui le collecte et le soumet (cf. plan-correction-cobage.md, Phase 13/Lot B1).
+     */
+    public function testUpdateSettingsPersistsTheCurrency(): void
+    {
+        $this->authenticateAs($this->createUser('settings-update-devise'));
+
+        $this->client->request(
+            'PATCH',
+            '/api/settings',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['devise' => 'XAF'])
+        );
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertSame('XAF', $payload['devise']);
+
+        $this->client->request('GET', '/api/settings');
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertSame('XAF', $payload['devise']);
+    }
+
+    public function testUpdateSettingsRejectsAnInvalidCurrency(): void
+    {
+        $this->authenticateAs($this->createUser('settings-update-devise-invalide'));
+
+        $this->client->request(
+            'PATCH',
+            '/api/settings',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['devise' => 'ABC'])
+        );
+
+        self::assertResponseStatusCodeSame(422);
+    }
+
     // ==================== resetSettings ====================
 
     public function testResetSettingsRestoresDefaults(): void

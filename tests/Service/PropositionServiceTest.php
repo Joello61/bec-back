@@ -224,6 +224,48 @@ class PropositionServiceTest extends TestCase
         $this->service->createProposition(1, $this->createDto(), $client);
     }
 
+    /**
+     * Bug de production : la creation comparait au poids DISPONIBLE ORIGINAL du voyage
+     * (jamais decremente) avec un seuil "<= 0" - une demande dont le poids egale
+     * exactement la capacite restante d'un voyage neuf (aucune proposition acceptee,
+     * disponible == restant) etait donc systematiquement rejetee (cf.
+     * plan-correction-cobage.md, Phase 13/Lot B1).
+     */
+    public function testCreatePropositionSucceedsWhenWeightExactlyMatchesRemainingCapacity(): void
+    {
+        $voyageur = $this->user(2);
+        $client = $this->user(3);
+        $this->voyageRepository->method('find')->willReturn($this->voyage(1, $voyageur, poidsDisponible: '10'));
+        $this->demandeRepository->method('find')->willReturn($this->demande(1, $client, poidsEstime: '10'));
+        $this->propositionRepository->method('existsByVoyageAndDemande')->willReturn(null);
+        $this->em->expects(self::once())->method('persist');
+        $this->em->expects(self::once())->method('flush');
+
+        $result = $this->service->createProposition(1, $this->createDto(), $client);
+
+        self::assertSame('en_attente', $result->getStatut());
+    }
+
+    /**
+     * Meme bug, autre facette : une fois une premiere proposition acceptee sur un
+     * voyage (poidsDisponibleRestant reduit, poidsDisponible original inchange), une
+     * nouvelle proposition qui depasse la capacite reellement restante doit etre
+     * rejetee - meme si elle tiendrait dans la capacite ORIGINALE du voyage.
+     */
+    public function testCreatePropositionRejectsWhenRemainingCapacityIsLowerThanOriginal(): void
+    {
+        $voyageur = $this->user(2);
+        $client = $this->user(3);
+        $this->voyageRepository->method('find')->willReturn(
+            $this->voyage(1, $voyageur, poidsDisponible: '20', poidsRestant: '5')
+        );
+        $this->demandeRepository->method('find')->willReturn($this->demande(1, $client, poidsEstime: '10'));
+        $this->propositionRepository->method('existsByVoyageAndDemande')->willReturn(null);
+
+        $this->expectException(BadRequestHttpException::class);
+        $this->service->createProposition(1, $this->createDto(), $client);
+    }
+
     public function testCreatePropositionSucceedsAndUsesTheDemandeCurrency(): void
     {
         $voyageur = $this->user(2);
