@@ -13,8 +13,10 @@ use Symfony\Component\Routing\Attribute\Route;
 /**
  * Scrapé par Prometheus (infrastructure partagée du VPS), jamais par un utilisateur
  * applicatif - protégé par un jeton dédié (METRICS_SCRAPE_TOKEN), jamais le firewall JWT
- * (config/packages/security.yaml, access_control PUBLIC_ACCESS explicite sur cette seule
- * route). Ce jeton est la seule protection réelle de cette route.
+ * (config/packages/security.yaml, firewall dédié "metrics" avec security: false - pas une
+ * règle access_control PUBLIC_ACCESS, qui resterait derrière le firewall "api" et échouerait
+ * en 401 sur un jeton qui n'est pas un JWT valide). Ce jeton applicatif est la seule
+ * protection réelle de cette route.
  */
 final class GetMetricsController
 {
