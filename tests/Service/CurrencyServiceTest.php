@@ -38,7 +38,6 @@ class CurrencyServiceTest extends TestCase
             $this->countryRepository,
             $this->em,
             'EUR',
-            'fr-FR',
         );
     }
 
@@ -93,7 +92,45 @@ class CurrencyServiceTest extends TestCase
         $result = $service->getCurrencyAndLangByCountry('Atlantide');
 
         self::assertSame('EUR', $result['currency']);
-        self::assertSame('fr-FR', $result['languages']);
+        self::assertSame('fr', $result['languages']);
+    }
+
+    /**
+     * Bug de production : un pays multilingue (format GeoNames brut, ex. "en-CM,fr-CM"
+     * pour le Cameroun) était jusqu'ici écrit tel quel dans UserSettings.langue, qui
+     * n'accepte que 'fr'/'en' - cassait la sauvegarde du formulaire Préférences pour
+     * tout utilisateur d'un tel pays (cf. plan-correction-cobage.md, Phase 13/Lot B1).
+     */
+    public function testGetCurrencyAndLangByCountryNormalizesMultiLanguageRawValue(): void
+    {
+        $this->countryRepository->method('findCodeAndLangByPays')->willReturn(['code' => 'CM', 'languages' => 'en-CM,fr-CM']);
+        $service = $this->makeService();
+
+        $result = $service->getCurrencyAndLangByCountry('Cameroun');
+
+        self::assertSame('en', $result['languages']);
+    }
+
+    public function testGetCurrencyAndLangByCountryFallsBackToFrenchForAnUnsupportedLanguage(): void
+    {
+        $this->countryRepository->method('findCodeAndLangByPays')->willReturn(['code' => 'ZZ', 'languages' => 'de-DE']);
+        $this->currencyRepository->method('findByCountry')->willReturn($this->currency('ABC'));
+        $service = $this->makeService();
+
+        $result = $service->getCurrencyAndLangByCountry('Pays Inconnu');
+
+        self::assertSame('fr', $result['languages']);
+    }
+
+    public function testGetCurrencyAndLangByCountryKeepsAnAlreadyNormalizedLanguage(): void
+    {
+        $this->countryRepository->method('findCodeAndLangByPays')->willReturn(['code' => 'ZZ', 'languages' => 'en']);
+        $this->currencyRepository->method('findByCountry')->willReturn($this->currency('ABC'));
+        $service = $this->makeService();
+
+        $result = $service->getCurrencyAndLangByCountry('Pays Inconnu');
+
+        self::assertSame('en', $result['languages']);
     }
 
     // ==================== convert ====================

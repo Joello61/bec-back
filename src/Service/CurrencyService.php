@@ -54,7 +54,6 @@ readonly class CurrencyService
         private CountryRepository $countryRepository,
         private EntityManagerInterface $entityManager,
         private string $defaultCurrency = 'EUR',
-        private string $defaultLanguages = 'fr-FR'
     ) {}
 
     /**
@@ -66,7 +65,7 @@ readonly class CurrencyService
         // Essayer de trouver le code pays (simpliste, peut être amélioré)
         $countryCodeAndLang = $this->getCountryCodeAndLanguages($countryName);
         $countryCode = $countryCodeAndLang['code'] ?? null;
-        $countryLang = $countryCodeAndLang['languages'] ?? null;
+        $countryLang = $this->normalizeLanguageCode($countryCodeAndLang['languages'] ?? null);
 
         if ($countryCode && isset(self::COUNTRY_CURRENCY_MAP[$countryCode])) {
             return ['currency' => self::COUNTRY_CURRENCY_MAP[$countryCode], 'languages' => $countryLang];
@@ -85,7 +84,27 @@ readonly class CurrencyService
             'countryCode' => $countryCode
         ]);
 
-        return ['currency' => $this->defaultCurrency, 'languages' => $this->defaultLanguages];
+        return ['currency' => $this->defaultCurrency, 'languages' => $countryLang];
+    }
+
+    /**
+     * Normalise une valeur de langue brute GeoNames (ex. "en-CM,fr-CM", format
+     * locale-PAYS séparé par des virgules pour un pays multilingue) vers l'un des
+     * deux seuls codes acceptés par UserSettings.langue ('fr'/'en', cf. UpdateSettingsDTO
+     * et le schéma Zod frontend correspondant). Repli sur 'fr' si la langue détectée
+     * n'est ni 'fr' ni 'en' - choix produit assumé (positionnement Cameroun/francophone
+     * de Cobage), pas une valeur technique par défaut.
+     */
+    private function normalizeLanguageCode(?string $rawLanguages): string
+    {
+        if (!$rawLanguages) {
+            return 'fr';
+        }
+
+        $firstLocale = explode(',', $rawLanguages)[0];
+        $languageCode = strtolower(explode('-', $firstLocale)[0]);
+
+        return in_array($languageCode, ['fr', 'en'], true) ? $languageCode : 'fr';
     }
 
     /**

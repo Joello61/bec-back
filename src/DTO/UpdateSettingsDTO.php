@@ -71,6 +71,12 @@ class UpdateSettingsDTO
     )]
     public ?string $langue = null;
 
+    #[Assert\Choice(
+        choices: ['XAF', 'EUR', 'USD'],
+        message: 'La devise doit être: XAF, EUR ou USD'
+    )]
+    public ?string $devise = null;
+
     #[Assert\Timezone]
     public ?string $timezone = null;
 
