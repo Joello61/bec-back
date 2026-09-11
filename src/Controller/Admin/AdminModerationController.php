@@ -7,7 +7,9 @@ namespace App\Controller\Admin;
 use App\DTO\Admin\DeleteContentDTO;
 use App\Entity\User;
 use App\Repository\AvisRepository;
+use App\Repository\DemandeRepository;
 use App\Repository\UserRepository;
+use App\Repository\VoyageRepository;
 use App\Service\Admin\ModerationService;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -28,7 +30,82 @@ class AdminModerationController extends AbstractController
         private readonly ModerationService $moderationService,
         private readonly UserRepository $userRepository,
         private readonly AvisRepository $avisRepository,
+        private readonly VoyageRepository $voyageRepository,
+        private readonly DemandeRepository $demandeRepository,
     ) {}
+
+    /**
+     * Liste paginée des voyages (modération) - endpoint dédié admin, distinct de
+     * GET /api/voyages (VoyageController::list()) : expose l'email du voyageur sans
+     * condition (groupe admin:voyage:list), jamais les préférences showEmail de
+     * VisibilityService, et n'exclut jamais un voyage dont le propriétaire a désactivé
+     * showInSearchResults (findAllPaginatedAdmin - la modération doit tout voir).
+     * Phase 13/Lot B6 du plan de correction (bec-docs).
+     */
+    #[Route('/voyages', name: 'list_voyages', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/admin/moderation/voyages',
+        summary: 'Liste des voyages (modération)',
+        security: [['cookieAuth' => []]]
+    )]
+    #[OA\Parameter(name: 'page', in: 'query', schema: new OA\Schema(type: 'integer', default: 1))]
+    #[OA\Parameter(name: 'limit', in: 'query', schema: new OA\Schema(type: 'integer', default: 20))]
+    #[OA\Parameter(name: 'statut', in: 'query', schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(
+        name: 'search',
+        description: 'Recherche sur nom/prénom/email du voyageur',
+        in: 'query',
+        schema: new OA\Schema(type: 'string', maxLength: 100)
+    )]
+    #[OA\Response(response: 200, description: 'Liste paginée')]
+    public function listVoyages(Request $request): JsonResponse
+    {
+        $page = $request->query->getInt('page', 1);
+        $limit = min($request->query->getInt('limit', 20), 50);
+
+        $filters = array_filter([
+            'statut' => $request->query->get('statut'),
+            'search' => substr((string) $request->query->get('search', ''), 0, 100) ?: null,
+        ], fn($value) => $value !== null);
+
+        $result = $this->voyageRepository->findAllPaginatedAdmin($page, $limit, $filters);
+
+        return $this->json($result, Response::HTTP_OK, [], ['groups' => ['voyage:list', 'admin:voyage:list']]);
+    }
+
+    /**
+     * Liste paginée des demandes (modération) - même patron que listVoyages() ci-dessus.
+     */
+    #[Route('/demandes', name: 'list_demandes', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/admin/moderation/demandes',
+        summary: 'Liste des demandes (modération)',
+        security: [['cookieAuth' => []]]
+    )]
+    #[OA\Parameter(name: 'page', in: 'query', schema: new OA\Schema(type: 'integer', default: 1))]
+    #[OA\Parameter(name: 'limit', in: 'query', schema: new OA\Schema(type: 'integer', default: 20))]
+    #[OA\Parameter(name: 'statut', in: 'query', schema: new OA\Schema(type: 'string'))]
+    #[OA\Parameter(
+        name: 'search',
+        description: 'Recherche sur nom/prénom/email du client',
+        in: 'query',
+        schema: new OA\Schema(type: 'string', maxLength: 100)
+    )]
+    #[OA\Response(response: 200, description: 'Liste paginée')]
+    public function listDemandes(Request $request): JsonResponse
+    {
+        $page = $request->query->getInt('page', 1);
+        $limit = min($request->query->getInt('limit', 20), 50);
+
+        $filters = array_filter([
+            'statut' => $request->query->get('statut'),
+            'search' => substr((string) $request->query->get('search', ''), 0, 100) ?: null,
+        ], fn($value) => $value !== null);
+
+        $result = $this->demandeRepository->findAllPaginatedAdmin($page, $limit, $filters);
+
+        return $this->json($result, Response::HTTP_OK, [], ['groups' => ['demande:list', 'admin:demande:list']]);
+    }
 
     /**
      * Liste paginée des avis (modération)
