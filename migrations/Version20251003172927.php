@@ -79,7 +79,6 @@ final class Version20251003172927 extends AbstractMigration
     public function down(Schema $schema): void
     {
         // this down() migration is auto-generated, please modify it to your needs
-        $this->addSql('CREATE SCHEMA public');
         $this->addSql('ALTER TABLE avis DROP CONSTRAINT FK_8F91ABF060BB6FE6');
         $this->addSql('ALTER TABLE avis DROP CONSTRAINT FK_8F91ABF0A96E5E09');
         $this->addSql('ALTER TABLE avis DROP CONSTRAINT FK_8F91ABF068C9E5AF');
