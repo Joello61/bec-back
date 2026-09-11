@@ -93,10 +93,11 @@ class TokenControllerTest extends WebTestCase
     {
         $this->client->request('POST', '/api/token/mercure/refresh');
 
-        // #[IsGranted('ROLE_USER')] rejette avant meme d'atteindre le corps du controleur
-        // (qui gere pourtant lui-meme un cas "$user === null" a la ligne suivante, mort
-        // code pour une requete non authentifiee - le firewall JWT renvoie 403, pas 401,
-        // pour un utilisateur anonyme face a un IsGranted non satisfait sur ce projet).
+        // #[IsGranted('ROLE_USER')] rejette avant meme d'atteindre le corps du controleur -
+        // le firewall JWT renvoie 403, pas 401, pour un utilisateur anonyme face a un
+        // IsGranted non satisfait sur ce projet. La verification manuelle "$user === null"
+        // qui existait dans le corps du controleur (mort code, jamais atteignable) a ete
+        // retiree (cf. plan-correction-cobage.md, Phase 13/Lot B4).
         self::assertResponseStatusCodeSame(403);
     }
 }
