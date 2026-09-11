@@ -172,6 +172,66 @@ class AdminModerationControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
     }
 
+    // ==================== listVoyages ====================
+
+    public function testListVoyagesRejectsANonAdminUser(): void
+    {
+        $this->authenticateAs($this->createUser('admin-mod-voyages-list-nonadmin'));
+
+        $this->client->request('GET', '/api/admin/moderation/voyages');
+
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    /**
+     * Bug de production : ModerationVoyagesTable.tsx (frontend) affiche
+     * voyage.voyageur.email, jamais fourni par GET /api/voyages depuis que la Phase 10
+     * a retire "email" du groupe voyage:list public - colonne toujours vide en pratique.
+     * Endpoint dedie (Phase 13/Lot B6) : expose l'email sans condition, ROLE_ADMIN deja
+     * garanti par #[IsGranted] au niveau classe.
+     */
+    public function testListVoyagesExposesTheOwnerEmail(): void
+    {
+        $owner = $this->createUser('admin-mod-voyages-email-owner', showEmail: false);
+        $this->voyage($owner);
+        $this->authenticateAs($this->admin('admin-mod-voyages-email-admin'));
+
+        $this->client->request('GET', '/api/admin/moderation/voyages');
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertNotEmpty($payload['data']);
+        self::assertSame($owner->getEmail(), $payload['data'][0]['voyageur']['email']);
+    }
+
+    public function testListVoyagesFiltersBySearchOnOwnerName(): void
+    {
+        $matchingOwner = $this->createUser('AdminModVoyageSearchUnique');
+        $otherOwner = $this->createUser('admin-mod-voyages-search-other');
+        $matching = $this->voyage($matchingOwner);
+        $other = $this->voyage($otherOwner);
+        $this->authenticateAs($this->admin('admin-mod-voyages-search-admin'));
+
+        $this->client->request('GET', '/api/admin/moderation/voyages?search=AdminModVoyageSearchUnique');
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        $ids = array_column($payload['data'], 'id');
+        self::assertContains($matching->getId(), $ids);
+        self::assertNotContains($other->getId(), $ids);
+    }
+
+    public function testListVoyagesCapsTheLimitAtFifty(): void
+    {
+        $this->authenticateAs($this->admin('admin-mod-voyages-list-cap-admin'));
+
+        $this->client->request('GET', '/api/admin/moderation/voyages?limit=1000');
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertSame(50, $payload['pagination']['limit']);
+    }
+
     // ==================== deleteVoyage ====================
 
     public function testDeleteVoyageReturnsAnErrorForAnUnknownVoyage(): void
@@ -206,6 +266,59 @@ class AdminModerationControllerTest extends WebTestCase
 
         self::assertResponseIsSuccessful();
         self::assertNull($this->em->getRepository(Voyage::class)->find($voyageId));
+    }
+
+    // ==================== listDemandes ====================
+
+    public function testListDemandesRejectsANonAdminUser(): void
+    {
+        $this->authenticateAs($this->createUser('admin-mod-demandes-list-nonadmin'));
+
+        $this->client->request('GET', '/api/admin/moderation/demandes');
+
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testListDemandesExposesTheOwnerEmail(): void
+    {
+        $owner = $this->createUser('admin-mod-demandes-email-owner', showEmail: false);
+        $this->demande($owner);
+        $this->authenticateAs($this->admin('admin-mod-demandes-email-admin'));
+
+        $this->client->request('GET', '/api/admin/moderation/demandes');
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertNotEmpty($payload['data']);
+        self::assertSame($owner->getEmail(), $payload['data'][0]['client']['email']);
+    }
+
+    public function testListDemandesFiltersBySearchOnOwnerName(): void
+    {
+        $matchingOwner = $this->createUser('AdminModDemandeSearchUnique');
+        $otherOwner = $this->createUser('admin-mod-demandes-search-other');
+        $matching = $this->demande($matchingOwner);
+        $other = $this->demande($otherOwner);
+        $this->authenticateAs($this->admin('admin-mod-demandes-search-admin'));
+
+        $this->client->request('GET', '/api/admin/moderation/demandes?search=AdminModDemandeSearchUnique');
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        $ids = array_column($payload['data'], 'id');
+        self::assertContains($matching->getId(), $ids);
+        self::assertNotContains($other->getId(), $ids);
+    }
+
+    public function testListDemandesCapsTheLimitAtFifty(): void
+    {
+        $this->authenticateAs($this->admin('admin-mod-demandes-list-cap-admin'));
+
+        $this->client->request('GET', '/api/admin/moderation/demandes?limit=1000');
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertSame(50, $payload['pagination']['limit']);
     }
 
     // ==================== deleteDemande ====================

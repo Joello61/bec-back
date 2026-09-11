@@ -268,8 +268,11 @@ class DemandeRepository extends ServiceEntityRepository
 
         $demandes = $qb->getQuery()->getResult();
 
+        // "u" joint pour que applyFilters() (search sur u.nom/prenom/email, Phase 13/Lot B6)
+        // reste valide - meme piege deja corrige sur findPublicPaginated (Lot B5).
         $countQb = $this->createQueryBuilder('d')
-            ->select('COUNT(d.id)');
+            ->select('COUNT(d.id)')
+            ->leftJoin('d.client', 'u');
 
         $this->applyFilters($countQb, $filters);
 
