@@ -30,6 +30,45 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
+     * Liste paginee pour l'admin (Lot 6.1) - necessaire pour retrouver la transaction a
+     * rembourser. Filtres optionnels : status, type, provider.
+     * @param array<string, mixed> $filters
+     * @return array{data: Transaction[], pagination: array{page: int, limit: int, total: int, pages: int}}
+     */
+    public function findAllPaginatedAdmin(int $page, int $limit, array $filters = []): array
+    {
+        $offset = ($page - 1) * $limit;
+
+        $qb = $this->createQueryBuilder('t')
+            ->orderBy('t.createdAt', 'DESC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit);
+
+        $countQb = $this->createQueryBuilder('t')
+            ->select('COUNT(t.id)');
+
+        foreach (['status', 'type', 'provider'] as $field) {
+            if (isset($filters[$field])) {
+                $qb->andWhere("t.{$field} = :{$field}")->setParameter($field, $filters[$field]);
+                $countQb->andWhere("t.{$field} = :{$field}")->setParameter($field, $filters[$field]);
+            }
+        }
+
+        $transactions = $qb->getQuery()->getResult();
+        $total = $countQb->getQuery()->getSingleScalarResult();
+
+        return [
+            'data' => $transactions,
+            'pagination' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'pages' => (int) ceil($total / $limit),
+            ],
+        ];
+    }
+
+    /**
      * Somme des montants par devise (EUR/XAF ne se cumulent jamais entre eux) pour un
      * statut donné, optionnellement bornée dans le temps - réutilisée pour le total, le
      * "ce mois-ci" et le calcul jour par jour (Lot 5, AdminStatsService::getRevenueStats).

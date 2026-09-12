@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Payment;
 
 use App\Entity\SubscriptionPlan;
+use App\Entity\Transaction;
 use App\Entity\User;
 use App\Entity\UserSubscription;
 use Stripe\Checkout\Session;
@@ -90,6 +91,46 @@ readonly class StripePaymentProvider implements PaymentProviderInterface
         $session = $this->stripeClient->checkout->sessions->create($params);
 
         return $this->toResult($session);
+    }
+
+    public function refundTransaction(Transaction $transaction): void
+    {
+        $paymentIntentId = $this->resolvePaymentIntentId($transaction);
+
+        $this->stripeClient->refunds->create(['payment_intent' => $paymentIntentId]);
+    }
+
+    /**
+     * Transaction::providerPaymentId porte l'id de la Invoice pour un abonnement
+     * (initial ou renouvellement, cf. SubscriptionService::handleInvoicePaid()) mais
+     * directement le payment_intent pour un boost (paiement one-time, cf.
+     * BoostService::handleCheckoutCompleted()) - l'API Refunds n'accepte pas un id de
+     * Invoice, il faut resoudre le payment_intent sous-jacent dans le premier cas.
+     *
+     * Invoice::$payment_intent n'existe plus depuis la version d'API 2025-03-31 de
+     * Stripe (vérifié sur docs.stripe.com/changelog, "Adds support for partial payments
+     * on invoices") : remplacé par Invoice::$payments (liste d'InvoicePayment, incluse
+     * par défaut à la lecture, sans expand), dont l'entrée is_default=true porte le
+     * payment_intent réellement associé au montant total de la facture.
+     */
+    private function resolvePaymentIntentId(Transaction $transaction): string
+    {
+        if ($transaction->getType() === Transaction::TYPE_BOOST) {
+            return $transaction->getProviderPaymentId();
+        }
+
+        $invoice = $this->stripeClient->invoices->retrieve($transaction->getProviderPaymentId());
+
+        foreach ($invoice->payments->data ?? [] as $invoicePayment) {
+            if ($invoicePayment->is_default && is_string($invoicePayment->payment->payment_intent ?? null)) {
+                return $invoicePayment->payment->payment_intent;
+            }
+        }
+
+        throw new \RuntimeException(sprintf(
+            'Impossible de rembourser la facture Stripe "%s" : aucun payment_intent associé',
+            $transaction->getProviderPaymentId()
+        ));
     }
 
     /**
