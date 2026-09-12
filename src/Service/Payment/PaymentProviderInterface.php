@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Service\Payment;
 
 use App\Entity\SubscriptionPlan;
+use App\Entity\Transaction;
 use App\Entity\User;
 use App\Entity\UserSubscription;
 
 /**
- * Une seule implementation existe dans ce lot (StripePaymentProvider) : Symfony
- * l'autowire directement par type. Le selecteur multi-provider (!tagged_locator par
- * cle 'card'/'mobile_money') sera introduit au Lot 3 quand Notch Pay rend le choix reel.
+ * Deux implementations (StripePaymentProvider, NotchPayPaymentProvider), selectionnees
+ * via un tagged locator indexe par famille de paiement ('card'/'mobile_money', cf.
+ * SubscriptionService::resolveProvider()).
  */
 interface PaymentProviderInterface
 {
@@ -41,4 +42,11 @@ interface PaymentProviderInterface
         string $successUrl,
         string $cancelUrl,
     ): CheckoutSessionResult;
+
+    /**
+     * Remboursement total (Lot 6.1) - jamais partiel, cf. politique CGU art. 10.5.
+     * Doit lever une exception (jamais un faux succès silencieux) si le remboursement
+     * echoue cote prestataire.
+     */
+    public function refundTransaction(Transaction $transaction): void;
 }

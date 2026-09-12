@@ -79,6 +79,15 @@ class Transaction
     private string $status = self::STATUS_PENDING;
 
     /**
+     * Date d'exécution du remboursement (Lot 6.1) - jamais exposée cote utilisateur,
+     * uniquement à l'admin. Raison et admin responsable tracés via AuditLogService,
+     * jamais dupliqués ici.
+     */
+    #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
+    #[Groups(['admin:transaction:list'])]
+    private ?\DateTimeInterface $refundedAt = null;
+
+    /**
      * Métadonnées provider uniquement (id, type d'événement, statut...) - jamais de
      * PAN/CVV ni de numéro de téléphone Mobile Money complet.
      */
@@ -218,6 +227,17 @@ class Transaction
     public function setStatus(string $status): static
     {
         $this->status = $status;
+        return $this;
+    }
+
+    public function getRefundedAt(): ?\DateTimeInterface
+    {
+        return $this->refundedAt;
+    }
+
+    public function setRefundedAt(?\DateTimeInterface $refundedAt): static
+    {
+        $this->refundedAt = $refundedAt;
         return $this;
     }
 

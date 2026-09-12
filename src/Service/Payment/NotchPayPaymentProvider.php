@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Service\Payment;
 
 use App\Entity\SubscriptionPlan;
+use App\Entity\Transaction;
 use App\Entity\User;
 use App\Entity\UserSubscription;
 use NotchPay\NotchPay;
 use NotchPay\Payment;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
  * Notch Pay (Mobile Money Cameroun, Lot 3). Vérifié par recherche documentaire (spike
@@ -20,8 +22,12 @@ use NotchPay\Payment;
  */
 readonly class NotchPayPaymentProvider implements PaymentProviderInterface
 {
+    private const API_BASE = 'https://api.notchpay.co';
+
     public function __construct(
         private string $notchPaySecretKey,
+        private string $notchPayPrivateKey,
+        private HttpClientInterface $httpClient,
     ) {
         NotchPay::setApiKey($this->notchPaySecretKey);
     }
@@ -89,5 +95,34 @@ readonly class NotchPayPaymentProvider implements PaymentProviderInterface
             checkoutUrl: $payment->authorization_url,
             providerCustomerId: null,
         );
+    }
+
+    /**
+     * Remboursement total (Lot 6.1). Aucune classe Refund dans le SDK notchpay-php v2.0
+     * installé (vérifié dans vendor/) - appel HTTP direct, conforme à la doc officielle
+     * (developer.notchpay.co/accept-payments/refunds) : endpoint POST /refunds, headers
+     * Authorization (clé secrète déjà utilisée pour Payment::initialize) + X-Grant (clé
+     * privée distincte - non disponible sans compte sandbox réel, cf. NOTCHPAY_PRIVATE_KEY).
+     * Montant omis du corps = remboursement total (jamais partiel, cf. interface).
+     */
+    public function refundTransaction(Transaction $transaction): void
+    {
+        $response = $this->httpClient->request('POST', self::API_BASE . '/refunds', [
+            'headers' => [
+                'Authorization' => $this->notchPaySecretKey,
+                'X-Grant' => $this->notchPayPrivateKey,
+            ],
+            'json' => ['payment' => $transaction->getProviderPaymentId()],
+        ]);
+
+        $statusCode = $response->getStatusCode();
+
+        if ($statusCode < 200 || $statusCode >= 300) {
+            throw new \RuntimeException(sprintf(
+                'Échec du remboursement Notch Pay (HTTP %d) pour le paiement "%s"',
+                $statusCode,
+                $transaction->getProviderPaymentId()
+            ));
+        }
     }
 }
