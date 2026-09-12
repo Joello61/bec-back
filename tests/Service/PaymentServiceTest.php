@@ -97,6 +97,35 @@ class PaymentServiceTest extends TestCase
         self::assertSame($existingAfterRace, $result);
     }
 
+    public function testCreatesANotchPayTransactionWithMobileMoneyMethodFamily(): void
+    {
+        // Lot 3 : même point d'idempotence pour Notch Pay - aucune branche spécifique au
+        // provider dans PaymentService, mais un webhook payment.complete rejoué ne doit
+        // pas plus dupliquer la Transaction qu'un événement Stripe rejoué.
+        $user = new User();
+        $this->transactionRepository->method('findByProviderPaymentId')->willReturn(null);
+        $this->em->method('wrapInTransaction')->willReturnCallback(fn (callable $fn) => $fn());
+        $this->em->expects(self::once())->method('persist');
+        $this->em->expects(self::once())->method('flush');
+
+        $transaction = $this->paymentService->findOrCreateFromProviderEvent(
+            provider: 'notchpay',
+            providerPaymentId: 'pay_789',
+            user: $user,
+            subscription: null,
+            type: Transaction::TYPE_SUBSCRIPTION_INITIAL,
+            paymentMethodFamily: Transaction::METHOD_FAMILY_MOBILE_MONEY,
+            amount: '3000',
+            currency: 'XAF',
+            status: Transaction::STATUS_SUCCEEDED,
+            rawPayload: ['notchpay_event' => 'payment.complete'],
+        );
+
+        self::assertSame('notchpay', $transaction->getProvider());
+        self::assertSame(Transaction::METHOD_FAMILY_MOBILE_MONEY, $transaction->getPaymentMethodFamily());
+        self::assertSame('pay_789', $transaction->getProviderPaymentId());
+    }
+
     public function testCreatesABoostTransactionWhenBoostIsProvided(): void
     {
         $user = new User();
