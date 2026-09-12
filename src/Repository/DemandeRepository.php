@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
+use App\Entity\Boost;
 use App\Entity\Demande;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -15,9 +16,46 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class DemandeRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry)
-    {
+    public function __construct(
+        ManagerRegistry $registry,
+        private readonly BoostRepository $boostRepository,
+    ) {
         parent::__construct($registry, Demande::class);
+    }
+
+    /**
+     * @param Demande[] $demandes
+     */
+    private function markCurrentlyBoosted(array $demandes): void
+    {
+        if ($demandes === []) {
+            return;
+        }
+
+        $ids = array_map(static fn (Demande $d) => $d->getId(), $demandes);
+        $boostedIds = $this->boostRepository->findActiveDemandeIds($ids);
+
+        foreach ($demandes as $demande) {
+            $demande->setIsCurrentlyBoosted(in_array($demande->getId(), $boostedIds, true));
+        }
+    }
+
+    /**
+     * Boostes en tete, puis tri habituel par date - meme logique que
+     * VoyageRepository::applyBoostOrdering() - monetisation Lot 2.
+     */
+    private function applyBoostOrdering(QueryBuilder $qb): void
+    {
+        $qb->leftJoin(
+            Boost::class,
+            'boost',
+            'WITH',
+            'boost.demande = d.id AND boost.status = :boostStatus AND boost.endAt > :boostNow'
+        )
+            ->setParameter('boostStatus', Boost::STATUS_ACTIVE)
+            ->setParameter('boostNow', new \DateTime())
+            ->orderBy('CASE WHEN boost.id IS NOT NULL THEN 0 ELSE 1 END', 'ASC')
+            ->addOrderBy('d.createdAt', 'DESC');
     }
 
     /**
@@ -66,15 +104,16 @@ class DemandeRepository extends ServiceEntityRepository
             ->leftJoin('d.client', 'u')
             ->leftJoin('u.settings', 's')
             ->addSelect('u', 's')
-            ->orderBy('d.createdAt', 'DESC')
             ->andWhere('d.statut = :statut')
             ->setParameter('statut', 'en_recherche')
             ->setFirstResult($offset)
             ->setMaxResults($limit);
 
+        $this->applyBoostOrdering($qb);
         $this->applyFilters($qb, $filters);
 
         $demandes = $qb->getQuery()->getResult();
+        $this->markCurrentlyBoosted($demandes);
 
         $countQb = $this->createQueryBuilder('d')
             ->select('COUNT(d.id)')
@@ -116,9 +155,10 @@ class DemandeRepository extends ServiceEntityRepository
             // ==================== FILTRER PAR VISIBILITÉ ====================
             ->where('s.privacy.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('visible', true)
-            ->orderBy('d.createdAt', 'DESC')
             ->setFirstResult($offset)
             ->setMaxResults($limit);
+
+        $this->applyBoostOrdering($qb);
 
         if ($excludeUser && !in_array('ROLE_ADMIN', $excludeUser->getRoles(), true)) {
             $qb->andWhere('d.client != :excludedUser')
@@ -136,6 +176,7 @@ class DemandeRepository extends ServiceEntityRepository
         }
 
         $demandes = $qb->getQuery()->getResult();
+        $this->markCurrentlyBoosted($demandes);
 
         $countQb = $this->createQueryBuilder('d')
             ->select('COUNT(d.id)')

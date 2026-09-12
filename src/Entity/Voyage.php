@@ -78,6 +78,14 @@ class Voyage
     #[Groups(['voyage:read', 'voyage:list', 'favori:list'])]
     private string $statut = 'actif';
 
+    /**
+     * Champ transitoire (jamais persisté, pas de #[ORM\Column]) : positionné par
+     * VoyageRepository après la requête principale via une requête batch sur
+     * BoostRepository::findActiveVoyageIds() - monétisation Lot 2.
+     */
+    #[Groups(['public:voyage:list', 'voyage:read', 'voyage:list', 'favori:list'])]
+    private bool $isCurrentlyBoosted = false;
+
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
     #[Groups(['voyage:read'])]
     private ?\DateTimeInterface $createdAt = null;
@@ -261,6 +269,17 @@ class Voyage
     public function setStatut(string $statut): static
     {
         $this->statut = $statut;
+        return $this;
+    }
+
+    public function isCurrentlyBoosted(): bool
+    {
+        return $this->isCurrentlyBoosted;
+    }
+
+    public function setIsCurrentlyBoosted(bool $isCurrentlyBoosted): static
+    {
+        $this->isCurrentlyBoosted = $isCurrentlyBoosted;
         return $this;
     }
 

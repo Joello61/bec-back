@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Service;
 
+use App\Entity\Boost;
 use App\Entity\Transaction;
 use App\Entity\User;
 use App\Repository\TransactionRepository;
@@ -94,5 +95,32 @@ class PaymentServiceTest extends TestCase
         $result = $this->call($user);
 
         self::assertSame($existingAfterRace, $result);
+    }
+
+    public function testCreatesABoostTransactionWhenBoostIsProvided(): void
+    {
+        $user = new User();
+        $boost = new Boost();
+        $this->transactionRepository->method('findByProviderPaymentId')->willReturn(null);
+        $this->em->method('wrapInTransaction')->willReturnCallback(fn (callable $fn) => $fn());
+        $this->em->expects(self::once())->method('persist');
+        $this->em->expects(self::once())->method('flush');
+
+        $transaction = $this->paymentService->findOrCreateFromProviderEvent(
+            provider: 'stripe',
+            providerPaymentId: 'pi_456',
+            user: $user,
+            subscription: null,
+            type: Transaction::TYPE_BOOST,
+            paymentMethodFamily: Transaction::METHOD_FAMILY_CARD,
+            amount: '2.99',
+            currency: 'EUR',
+            status: Transaction::STATUS_SUCCEEDED,
+            rawPayload: ['stripe_event' => 'checkout.session.completed'],
+            boost: $boost,
+        );
+
+        self::assertSame($boost, $transaction->getBoost());
+        self::assertNull($transaction->getSubscription());
     }
 }

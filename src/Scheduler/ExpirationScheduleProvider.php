@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Scheduler;
 
 use App\Message\ExpireBansMessage;
+use App\Message\ExpireBoostsMessage;
 use App\Message\ExpireDemandesMessage;
 use App\Message\ExpireVoyagesMessage;
 use Symfony\Component\Scheduler\Attribute\AsSchedule;
@@ -43,6 +44,16 @@ class ExpirationScheduleProvider implements ScheduleProviderInterface
                 RecurringMessage::every(
                     '1 hour',
                     new ExpireBansMessage()
+                )
+            )
+
+            // ==================== EXPIRATION DES BOOSTS (monetisation Lot 2) ====================
+            // Tous les jours à 3h du matin - purement pour la coherence du reporting, le
+            // tri des listings reste base sur endAt > NOW(), independant de ce sweep.
+            ->add(
+                RecurringMessage::cron(
+                    '0 3 * * *',
+                    new ExpireBoostsMessage()
                 )
             );
     }

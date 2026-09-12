@@ -21,6 +21,7 @@ class Transaction
 {
     public const TYPE_SUBSCRIPTION_INITIAL = 'subscription_initial';
     public const TYPE_SUBSCRIPTION_RENEWAL = 'subscription_renewal';
+    public const TYPE_BOOST = 'boost';
 
     public const STATUS_PENDING = 'pending';
     public const STATUS_SUCCEEDED = 'succeeded';
@@ -44,6 +45,10 @@ class Transaction
     #[ORM\ManyToOne(targetEntity: UserSubscription::class)]
     #[ORM\JoinColumn(nullable: true)]
     private ?UserSubscription $subscription = null;
+
+    #[ORM\ManyToOne(targetEntity: Boost::class)]
+    #[ORM\JoinColumn(nullable: true)]
+    private ?Boost $boost = null;
 
     #[ORM\Column(length: 30)]
     #[Groups(['transaction:read', 'admin:transaction:list'])]
@@ -124,6 +129,17 @@ class Transaction
     public function setSubscription(?UserSubscription $subscription): static
     {
         $this->subscription = $subscription;
+        return $this;
+    }
+
+    public function getBoost(): ?Boost
+    {
+        return $this->boost;
+    }
+
+    public function setBoost(?Boost $boost): static
+    {
+        $this->boost = $boost;
         return $this;
     }
 
