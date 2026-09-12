@@ -303,6 +303,14 @@ class DemandeRepository extends ServiceEntityRepository
     }
 
     /**
+     * Compte les demandes actives d'un utilisateur (quota freemium, monétisation Lot 1)
+     */
+    public function countActiveByUser(User $user): int
+    {
+        return $this->count(['client' => $user, 'statut' => 'en_recherche']);
+    }
+
+    /**
      * Compte les demandes créées entre deux dates
      */
     public function countCreatedBetween(\DateTimeInterface $start, \DateTimeInterface $end): int

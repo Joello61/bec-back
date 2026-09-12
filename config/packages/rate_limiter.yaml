@@ -36,6 +36,19 @@ framework:
             limit: 30
             interval: '1 minute'
 
+        # Empeche la creation repetee de Checkout Sessions Stripe (10 par utilisateur/10min)
+        payment_checkout:
+            policy: 'sliding_window'
+            limit: 10
+            interval: '10 minutes'
+
+        # Defense en profondeur sur l'endpoint webhook Stripe (120/min, la signature Stripe
+        # reste la seule verification d'authenticite, ce limiter protege juste des abus/replay)
+        payment_webhook:
+            policy: 'sliding_window'
+            limit: 120
+            interval: '1 minute'
+
 # Assouplissement dev uniquement (Phase 7b-B, releve Phase 11/Lot B) : la suite E2E
 # (bec-frontend/e2e) inscrit un compte reel par scenario pour s'isoler entre tests - la
 # limite de prod (3/IP/heure) suffisait a peine a la suite existante. Un decompte exact sur

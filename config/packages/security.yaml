@@ -79,6 +79,16 @@ security:
         # Pas de règle PUBLIC_ACCESS ici pour /api/metrics : le firewall dédié
         # `metrics` (security: false, ci-dessus) ne consulte jamais access_control.
 
+        # Catalogue des plans d'abonnement : donnée référentielle publique (page tarifs),
+        # monétisation Lot 1.
+        - { path: ^/api/subscriptions/plans, methods: [GET], roles: PUBLIC_ACCESS }
+
+        # Webhooks Stripe/Notch Pay : appelés par le provider de paiement, jamais par un
+        # utilisateur authentifié - l'authenticité est garantie par la vérification de
+        # signature dans le RequestParser dédié (jamais par le firewall/JWT), monétisation
+        # Lot 1. Route hors du préfixe /api (cf. config/routes/webhook.yaml).
+        - { path: ^/webhook, roles: PUBLIC_ACCESS }
+
         # Documentation admin
         - { path: ^/api/doc, roles: ROLE_ADMIN }
 

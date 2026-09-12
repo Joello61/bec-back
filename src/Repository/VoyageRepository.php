@@ -305,6 +305,14 @@ class VoyageRepository extends ServiceEntityRepository
     }
 
     /**
+     * Compte les voyages actifs d'un utilisateur (quota freemium, monétisation Lot 1)
+     */
+    public function countActiveByUser(User $user): int
+    {
+        return $this->count(['voyageur' => $user, 'statut' => 'actif']);
+    }
+
+    /**
      * Compte les voyages créés entre deux dates
      */
     public function countCreatedBetween(\DateTimeInterface $start, \DateTimeInterface $end): int
