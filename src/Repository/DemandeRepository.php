@@ -378,4 +378,20 @@ class DemandeRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Incrementation atomique (Lot 6.2) - jamais un cycle load-entite/flush, qui
+     * perdrait des vues sous acces concurrents (meme patron que
+     * MessageRepository::markConversationAsRead()).
+     */
+    public function incrementNombreVues(int $id): void
+    {
+        $this->createQueryBuilder('d')
+            ->update()
+            ->set('d.nombreVues', 'd.nombreVues + 1')
+            ->where('d.id = :id')
+            ->setParameter('id', $id)
+            ->getQuery()
+            ->execute();
+    }
 }

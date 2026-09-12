@@ -13,6 +13,10 @@ use App\Entity\Voyage;
  */
 readonly class VisibilityService
 {
+    public function __construct(
+        private SubscriptionService $subscriptionService,
+    ) {}
+
     /**
      * Vérifie si un utilisateur est visible dans les résultats de recherche
      */
@@ -198,5 +202,45 @@ readonly class VisibilityService
         }
 
         return $normalized;
+    }
+
+    /**
+     * Injecte le nombre de vues d'une annonce (Lot 6.2) dans un tableau déjà normalisé,
+     * uniquement au propriétaire - jamais à un tiers, ce n'est pas une donnée publique.
+     * Avantage différenciant des plans payants (SubscriptionPlan::hasViewStats, cf.
+     * hasBadge existant) : si le propriétaire n'y a pas droit, injecte un indicateur
+     * "verrouillé" (nombreVuesLocked) plutôt que le vrai chiffre, pour permettre un
+     * encart d'upsell frontend sans jamais exposer la valeur réelle côté réseau.
+     * @param array<string, mixed> $normalized
+     * @return array<string, mixed>
+     */
+    public function injectViewsCountIfEntitled(array $normalized, User $owner, ?User $viewer, int $nombreVues): array
+    {
+        if ($viewer === null || $owner !== $viewer) {
+            return $normalized;
+        }
+
+        if ($this->hasViewStatsEntitlement($owner)) {
+            $normalized['nombreVues'] = $nombreVues;
+        } else {
+            $normalized['nombreVuesLocked'] = true;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Fail-closed (pas de statistique affichée) plutôt que fail-open : contrairement
+     * au quota freemium (VoyageVoter/DemandeVoter::canCreate()), aucune action
+     * utilisateur n'est bloquée par cette fonctionnalité d'affichage - une erreur de
+     * configuration ne doit jamais faire planter la page de détail en 500.
+     */
+    private function hasViewStatsEntitlement(User $owner): bool
+    {
+        try {
+            return $this->subscriptionService->getEffectivePlan($owner)->hasViewStats();
+        } catch (\RuntimeException) {
+            return false;
+        }
     }
 }

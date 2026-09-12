@@ -140,6 +140,7 @@ class DemandeController extends AbstractController
             ?? $this->currencyService->getDefaultCurrency();
 
         $demande = $this->demandeService->getDemande($id);
+        $this->demandeService->registerView($demande, $currentUser);
 
         $demandeData = json_decode(
             $this->serializer->serialize($demande, 'json', ['groups' => ['demande:read']]),
@@ -150,6 +151,12 @@ class DemandeController extends AbstractController
             'client',
             $demande->getClient(),
             $currentUser
+        );
+        $demandeData = $this->visibilityService->injectViewsCountIfEntitled(
+            $demandeData,
+            $demande->getClient(),
+            $currentUser,
+            $demande->getNombreVues()
         );
 
         // ==================== CONVERSION AUTOMATIQUE ====================

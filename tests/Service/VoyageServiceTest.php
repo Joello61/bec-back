@@ -412,4 +412,24 @@ class VoyageServiceTest extends TestCase
 
         self::assertSame(['result'], $this->service->findMatchingDemandes(1));
     }
+
+    // ==================== registerView (Lot 6.2) ====================
+
+    public function testRegisterViewIncrementsForAThirdParty(): void
+    {
+        $voyage = $this->voyage(1, $this->user(1));
+        $viewer = $this->user(2);
+        $this->voyageRepository->expects(self::once())->method('incrementNombreVues')->with(1);
+
+        $this->service->registerView($voyage, $viewer);
+    }
+
+    public function testRegisterViewDoesNotIncrementForTheOwner(): void
+    {
+        $owner = $this->user(1);
+        $voyage = $this->voyage(1, $owner);
+        $this->voyageRepository->expects(self::never())->method('incrementNombreVues');
+
+        $this->service->registerView($voyage, $owner);
+    }
 }

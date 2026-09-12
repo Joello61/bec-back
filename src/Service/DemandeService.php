@@ -57,6 +57,19 @@ readonly class DemandeService
         return $demande;
     }
 
+    /**
+     * Comptabilise une vue par un tiers (Lot 6.2) - jamais pour le proprietaire
+     * lui-meme (evite qu'il gonfle sa propre statistique en rafraichissant sa page).
+     */
+    public function registerView(Demande $demande, User $viewer): void
+    {
+        if ($demande->getClient() === $viewer) {
+            return;
+        }
+
+        $this->demandeRepository->incrementNombreVues((int) $demande->getId());
+    }
+
     public function createDemande(CreateDemandeDTO $dto, User $user): Demande
     {
         // ==================== DEVISE DEPUIS SETTINGS UNIQUEMENT ====================

@@ -46,7 +46,7 @@ class VoyageVoterTest extends TestCase
 
     private function visibilityService(): VisibilityService
     {
-        return new VisibilityService();
+        return new VisibilityService($this->subscriptionService);
     }
 
     private function planWithQuota(?int $maxActiveVoyages): SubscriptionPlan

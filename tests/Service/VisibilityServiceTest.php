@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Service;
 
 use App\Entity\Demande;
+use App\Entity\SubscriptionPlan;
 use App\Entity\User;
 use App\Entity\UserSettings;
 use App\Entity\Voyage;
+use App\Service\SubscriptionService;
 use App\Service\VisibilityService;
 use App\Tests\Support\InMemoryUserTrait;
 use PHPUnit\Framework\TestCase;
@@ -21,11 +23,13 @@ class VisibilityServiceTest extends TestCase
 {
     use InMemoryUserTrait;
 
+    private SubscriptionService&\PHPUnit\Framework\MockObject\MockObject $subscriptionService;
     private VisibilityService $service;
 
     protected function setUp(): void
     {
-        $this->service = new VisibilityService();
+        $this->subscriptionService = $this->createMock(SubscriptionService::class);
+        $this->service = new VisibilityService($this->subscriptionService);
     }
 
     private function settingsFor(User $user): UserSettings
@@ -199,5 +203,70 @@ class VisibilityServiceTest extends TestCase
         $recipient = $this->makeUser();
 
         self::assertTrue($this->service->canSendMessageTo($sender, $recipient));
+    }
+
+    // ==================== injectViewsCountIfEntitled (Lot 6.2) ====================
+
+    private function planWithViewStats(bool $hasViewStats): SubscriptionPlan
+    {
+        $plan = new SubscriptionPlan();
+        $plan->setHasViewStats($hasViewStats);
+
+        return $plan;
+    }
+
+    public function testInjectViewsCountInjectsNothingForAThirdParty(): void
+    {
+        $owner = $this->makeUser();
+        $viewer = $this->makeUser();
+        $this->subscriptionService->expects($this->never())->method('getEffectivePlan');
+
+        $normalized = $this->service->injectViewsCountIfEntitled([], $owner, $viewer, 42);
+
+        self::assertArrayNotHasKey('nombreVues', $normalized);
+        self::assertArrayNotHasKey('nombreVuesLocked', $normalized);
+    }
+
+    public function testInjectViewsCountInjectsNothingForAnAnonymousViewer(): void
+    {
+        $owner = $this->makeUser();
+
+        $normalized = $this->service->injectViewsCountIfEntitled([], $owner, null, 42);
+
+        self::assertArrayNotHasKey('nombreVues', $normalized);
+        self::assertArrayNotHasKey('nombreVuesLocked', $normalized);
+    }
+
+    public function testInjectViewsCountInjectsTheRealValueForAnEntitledOwner(): void
+    {
+        $owner = $this->makeUser();
+        $this->subscriptionService->method('getEffectivePlan')->with($owner)->willReturn($this->planWithViewStats(true));
+
+        $normalized = $this->service->injectViewsCountIfEntitled([], $owner, $owner, 42);
+
+        self::assertSame(42, $normalized['nombreVues']);
+        self::assertArrayNotHasKey('nombreVuesLocked', $normalized);
+    }
+
+    public function testInjectViewsCountInjectsALockedFlagForANonEntitledOwner(): void
+    {
+        $owner = $this->makeUser();
+        $this->subscriptionService->method('getEffectivePlan')->with($owner)->willReturn($this->planWithViewStats(false));
+
+        $normalized = $this->service->injectViewsCountIfEntitled([], $owner, $owner, 42);
+
+        self::assertTrue($normalized['nombreVuesLocked']);
+        self::assertArrayNotHasKey('nombreVues', $normalized);
+    }
+
+    public function testInjectViewsCountFailsClosedWhenSubscriptionServiceThrows(): void
+    {
+        $owner = $this->makeUser();
+        $this->subscriptionService->method('getEffectivePlan')->willThrowException(new \RuntimeException('Plan gratuit introuvable'));
+
+        $normalized = $this->service->injectViewsCountIfEntitled([], $owner, $owner, 42);
+
+        self::assertTrue($normalized['nombreVuesLocked']);
+        self::assertArrayNotHasKey('nombreVues', $normalized);
     }
 }
