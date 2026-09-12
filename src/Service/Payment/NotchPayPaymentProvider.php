@@ -79,6 +79,12 @@ readonly class NotchPayPaymentProvider implements PaymentProviderInterface
 
         $payment = Payment::initialize($params);
 
+        // Payment::initialize() est type array|object par le SDK mais renvoie toujours
+        // un objet avec le return_type par defaut ('obj') - jamais surchage ici.
+        if (!is_object($payment) || !isset($payment->authorization_url)) {
+            throw new \RuntimeException('Réponse Notch Pay inattendue : authorization_url manquant');
+        }
+
         return new CheckoutSessionResult(
             checkoutUrl: $payment->authorization_url,
             providerCustomerId: null,
