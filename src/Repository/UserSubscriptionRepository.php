@@ -64,4 +64,44 @@ class UserSubscriptionRepository extends ServiceEntityRepository
 
         return $result['providerCustomerId'] ?? null;
     }
+
+    /**
+     * Abonnements Mobile Money actifs dont la periode se termine avant $before et pour
+     * lesquels aucun rappel n'a encore ete envoye pour la periode en cours - Notch Pay
+     * n'a pas de recurrence native (Lot 3), ce rappel est le seul mecanisme de relance.
+     * @return UserSubscription[]
+     */
+    public function findNeedingRenewalReminder(\DateTimeInterface $before): array
+    {
+        return $this->createQueryBuilder('s')
+            ->andWhere('s.provider = :provider')
+            ->andWhere('s.status = :status')
+            ->andWhere('s.currentPeriodEnd IS NOT NULL')
+            ->andWhere('s.currentPeriodEnd <= :before')
+            ->andWhere('s.renewalReminderSentAt IS NULL OR s.renewalReminderSentAt < s.currentPeriodStart')
+            ->setParameter('provider', UserSubscription::PROVIDER_NOTCHPAY)
+            ->setParameter('status', UserSubscription::STATUS_ACTIVE)
+            ->setParameter('before', $before)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Abonnements Mobile Money actifs dont le delai de grace (periode + N jours) est
+     * depasse sans nouveau paiement recu - a faire basculer en expired.
+     * @return UserSubscription[]
+     */
+    public function findNotchPayPastGracePeriod(\DateTimeInterface $cutoff): array
+    {
+        return $this->createQueryBuilder('s')
+            ->andWhere('s.provider = :provider')
+            ->andWhere('s.status = :status')
+            ->andWhere('s.currentPeriodEnd IS NOT NULL')
+            ->andWhere('s.currentPeriodEnd < :cutoff')
+            ->setParameter('provider', UserSubscription::PROVIDER_NOTCHPAY)
+            ->setParameter('status', UserSubscription::STATUS_ACTIVE)
+            ->setParameter('cutoff', $cutoff)
+            ->getQuery()
+            ->getResult();
+    }
 }
