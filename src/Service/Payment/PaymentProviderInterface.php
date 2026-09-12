@@ -16,9 +16,14 @@ use App\Entity\UserSubscription;
  */
 interface PaymentProviderInterface
 {
+    /**
+     * @param string $billingPeriod UserSubscription::BILLING_PERIOD_MONTHLY|BILLING_PERIOD_YEARLY
+     *                               (Lot 6.3) - selectionne le prix/Price a utiliser sur le plan.
+     */
     public function createCheckoutSession(
         User $user,
         SubscriptionPlan $plan,
+        string $billingPeriod,
         string $clientReferenceId,
         ?string $existingProviderCustomerId,
         string $successUrl,

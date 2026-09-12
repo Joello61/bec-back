@@ -4,10 +4,16 @@ declare(strict_types=1);
 
 namespace App\Tests\Service\Payment;
 
+use App\Entity\SubscriptionPlan;
 use App\Entity\Transaction;
+use App\Entity\User;
+use App\Entity\UserSubscription;
 use App\Service\Payment\StripePaymentProvider;
 use PHPUnit\Framework\TestCase;
+use Stripe\Checkout\Session;
 use Stripe\Invoice;
+use Stripe\Service\Checkout\CheckoutServiceFactory;
+use Stripe\Service\Checkout\SessionService;
 use Stripe\Service\InvoiceService;
 use Stripe\Service\RefundService;
 use Stripe\StripeClient;
@@ -99,6 +105,84 @@ class StripePaymentProviderTest extends TestCase
             ->with(['payment_intent' => 'pi_sub_456']);
 
         $this->provider->refundTransaction($transaction);
+    }
+
+    private function plan(): SubscriptionPlan
+    {
+        $plan = new SubscriptionPlan();
+        $plan->setCode('plus')->setName('Plus')->setStripePriceId('price_monthly')->setStripePriceIdYearly('price_yearly');
+
+        return $plan;
+    }
+
+    // ==================== createCheckoutSession (Lot 6.3) ====================
+
+    public function testCreateCheckoutSessionUsesTheMonthlyPriceByDefault(): void
+    {
+        $sessionService = $this->createMock(SessionService::class);
+        $checkoutFactory = $this->createMock(CheckoutServiceFactory::class);
+        $checkoutFactory->method('__get')->willReturnMap([['sessions', $sessionService]]);
+        $this->stripeClient->method('__get')->willReturnMap([['checkout', $checkoutFactory]]);
+
+        $sessionService->expects($this->once())
+            ->method('create')
+            ->with($this->callback(fn (array $params) => $params['line_items'][0]['price'] === 'price_monthly'))
+            ->willReturn(Session::constructFrom(['url' => 'https://checkout.stripe.com/monthly', 'customer' => null]));
+
+        $result = $this->provider->createCheckoutSession(
+            new User(),
+            $this->plan(),
+            UserSubscription::BILLING_PERIOD_MONTHLY,
+            '1',
+            null,
+            'https://ok',
+            'https://ko',
+        );
+
+        self::assertSame('https://checkout.stripe.com/monthly', $result->checkoutUrl);
+    }
+
+    public function testCreateCheckoutSessionUsesTheYearlyPriceWhenRequested(): void
+    {
+        $sessionService = $this->createMock(SessionService::class);
+        $checkoutFactory = $this->createMock(CheckoutServiceFactory::class);
+        $checkoutFactory->method('__get')->willReturnMap([['sessions', $sessionService]]);
+        $this->stripeClient->method('__get')->willReturnMap([['checkout', $checkoutFactory]]);
+
+        $sessionService->expects($this->once())
+            ->method('create')
+            ->with($this->callback(fn (array $params) => $params['line_items'][0]['price'] === 'price_yearly'))
+            ->willReturn(Session::constructFrom(['url' => 'https://checkout.stripe.com/yearly', 'customer' => null]));
+
+        $result = $this->provider->createCheckoutSession(
+            new User(),
+            $this->plan(),
+            UserSubscription::BILLING_PERIOD_YEARLY,
+            '1',
+            null,
+            'https://ok',
+            'https://ko',
+        );
+
+        self::assertSame('https://checkout.stripe.com/yearly', $result->checkoutUrl);
+    }
+
+    public function testCreateCheckoutSessionThrowsWhenTheYearlyPriceIsNotConfigured(): void
+    {
+        $plan = new SubscriptionPlan();
+        $plan->setCode('plus')->setName('Plus')->setStripePriceId('price_monthly');
+
+        $this->expectException(\RuntimeException::class);
+
+        $this->provider->createCheckoutSession(
+            new User(),
+            $plan,
+            UserSubscription::BILLING_PERIOD_YEARLY,
+            '1',
+            null,
+            'https://ok',
+            'https://ko',
+        );
     }
 
     public function testRefundTransactionThrowsWhenTheInvoiceHasNoDefaultPayment(): void

@@ -98,7 +98,7 @@ readonly class SubscriptionService
         return $freePlan;
     }
 
-    public function checkout(User $user, string $planCode, string $paymentMethod, string $successUrl, string $cancelUrl): CheckoutSessionResult
+    public function checkout(User $user, string $planCode, string $paymentMethod, string $billingPeriod, string $successUrl, string $cancelUrl): CheckoutSessionResult
     {
         $plan = $this->subscriptionPlanRepository->findByCode($planCode);
 
@@ -117,13 +117,20 @@ readonly class SubscriptionService
         $provider = $this->resolveProvider($paymentMethod);
         $providerName = $this->providerNameFor($paymentMethod);
         $isMobileMoney = $paymentMethod === self::PAYMENT_METHOD_MOBILE_MONEY;
-        $amount = $isMobileMoney ? $plan->getPriceAmountXaf() : $plan->getPriceAmountEur();
+        $isYearly = $billingPeriod === UserSubscription::BILLING_PERIOD_YEARLY;
+        $amount = match (true) {
+            $isMobileMoney && $isYearly => $plan->getPriceAmountXafYearly(),
+            $isMobileMoney => $plan->getPriceAmountXaf(),
+            $isYearly => $plan->getPriceAmountEurYearly(),
+            default => $plan->getPriceAmountEur(),
+        };
         $currency = $isMobileMoney ? 'XAF' : 'EUR';
 
         if ($amount === null) {
             throw new BadRequestHttpException(sprintf(
-                'Le plan "%s" n\'a pas de tarif configuré pour ce moyen de paiement',
-                $plan->getCode()
+                'Le plan "%s" n\'a pas de tarif %s configuré pour ce moyen de paiement',
+                $plan->getCode(),
+                $isYearly ? 'annuel' : 'mensuel'
             ));
         }
 
@@ -132,6 +139,7 @@ readonly class SubscriptionService
             ->setPlan($plan)
             ->setStatus(UserSubscription::STATUS_INCOMPLETE)
             ->setProvider($providerName)
+            ->setBillingPeriod($billingPeriod)
             ->setAmount($amount)
             ->setCurrency($currency)
             ->setWithdrawalWaiverConsentedAt(new \DateTime());
@@ -147,6 +155,7 @@ readonly class SubscriptionService
         $result = $provider->createCheckoutSession(
             $user,
             $plan,
+            $billingPeriod,
             (string) $subscription->getId(),
             $existingProviderCustomerId,
             $successUrl,
@@ -355,10 +364,11 @@ readonly class SubscriptionService
 
         $now = new \DateTime();
         $isFirstActivation = $subscription->getStatus() !== UserSubscription::STATUS_ACTIVE;
+        $cycleModifier = $subscription->getBillingPeriod() === UserSubscription::BILLING_PERIOD_YEARLY ? '+1 year' : '+1 month';
 
         $subscription->setStatus(UserSubscription::STATUS_ACTIVE)
             ->setCurrentPeriodStart($now)
-            ->setCurrentPeriodEnd((clone $now)->modify('+1 month'));
+            ->setCurrentPeriodEnd((clone $now)->modify($cycleModifier));
         $this->entityManager->flush();
 
         $this->paymentService->findOrCreateFromProviderEvent(
