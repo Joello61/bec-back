@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Entity\Boost;
 use App\Entity\Transaction;
 use App\Entity\User;
 use App\Entity\UserSubscription;
@@ -40,6 +41,7 @@ readonly class PaymentService
         string $currency,
         string $status,
         array $rawPayload,
+        ?Boost $boost = null,
     ): Transaction {
         $existing = $this->transactionRepository->findByProviderPaymentId($provider, $providerPaymentId);
 
@@ -59,6 +61,7 @@ readonly class PaymentService
                     $providerPaymentId,
                     $user,
                     $subscription,
+                    $boost,
                     $type,
                     $paymentMethodFamily,
                     $amount,
@@ -71,6 +74,7 @@ readonly class PaymentService
                         ->setProviderPaymentId($providerPaymentId)
                         ->setUser($user)
                         ->setSubscription($subscription)
+                        ->setBoost($boost)
                         ->setType($type)
                         ->setPaymentMethodFamily($paymentMethodFamily)
                         ->setAmount($amount)

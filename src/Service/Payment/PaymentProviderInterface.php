@@ -25,4 +25,20 @@ interface PaymentProviderInterface
     ): CheckoutSessionResult;
 
     public function cancelSubscription(UserSubscription $subscription): void;
+
+    /**
+     * Paiement à l'acte (boost, Lot 2) : mode "payment" avec un prix ad-hoc
+     * (price_data inline), distinct de createCheckoutSession() qui exige un Price
+     * Stripe recurring pré-créé (mode "subscription").
+     */
+    public function createOneTimeCheckoutSession(
+        User $user,
+        string $productName,
+        string $amount,
+        string $currency,
+        string $clientReferenceId,
+        ?string $existingProviderCustomerId,
+        string $successUrl,
+        string $cancelUrl,
+    ): CheckoutSessionResult;
 }

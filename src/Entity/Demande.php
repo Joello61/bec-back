@@ -70,6 +70,14 @@ class Demande
     #[Groups(['demande:read', 'demande:list', 'favori:list'])]
     private string $statut = 'en_recherche';
 
+    /**
+     * Champ transitoire (jamais persisté, pas de #[ORM\Column]) : positionné par
+     * DemandeRepository après la requête principale via une requête batch sur
+     * BoostRepository::findActiveDemandeIds() - monétisation Lot 2.
+     */
+    #[Groups(['public:demande:list', 'demande:read', 'demande:list', 'favori:list'])]
+    private bool $isCurrentlyBoosted = false;
+
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
     #[Groups(['demande:read'])]
     private ?\DateTimeInterface $createdAt = null;
@@ -226,6 +234,17 @@ class Demande
     public function setStatut(string $statut): static
     {
         $this->statut = $statut;
+        return $this;
+    }
+
+    public function isCurrentlyBoosted(): bool
+    {
+        return $this->isCurrentlyBoosted;
+    }
+
+    public function setIsCurrentlyBoosted(bool $isCurrentlyBoosted): static
+    {
+        $this->isCurrentlyBoosted = $isCurrentlyBoosted;
         return $this;
     }
 
