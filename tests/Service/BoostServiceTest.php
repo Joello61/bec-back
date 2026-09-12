@@ -20,6 +20,7 @@ use App\Service\Payment\PaymentProviderInterface;
 use App\Service\PaymentService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Psr\Container\ContainerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -50,6 +51,10 @@ class BoostServiceTest extends TestCase
         $this->em = $this->createMock(EntityManagerInterface::class);
         $paymentService = $this->createMock(PaymentService::class);
 
+        $paymentProviders = $this->createMock(ContainerInterface::class);
+        $paymentProviders->method('has')->willReturn(true);
+        $paymentProviders->method('get')->willReturn($this->paymentProvider);
+
         $this->service = new BoostService(
             $this->em,
             $this->boostOfferRepository,
@@ -57,16 +62,16 @@ class BoostServiceTest extends TestCase
             $this->voyageRepository,
             $this->demandeRepository,
             $this->userSubscriptionRepository,
-            $this->paymentProvider,
+            $paymentProviders,
             $paymentService,
             new NullLogger(),
         );
     }
 
-    private function offer(int $durationDays = 7, string $price = '2.99'): BoostOffer
+    private function offer(int $durationDays = 7, string $price = '2.99', ?string $priceXaf = null): BoostOffer
     {
         $offer = new BoostOffer();
-        $offer->setName($durationDays . ' jours')->setDurationDays($durationDays)->setPriceAmountEur($price)->setIsActive(true);
+        $offer->setName($durationDays . ' jours')->setDurationDays($durationDays)->setPriceAmountEur($price)->setPriceAmountXaf($priceXaf)->setIsActive(true);
 
         return $offer;
     }
@@ -77,7 +82,7 @@ class BoostServiceTest extends TestCase
 
         $this->expectException(NotFoundHttpException::class);
 
-        $this->service->checkout(new User(), BoostService::TARGET_VOYAGE, 1, 99, 'https://ok', 'https://ko');
+        $this->service->checkout(new User(), BoostService::TARGET_VOYAGE, 1, 99, 'card', 'https://ok', 'https://ko');
     }
 
     public function testCheckoutRejectsAnInvalidTargetType(): void
@@ -86,7 +91,7 @@ class BoostServiceTest extends TestCase
 
         $this->expectException(BadRequestHttpException::class);
 
-        $this->service->checkout(new User(), 'invalide', 1, 1, 'https://ok', 'https://ko');
+        $this->service->checkout(new User(), 'invalide', 1, 1, 'card', 'https://ok', 'https://ko');
     }
 
     public function testCheckoutRejectsAnUnknownVoyage(): void
@@ -96,7 +101,7 @@ class BoostServiceTest extends TestCase
 
         $this->expectException(NotFoundHttpException::class);
 
-        $this->service->checkout(new User(), BoostService::TARGET_VOYAGE, 1, 1, 'https://ok', 'https://ko');
+        $this->service->checkout(new User(), BoostService::TARGET_VOYAGE, 1, 1, 'card', 'https://ok', 'https://ko');
     }
 
     public function testCheckoutCreatesAPendingBoostWithAmountFrozenFromTheOfferAndDelegatesToTheProvider(): void
@@ -121,7 +126,7 @@ class BoostServiceTest extends TestCase
             ->method('createOneTimeCheckoutSession')
             ->willReturn(new CheckoutSessionResult('https://checkout.stripe.com/session/boost'));
 
-        $result = $this->service->checkout($user, BoostService::TARGET_VOYAGE, 1, 1, 'https://ok', 'https://ko');
+        $result = $this->service->checkout($user, BoostService::TARGET_VOYAGE, 1, 1, 'card', 'https://ok', 'https://ko');
 
         self::assertSame('https://checkout.stripe.com/session/boost', $result->checkoutUrl);
         self::assertNotNull($capturedBoost);
@@ -131,6 +136,65 @@ class BoostServiceTest extends TestCase
         self::assertSame($voyage, $capturedBoost->getVoyage());
         self::assertNull($capturedBoost->getDemande());
         self::assertNotNull($capturedBoost->getWithdrawalWaiverConsentedAt());
+    }
+
+    public function testCheckoutWithMobileMoneyFreezesXafAmountAndNotchPayProvider(): void
+    {
+        $user = new User();
+        $offer = $this->offer(durationDays: 7, priceXaf: '2000');
+        $voyage = new Voyage();
+        $voyage->setVilleDepart('Douala')->setVilleArrivee('Paris');
+
+        $this->boostOfferRepository->method('findById')->willReturn($offer);
+        $this->voyageRepository->method('find')->willReturn($voyage);
+        $this->userSubscriptionRepository->method('findLatestProviderCustomerId')->willReturn(null);
+
+        $capturedBoost = null;
+        $this->em->method('persist')->willReturnCallback(function ($entity) use (&$capturedBoost) {
+            if ($entity instanceof Boost) {
+                $capturedBoost = $entity;
+            }
+        });
+
+        $this->paymentProvider->expects(self::once())
+            ->method('createOneTimeCheckoutSession')
+            ->willReturn(new CheckoutSessionResult('https://notchpay.co/pay/boost'));
+
+        $this->service->checkout($user, BoostService::TARGET_VOYAGE, 1, 1, 'mobile_money', 'https://ok', 'https://ko');
+
+        self::assertNotNull($capturedBoost);
+        self::assertSame('2000', $capturedBoost->getAmount());
+        self::assertSame('XAF', $capturedBoost->getCurrency());
+    }
+
+    public function testCheckoutRejectsMobileMoneyWhenOfferHasNoXafPriceConfigured(): void
+    {
+        $this->boostOfferRepository->method('findById')->willReturn($this->offer());
+        $this->voyageRepository->method('find')->willReturn(new Voyage());
+
+        $this->expectException(BadRequestHttpException::class);
+
+        $this->service->checkout(new User(), BoostService::TARGET_VOYAGE, 1, 1, 'mobile_money', 'https://ok', 'https://ko');
+    }
+
+    public function testHandleNotchPayPaymentCompletedActivatesTheBoostWithEndAtComputedFromDurationDays(): void
+    {
+        $offer = $this->offer(durationDays: 15);
+        $boost = new Boost();
+        $boost->setOffer($offer)
+            ->setUser(new User())
+            ->setStatus(Boost::STATUS_PENDING)
+            ->setAmount('2000')
+            ->setCurrency('XAF');
+
+        $this->boostRepository->method('find')->willReturn($boost);
+        $this->em->expects(self::once())->method('flush');
+
+        $this->service->handleNotchPayPaymentCompleted(['id' => 'pay_123', 'reference' => '42', 'amount' => 2000, 'currency' => 'XAF']);
+
+        self::assertSame(Boost::STATUS_ACTIVE, $boost->getStatus());
+        self::assertNotNull($boost->getStartAt());
+        self::assertNotNull($boost->getEndAt());
     }
 
     public function testHandleCheckoutCompletedDoesNothingWhenClientReferenceIsUnknown(): void

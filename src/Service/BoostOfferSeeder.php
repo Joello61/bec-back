@@ -40,6 +40,7 @@ readonly class BoostOfferSeeder
             $offer->setName($data['name'])
                 ->setDurationDays($data['duration_days'])
                 ->setPriceAmountEur($data['price_amount_eur'])
+                ->setPriceAmountXaf($data['price_amount_xaf'])
                 ->setSortOrder($data['sort_order']);
 
             $this->entityManager->persist($offer);
@@ -59,9 +60,9 @@ readonly class BoostOfferSeeder
     private function getOffersData(): array
     {
         return [
-            ['name' => '7 jours', 'duration_days' => 7, 'price_amount_eur' => '2.99', 'sort_order' => 0],
-            ['name' => '15 jours', 'duration_days' => 15, 'price_amount_eur' => '4.99', 'sort_order' => 1],
-            ['name' => '30 jours', 'duration_days' => 30, 'price_amount_eur' => '7.99', 'sort_order' => 2],
+            ['name' => '7 jours', 'duration_days' => 7, 'price_amount_eur' => '2.99', 'price_amount_xaf' => '2000', 'sort_order' => 0],
+            ['name' => '15 jours', 'duration_days' => 15, 'price_amount_eur' => '4.99', 'price_amount_xaf' => '3000', 'sort_order' => 1],
+            ['name' => '30 jours', 'duration_days' => 30, 'price_amount_eur' => '7.99', 'price_amount_xaf' => '5000', 'sort_order' => 2],
         ];
     }
 

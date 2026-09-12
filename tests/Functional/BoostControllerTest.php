@@ -69,6 +69,7 @@ class BoostControllerTest extends WebTestCase
             'targetType' => 'voyage',
             'targetId' => $targetId,
             'offerId' => $offerId,
+            'paymentMethod' => 'card',
             'accessImmediateConsent' => true,
             'withdrawalWaiverConsent' => true,
         ];

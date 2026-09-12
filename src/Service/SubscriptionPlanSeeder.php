@@ -42,6 +42,7 @@ readonly class SubscriptionPlanSeeder
             $plan->setCode($data['code'])
                 ->setName($data['name'])
                 ->setPriceAmountEur($data['price_amount_eur'])
+                ->setPriceAmountXaf($data['price_amount_xaf'])
                 ->setBillingPeriod('monthly')
                 ->setMaxActiveVoyages($data['max_active_voyages'])
                 ->setMaxActiveDemandes($data['max_active_demandes'])
@@ -70,6 +71,7 @@ readonly class SubscriptionPlanSeeder
                 'code' => 'free',
                 'name' => 'Free',
                 'price_amount_eur' => null,
+                'price_amount_xaf' => null,
                 'max_active_voyages' => 3,
                 'max_active_demandes' => 3,
                 'has_badge' => false,
@@ -80,6 +82,9 @@ readonly class SubscriptionPlanSeeder
                 'code' => 'plus',
                 'name' => 'Plus',
                 'price_amount_eur' => '4.99',
+                // Montant XAF indicatif, fixé comme le montant EUR (pas de conversion
+                // dynamique via CurrencyService - cf. Lot 3).
+                'price_amount_xaf' => '3000',
                 'max_active_voyages' => null,
                 'max_active_demandes' => null,
                 'has_badge' => true,
@@ -90,6 +95,7 @@ readonly class SubscriptionPlanSeeder
                 'code' => 'pro',
                 'name' => 'Pro',
                 'price_amount_eur' => '9.99',
+                'price_amount_xaf' => '6000',
                 'max_active_voyages' => null,
                 'max_active_demandes' => null,
                 'has_badge' => true,

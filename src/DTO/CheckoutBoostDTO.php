@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\DTO;
 
 use App\Service\BoostService;
+use App\Service\SubscriptionService;
 use Symfony\Component\Validator\Constraints as Assert;
 
 class CheckoutBoostDTO
@@ -20,6 +21,10 @@ class CheckoutBoostDTO
     #[Assert\NotBlank(message: "L'offre de boost est obligatoire")]
     #[Assert\Positive(message: "L'identifiant de l'offre doit être positif")]
     public int $offerId;
+
+    #[Assert\NotBlank(message: 'Le moyen de paiement est obligatoire')]
+    #[Assert\Choice(choices: [SubscriptionService::PAYMENT_METHOD_CARD, SubscriptionService::PAYMENT_METHOD_MOBILE_MONEY], message: 'Moyen de paiement invalide')]
+    public string $paymentMethod;
 
     /**
      * Consentement exprès à un accès immédiat au service (art. L.221-28 13° Code

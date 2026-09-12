@@ -10,10 +10,12 @@ use App\Entity\User;
 use App\Entity\UserSubscription;
 use App\Repository\SubscriptionPlanRepository;
 use App\Repository\UserSubscriptionRepository;
-use App\Service\Payment\PaymentProviderInterface;
 use App\Service\Payment\CheckoutSessionResult;
+use App\Service\Payment\PaymentProviderInterface;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\AutowireLocator;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -21,14 +23,53 @@ readonly class SubscriptionService
 {
     private const FREE_PLAN_CODE = 'free';
 
+    public const PAYMENT_METHOD_CARD = 'card';
+    public const PAYMENT_METHOD_MOBILE_MONEY = 'mobile_money';
+
     public function __construct(
         private EntityManagerInterface $entityManager,
         private SubscriptionPlanRepository $subscriptionPlanRepository,
         private UserSubscriptionRepository $userSubscriptionRepository,
-        private PaymentProviderInterface $paymentProvider,
+        #[AutowireLocator('app.payment_provider', indexAttribute: 'key')]
+        private ContainerInterface $paymentProviders,
         private PaymentService $paymentService,
         private LoggerInterface $logger,
     ) {}
+
+    /**
+     * Resout le provider a partir de la famille de paiement choisie au checkout.
+     */
+    private function resolveProvider(string $paymentMethod): PaymentProviderInterface
+    {
+        if (!$this->paymentProviders->has($paymentMethod)) {
+            throw new BadRequestHttpException('Moyen de paiement invalide');
+        }
+
+        /** @var PaymentProviderInterface $provider */
+        $provider = $this->paymentProviders->get($paymentMethod);
+
+        return $provider;
+    }
+
+    private function providerNameFor(string $paymentMethod): string
+    {
+        return match ($paymentMethod) {
+            self::PAYMENT_METHOD_MOBILE_MONEY => UserSubscription::PROVIDER_NOTCHPAY,
+            default => UserSubscription::PROVIDER_STRIPE,
+        };
+    }
+
+    /**
+     * Famille de paiement ('card'/'mobile_money') a partir du provider stocke - utilise
+     * pour resoudre a nouveau le bon provider lors d'une resiliation (le paiement
+     * d'origine n'est pas rejoue a ce moment-la).
+     */
+    private function paymentMethodFor(UserSubscription $subscription): string
+    {
+        return $subscription->getProvider() === UserSubscription::PROVIDER_NOTCHPAY
+            ? self::PAYMENT_METHOD_MOBILE_MONEY
+            : self::PAYMENT_METHOD_CARD;
+    }
 
     public function getActiveSubscription(User $user): ?UserSubscription
     {
@@ -57,7 +98,7 @@ readonly class SubscriptionService
         return $freePlan;
     }
 
-    public function checkout(User $user, string $planCode, string $successUrl, string $cancelUrl): CheckoutSessionResult
+    public function checkout(User $user, string $planCode, string $paymentMethod, string $successUrl, string $cancelUrl): CheckoutSessionResult
     {
         $plan = $this->subscriptionPlanRepository->findByCode($planCode);
 
@@ -69,21 +110,30 @@ readonly class SubscriptionService
             throw new BadRequestHttpException('Le plan gratuit ne nécessite pas de paiement');
         }
 
-        if ($plan->getStripePriceId() === null) {
-            throw new \RuntimeException(sprintf('Le plan "%s" n\'a pas de Price Stripe configuré', $plan->getCode()));
-        }
-
         if ($this->getActiveSubscription($user) !== null) {
             throw new BadRequestHttpException('Un abonnement actif existe déjà - résiliez-le avant d\'en souscrire un nouveau');
+        }
+
+        $provider = $this->resolveProvider($paymentMethod);
+        $providerName = $this->providerNameFor($paymentMethod);
+        $isMobileMoney = $paymentMethod === self::PAYMENT_METHOD_MOBILE_MONEY;
+        $amount = $isMobileMoney ? $plan->getPriceAmountXaf() : $plan->getPriceAmountEur();
+        $currency = $isMobileMoney ? 'XAF' : 'EUR';
+
+        if ($amount === null) {
+            throw new BadRequestHttpException(sprintf(
+                'Le plan "%s" n\'a pas de tarif configuré pour ce moyen de paiement',
+                $plan->getCode()
+            ));
         }
 
         $subscription = new UserSubscription();
         $subscription->setUser($user)
             ->setPlan($plan)
             ->setStatus(UserSubscription::STATUS_INCOMPLETE)
-            ->setProvider(UserSubscription::PROVIDER_STRIPE)
-            ->setAmount((string) $plan->getPriceAmountEur())
-            ->setCurrency('EUR')
+            ->setProvider($providerName)
+            ->setAmount($amount)
+            ->setCurrency($currency)
             ->setWithdrawalWaiverConsentedAt(new \DateTime());
 
         $this->entityManager->persist($subscription);
@@ -91,10 +141,10 @@ readonly class SubscriptionService
 
         $existingProviderCustomerId = $this->userSubscriptionRepository->findLatestProviderCustomerId(
             $user,
-            UserSubscription::PROVIDER_STRIPE
+            $providerName
         );
 
-        $result = $this->paymentProvider->createCheckoutSession(
+        $result = $provider->createCheckoutSession(
             $user,
             $plan,
             (string) $subscription->getId(),
@@ -119,7 +169,7 @@ readonly class SubscriptionService
             throw new NotFoundHttpException('Aucun abonnement actif à résilier');
         }
 
-        $this->paymentProvider->cancelSubscription($subscription);
+        $this->resolveProvider($this->paymentMethodFor($subscription))->cancelSubscription($subscription);
 
         $subscription->setCancelAtPeriodEnd(true);
         $this->entityManager->flush();
@@ -290,6 +340,71 @@ readonly class SubscriptionService
 
         $subscription->setStatus(UserSubscription::STATUS_CANCELED);
         $this->entityManager->flush();
+    }
+
+    /**
+     * @param array<string, mixed> $payment Objet Payment Notch Pay (payment.complete)
+     */
+    public function handleNotchPayPaymentCompleted(array $payment): void
+    {
+        $subscription = $this->findSubscriptionFromClientReference($payment['reference'] ?? null);
+
+        if ($subscription === null) {
+            return;
+        }
+
+        $now = new \DateTime();
+        $isFirstActivation = $subscription->getStatus() !== UserSubscription::STATUS_ACTIVE;
+
+        $subscription->setStatus(UserSubscription::STATUS_ACTIVE)
+            ->setCurrentPeriodStart($now)
+            ->setCurrentPeriodEnd((clone $now)->modify('+1 month'));
+        $this->entityManager->flush();
+
+        $this->paymentService->findOrCreateFromProviderEvent(
+            provider: UserSubscription::PROVIDER_NOTCHPAY,
+            providerPaymentId: (string) ($payment['id'] ?? $payment['reference'] ?? ''),
+            user: $subscription->getUser(),
+            subscription: $subscription,
+            type: $isFirstActivation ? Transaction::TYPE_SUBSCRIPTION_INITIAL : Transaction::TYPE_SUBSCRIPTION_RENEWAL,
+            paymentMethodFamily: Transaction::METHOD_FAMILY_MOBILE_MONEY,
+            amount: number_format((float) ($payment['amount'] ?? 0), 2, '.', ''),
+            currency: strtoupper((string) ($payment['currency'] ?? 'xaf')),
+            status: Transaction::STATUS_SUCCEEDED,
+            rawPayload: ['notchpay_event' => 'payment.complete', 'payment_reference' => $payment['reference'] ?? null],
+        );
+
+        $this->logger->info('Abonnement Mobile Money activé/renouvelé via payment.complete', [
+            'userSubscriptionId' => $subscription->getId(),
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $payment Objet Payment Notch Pay (payment.failed)
+     */
+    public function handleNotchPayPaymentFailed(array $payment): void
+    {
+        $subscription = $this->findSubscriptionFromClientReference($payment['reference'] ?? null);
+
+        if ($subscription === null) {
+            return;
+        }
+
+        $subscription->setStatus(UserSubscription::STATUS_PAST_DUE);
+        $this->entityManager->flush();
+
+        $this->paymentService->findOrCreateFromProviderEvent(
+            provider: UserSubscription::PROVIDER_NOTCHPAY,
+            providerPaymentId: (string) ($payment['id'] ?? $payment['reference'] ?? ''),
+            user: $subscription->getUser(),
+            subscription: $subscription,
+            type: Transaction::TYPE_SUBSCRIPTION_RENEWAL,
+            paymentMethodFamily: Transaction::METHOD_FAMILY_MOBILE_MONEY,
+            amount: number_format((float) ($payment['amount'] ?? 0), 2, '.', ''),
+            currency: strtoupper((string) ($payment['currency'] ?? 'xaf')),
+            status: Transaction::STATUS_FAILED,
+            rawPayload: ['notchpay_event' => 'payment.failed', 'payment_reference' => $payment['reference'] ?? null],
+        );
     }
 
     private function mapStripeStatus(string $stripeStatus): string

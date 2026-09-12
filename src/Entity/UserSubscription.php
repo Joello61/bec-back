@@ -21,6 +21,7 @@ class UserSubscription
     public const STATUS_EXPIRED = 'expired';
 
     public const PROVIDER_STRIPE = 'stripe';
+    public const PROVIDER_NOTCHPAY = 'notchpay';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -81,6 +82,13 @@ class UserSubscription
      */
     #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
     private ?\DateTimeInterface $withdrawalWaiverConsentedAt = null;
+
+    /**
+     * Date d'envoi du dernier rappel de renouvellement (Mobile Money uniquement, Lot 3 -
+     * Notch Pay n'a pas de récurrence native, cf. SendRenewalReminderHandler).
+     */
+    #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
+    private ?\DateTimeInterface $renewalReminderSentAt = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
     private ?\DateTimeInterface $createdAt = null;
@@ -240,6 +248,17 @@ class UserSubscription
     public function setWithdrawalWaiverConsentedAt(?\DateTimeInterface $withdrawalWaiverConsentedAt): static
     {
         $this->withdrawalWaiverConsentedAt = $withdrawalWaiverConsentedAt;
+        return $this;
+    }
+
+    public function getRenewalReminderSentAt(): ?\DateTimeInterface
+    {
+        return $this->renewalReminderSentAt;
+    }
+
+    public function setRenewalReminderSentAt(?\DateTimeInterface $renewalReminderSentAt): static
+    {
+        $this->renewalReminderSentAt = $renewalReminderSentAt;
         return $this;
     }
 

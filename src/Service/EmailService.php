@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Entity\User;
+use App\Entity\UserSubscription;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 use Symfony\Component\Mailer\MailerInterface;
@@ -123,6 +124,26 @@ readonly class EmailService
     }
 
     /**
+     * Rappel de renouvellement Mobile Money (Lot 3) : Notch Pay n'a pas de récurrence
+     * native, ce rappel est le seul mécanisme qui évite une expiration silencieuse.
+     * Toujours transactionnel (jamais soumis aux préférences marketing) : la
+     * conséquence d'un rappel manqué est la perte du service, pas une gêne commerciale.
+     * @throws TransportExceptionInterface
+     */
+    public function sendRenewalReminderEmail(User $user, UserSubscription $subscription): void
+    {
+        $renewUrl = sprintf('%s/dashboard/settings/subscription', $this->frontendUrl);
+
+        $email = (new Email())
+            ->from('noreply@cobage.joeltech.dev')
+            ->to($user->getEmail())
+            ->subject('Votre abonnement Cobage arrive à échéance')
+            ->html($this->getRenewalReminderContent($user, $subscription, $renewUrl));
+
+        $this->send($email, $user, true); // Transactionnel
+    }
+
+    /**
      * Email de notification générique (respecte les préférences)
      * @throws TransportExceptionInterface
      */
@@ -229,6 +250,33 @@ readonly class EmailService
             </div>',
             $user->getPrenom(),
             (new \DateTime())->format('d/m/Y à H:i')
+        );
+    }
+
+    private function getRenewalReminderContent(User $user, UserSubscription $subscription, string $renewUrl): string
+    {
+        $periodEnd = $subscription->getCurrentPeriodEnd()?->format('d/m/Y') ?? '-';
+
+        return sprintf(
+            '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+                <h1 style="color:#00695c;">Votre abonnement arrive à échéance</h1>
+                <p>Bonjour %s,</p>
+                <p>Votre abonnement <strong>%s</strong> arrive à échéance le <strong>%s</strong>.</p>
+                <p>Notch Pay (Mobile Money) ne permet pas de renouvellement automatique : pour continuer à
+                profiter de votre abonnement sans interruption, merci de renouveler votre paiement avant
+                cette date.</p>
+                <div style="text-align:center;margin:32px 0;">
+                    <a href="%s" style="display:inline-block;padding:14px 28px;background-color:#00695c;color:white;text-decoration:none;border-radius:6px;font-weight:bold;">
+                        Renouveler mon abonnement
+                    </a>
+                </div>
+                <p>Sans renouvellement, votre abonnement passera automatiquement au plan gratuit après un
+                court délai de grâce.</p>
+            </div>',
+            $user->getPrenom(),
+            $subscription->getPlan()?->getName() ?? '',
+            $periodEnd,
+            $renewUrl
         );
     }
 }
