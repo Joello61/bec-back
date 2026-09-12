@@ -57,6 +57,19 @@ readonly class VoyageService
         return $voyage;
     }
 
+    /**
+     * Comptabilise une vue par un tiers (Lot 6.2) - jamais pour le proprietaire
+     * lui-meme (evite qu'il gonfle sa propre statistique en rafraichissant sa page).
+     */
+    public function registerView(Voyage $voyage, User $viewer): void
+    {
+        if ($voyage->getVoyageur() === $viewer) {
+            return;
+        }
+
+        $this->voyageRepository->incrementNombreVues((int) $voyage->getId());
+    }
+
     public function createVoyage(CreateVoyageDTO $dto, User $user): Voyage
     {
         // ==================== DEVISE DEPUIS SETTINGS UNIQUEMENT ====================
