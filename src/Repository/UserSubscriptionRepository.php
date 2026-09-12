@@ -43,4 +43,25 @@ class UserSubscriptionRepository extends ServiceEntityRepository
             'providerSubscriptionId' => $providerSubscriptionId,
         ]);
     }
+
+    /**
+     * Identifiant client provider (Stripe Customer) le plus récent connu pour cet
+     * utilisateur, pour éviter de recréer un customer à chaque nouveau checkout.
+     */
+    public function findLatestProviderCustomerId(User $user, string $provider): ?string
+    {
+        $result = $this->createQueryBuilder('s')
+            ->select('s.providerCustomerId')
+            ->andWhere('s.user = :user')
+            ->andWhere('s.provider = :provider')
+            ->andWhere('s.providerCustomerId IS NOT NULL')
+            ->setParameter('user', $user)
+            ->setParameter('provider', $provider)
+            ->orderBy('s.createdAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $result['providerCustomerId'] ?? null;
+    }
 }
