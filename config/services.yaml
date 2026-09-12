@@ -23,6 +23,13 @@ parameters:
     app.default_currency: '%env(DEFAULT_CURRENCY)%'
     app.exchange_rate_api_key: '%env(EXCHANGE_RATE_API_KEY)%'
 
+    # Stripe (abonnements carte, Lot 1 monetisation)
+    app.stripe_secret_key: '%env(STRIPE_SECRET_KEY)%'
+    app.stripe_webhook_secret: '%env(STRIPE_WEBHOOK_SECRET)%'
+    # Stopgap tant que le CRUD admin du catalogue (Lot 5) n'existe pas encore.
+    app.stripe_price_id_plus: '%env(STRIPE_PRICE_ID_PLUS)%'
+    app.stripe_price_id_pro: '%env(STRIPE_PRICE_ID_PRO)%'
+
     sms_verification.enabled: '%env(bool:SMS_VERIFICATION_ENABLED)%'
     email_verification_enabled: '%env(bool:EMAIL_VERIFICATION_ENABLED)%'
 
@@ -65,6 +72,17 @@ services:
         arguments:
             $exchangeRateApiKey: '%app.exchange_rate_api_key%'
             $defaultCurrency: '%app.default_currency%'
+
+    App\Service\SubscriptionPlanSeeder:
+        arguments:
+            $stripePriceIdPlus: '%app.stripe_price_id_plus%'
+            $stripePriceIdPro: '%app.stripe_price_id_pro%'
+
+    # Client Stripe injecte comme service dedie (meme raison que Twilio/OAuth2
+    # ci-dessous : remplaçable par un double en test).
+    Stripe\StripeClient:
+        arguments:
+            - '%app.stripe_secret_key%'
 
     # ==================== CONFIGURATION TWILIO ====================
     # Client Twilio injecte comme service dedie (au lieu d'etre instancie en dur dans le
