@@ -47,7 +47,26 @@ class SubscriptionPlan
     private ?string $priceAmountXaf = null;
 
     /**
-     * Périodicité de facturation (mensuel uniquement en MVP, pas de plan annuel)
+     * Prix annuel en euros (Lot 6.3), optionnel - null tant que la cadence annuelle
+     * n'est pas configurée pour ce plan. La cadence est choisie au checkout
+     * (UserSubscription::billingPeriod), jamais figee sur le plan lui-meme.
+     */
+    #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
+    #[Groups(['subscription_plan:read', 'subscription_plan:list', 'admin:subscription_plan:read'])]
+    private ?string $priceAmountEurYearly = null;
+
+    /**
+     * Prix annuel en XAF (Lot 6.3), optionnel - meme raison que priceAmountEurYearly.
+     */
+    #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
+    #[Groups(['subscription_plan:read', 'subscription_plan:list', 'admin:subscription_plan:read'])]
+    private ?string $priceAmountXafYearly = null;
+
+    /**
+     * Vestige du MVP (mensuel uniquement) - jamais exploite depuis le Lot 6.3, qui
+     * traite la cadence comme un choix au checkout (UserSubscription::billingPeriod)
+     * plutot qu'une caracteristique figee du plan. Ni supprime ni reutilise : aucun
+     * interet a une migration de suppression pour un champ inoffensif.
      */
     #[ORM\Column(length: 20)]
     #[Groups(['subscription_plan:read', 'subscription_plan:list', 'admin:subscription_plan:read'])]
@@ -95,6 +114,15 @@ class SubscriptionPlan
     #[ORM\Column(length: 255, nullable: true, unique: true)]
     #[Groups(['admin:subscription_plan:read'])]
     private ?string $stripePriceId = null;
+
+    /**
+     * Identifiant du Price Stripe pour la cadence annuelle (Lot 6.3) - distinct du
+     * Price mensuel, Stripe n'autorise pas un seul Price pour deux intervalles de
+     * recurrence differents.
+     */
+    #[ORM\Column(length: 255, nullable: true, unique: true)]
+    #[Groups(['admin:subscription_plan:read'])]
+    private ?string $stripePriceIdYearly = null;
 
     /**
      * Le plan est actuellement proposé à la souscription (levier admin "promouvoir/
@@ -186,6 +214,28 @@ class SubscriptionPlan
         return $this;
     }
 
+    public function getPriceAmountEurYearly(): ?string
+    {
+        return $this->priceAmountEurYearly;
+    }
+
+    public function setPriceAmountEurYearly(?string $priceAmountEurYearly): static
+    {
+        $this->priceAmountEurYearly = $priceAmountEurYearly;
+        return $this;
+    }
+
+    public function getPriceAmountXafYearly(): ?string
+    {
+        return $this->priceAmountXafYearly;
+    }
+
+    public function setPriceAmountXafYearly(?string $priceAmountXafYearly): static
+    {
+        $this->priceAmountXafYearly = $priceAmountXafYearly;
+        return $this;
+    }
+
     public function getBillingPeriod(): string
     {
         return $this->billingPeriod;
@@ -260,6 +310,17 @@ class SubscriptionPlan
     public function setStripePriceId(?string $stripePriceId): static
     {
         $this->stripePriceId = $stripePriceId;
+        return $this;
+    }
+
+    public function getStripePriceIdYearly(): ?string
+    {
+        return $this->stripePriceIdYearly;
+    }
+
+    public function setStripePriceIdYearly(?string $stripePriceIdYearly): static
+    {
+        $this->stripePriceIdYearly = $stripePriceIdYearly;
         return $this;
     }
 

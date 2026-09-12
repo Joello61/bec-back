@@ -23,6 +23,9 @@ class UserSubscription
     public const PROVIDER_STRIPE = 'stripe';
     public const PROVIDER_NOTCHPAY = 'notchpay';
 
+    public const BILLING_PERIOD_MONTHLY = 'monthly';
+    public const BILLING_PERIOD_YEARLY = 'yearly';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -45,6 +48,16 @@ class UserSubscription
     #[ORM\Column(length: 20)]
     #[Groups(['user_subscription:read'])]
     private string $provider = self::PROVIDER_STRIPE;
+
+    /**
+     * Cadence reellement choisie au checkout (Lot 6.3) - jamais derivee du plan a
+     * posteriori, cf. SubscriptionPlan::billingPeriod qui reste un vestige non
+     * exploite (un plan porte optionnellement un prix annuel, la cadence est un choix
+     * fait au checkout, pas une caracteristique figee du plan).
+     */
+    #[ORM\Column(length: 20)]
+    #[Groups(['user_subscription:read'])]
+    private string $billingPeriod = self::BILLING_PERIOD_MONTHLY;
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $providerCustomerId = null;
@@ -160,6 +173,17 @@ class UserSubscription
     public function setProvider(string $provider): static
     {
         $this->provider = $provider;
+        return $this;
+    }
+
+    public function getBillingPeriod(): string
+    {
+        return $this->billingPeriod;
+    }
+
+    public function setBillingPeriod(string $billingPeriod): static
+    {
+        $this->billingPeriod = $billingPeriod;
         return $this;
     }
 
