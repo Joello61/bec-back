@@ -22,6 +22,7 @@
         "lexik/jwt-authentication-bundle": "^3.1",
         "nelmio/api-doc-bundle": "^5.6",
         "nelmio/cors-bundle": "^2.5",
+        "notchpay/notchpay-php": "^2.0",
         "open-telemetry/exporter-otlp": "^1.4",
         "open-telemetry/sdk": "^1.15",
         "phpdocumentor/reflection-docblock": "^5.6",

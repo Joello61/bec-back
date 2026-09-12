@@ -24,6 +24,10 @@ readonly class StripePaymentProvider implements PaymentProviderInterface
         string $successUrl,
         string $cancelUrl,
     ): CheckoutSessionResult {
+        if ($plan->getStripePriceId() === null) {
+            throw new \RuntimeException(sprintf('Le plan "%s" n\'a pas de Price Stripe configuré', $plan->getCode()));
+        }
+
         $params = [
             'mode' => 'subscription',
             'line_items' => [
