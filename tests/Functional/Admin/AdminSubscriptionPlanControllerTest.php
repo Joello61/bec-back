@@ -53,6 +53,7 @@ class AdminSubscriptionPlanControllerTest extends WebTestCase
             'maxActiveVoyages' => null,
             'maxActiveDemandes' => null,
             'hasBadge' => true,
+            'hasViewStats' => false,
             'isFeatured' => false,
             'isActive' => true,
             'sortOrder' => 1,
@@ -142,6 +143,7 @@ class AdminSubscriptionPlanControllerTest extends WebTestCase
         $payload = json_decode($this->client->getResponse()->getContent(), true);
         self::assertSame($code, $payload['code']);
         self::assertArrayHasKey('isFeatured', $payload);
+        self::assertFalse($payload['hasViewStats']);
     }
 
     // ==================== update ====================
