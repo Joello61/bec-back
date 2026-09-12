@@ -17,15 +17,15 @@ class BoostOffer
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['boost_offer:read', 'boost_offer:list'])]
+    #[Groups(['boost_offer:read', 'boost_offer:list', 'admin:boost_offer:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 100)]
-    #[Groups(['boost_offer:read', 'boost_offer:list'])]
+    #[Groups(['boost_offer:read', 'boost_offer:list', 'admin:boost_offer:read'])]
     private ?string $name = null;
 
     #[ORM\Column(type: Types::INTEGER)]
-    #[Groups(['boost_offer:read', 'boost_offer:list'])]
+    #[Groups(['boost_offer:read', 'boost_offer:list', 'admin:boost_offer:read'])]
     private ?int $durationDays = null;
 
     /**
@@ -33,7 +33,7 @@ class BoostOffer
      * Stripe pré-créé, contrairement à SubscriptionPlan).
      */
     #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2)]
-    #[Groups(['boost_offer:read', 'boost_offer:list'])]
+    #[Groups(['boost_offer:read', 'boost_offer:list', 'admin:boost_offer:read'])]
     private ?string $priceAmountEur = null;
 
     /**
@@ -41,28 +41,39 @@ class BoostOffer
      * n'a pas été fixé pour cette offre.
      */
     #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
-    #[Groups(['boost_offer:read', 'boost_offer:list'])]
+    #[Groups(['boost_offer:read', 'boost_offer:list', 'admin:boost_offer:read'])]
     private ?string $priceAmountXaf = null;
 
     #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['boost_offer:read', 'boost_offer:list'])]
+    #[Groups(['boost_offer:read', 'boost_offer:list', 'admin:boost_offer:read'])]
     private bool $isActive = true;
+
+    /**
+     * Mise en avant visuelle sur la page tarifs (Lot 5), distincte de isActive
+     * ("proposée à l'achat").
+     */
+    #[ORM\Column(type: Types::BOOLEAN)]
+    #[Groups(['boost_offer:read', 'boost_offer:list', 'admin:boost_offer:read'])]
+    private bool $isFeatured = false;
 
     /**
      * Soft-delete : une offre retirée du catalogue mais référencée par un Boost
      * historique doit rester en base (cf. ../CLAUDE.md §8, jamais de suppression physique).
      */
     #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
+    #[Groups(['admin:boost_offer:read'])]
     private ?\DateTimeInterface $deletedAt = null;
 
     #[ORM\Column(type: Types::INTEGER)]
-    #[Groups(['boost_offer:read', 'boost_offer:list'])]
+    #[Groups(['boost_offer:read', 'boost_offer:list', 'admin:boost_offer:read'])]
     private int $sortOrder = 0;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
+    #[Groups(['admin:boost_offer:read'])]
     private ?\DateTimeInterface $createdAt = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
+    #[Groups(['admin:boost_offer:read'])]
     private ?\DateTimeInterface $updatedAt = null;
 
     #[ORM\PrePersist]
@@ -135,6 +146,17 @@ class BoostOffer
     public function setIsActive(bool $isActive): static
     {
         $this->isActive = $isActive;
+        return $this;
+    }
+
+    public function isFeatured(): bool
+    {
+        return $this->isFeatured;
+    }
+
+    public function setIsFeatured(bool $isFeatured): static
+    {
+        $this->isFeatured = $isFeatured;
         return $this;
     }
 

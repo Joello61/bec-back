@@ -9,6 +9,7 @@ use App\Repository\ConversationRepository;
 use App\Repository\DemandeRepository;
 use App\Repository\MessageRepository;
 use App\Repository\SignalementRepository;
+use App\Repository\TransactionRepository;
 use App\Repository\UserRepository;
 use App\Repository\VoyageRepository;
 use App\Service\Admin\AdminStatsService;
@@ -36,6 +37,7 @@ class AdminStatsServiceTest extends TestCase
             $this->createMock(AvisRepository::class),
             $this->createMock(MessageRepository::class),
             $this->createMock(ConversationRepository::class),
+            $this->createMock(TransactionRepository::class),
         );
     }
 

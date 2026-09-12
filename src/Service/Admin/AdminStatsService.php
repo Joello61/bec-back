@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Service\Admin;
 
+use App\Entity\Transaction;
 use App\Repository\AvisRepository;
 use App\Repository\ConversationRepository;
 use App\Repository\DemandeRepository;
 use App\Repository\MessageRepository;
 use App\Repository\SignalementRepository;
+use App\Repository\TransactionRepository;
 use App\Repository\UserRepository;
 use App\Repository\VoyageRepository;
 
@@ -22,6 +24,7 @@ readonly class AdminStatsService
         private AvisRepository $avisRepository,
         private MessageRepository $messageRepository,
         private ConversationRepository $conversationRepository,
+        private TransactionRepository $transactionRepository,
     ) {}
 
     /**
@@ -338,6 +341,57 @@ readonly class AdminStatsService
                 'count' => $facebook,
                 'percentage' => $total > 0 ? round(($facebook / $total) * 100, 1) : 0,
             ],
+        ];
+    }
+
+    /**
+     * Statistiques de revenus (Lot 5, monétisation) - agrégats uniquement, jamais de
+     * journal de transactions individuelles (Transaction::$providerPaymentId/$rawPayload
+     * ne sont volontairement jamais sérialisés, cf. entité).
+     * @return array<string, mixed>
+     */
+    public function getRevenueStats(int $days = 30): array
+    {
+        $totalByCurrency = $this->transactionRepository->sumAmountByCurrency(Transaction::STATUS_SUCCEEDED);
+
+        $startOfMonth = new \DateTime('first day of this month 00:00:00');
+        $thisMonthByCurrency = $this->transactionRepository->sumAmountByCurrency(
+            Transaction::STATUS_SUCCEEDED,
+            $startOfMonth
+        );
+
+        $byType = $this->transactionRepository->sumAmountByCurrencyGroupedByType(Transaction::STATUS_SUCCEEDED);
+        $byPaymentMethod = $this->transactionRepository->sumAmountByCurrencyGroupedByPaymentMethod(Transaction::STATUS_SUCCEEDED);
+
+        $dailyRevenue = [];
+        for ($i = $days - 1; $i >= 0; $i--) {
+            $date = new \DateTime("-{$i} days");
+            $dateStr = $date->format('Y-m-d');
+
+            $dailyRevenue[] = [
+                'date' => $dateStr,
+                'byCurrency' => $this->transactionRepository->sumAmountByCurrency(
+                    Transaction::STATUS_SUCCEEDED,
+                    new \DateTime($dateStr . ' 00:00:00'),
+                    new \DateTime($dateStr . ' 23:59:59')
+                ),
+            ];
+        }
+
+        $succeeded = $this->transactionRepository->count(['status' => Transaction::STATUS_SUCCEEDED]);
+        $failed = $this->transactionRepository->count(['status' => Transaction::STATUS_FAILED]);
+
+        return [
+            'totalByCurrency' => $totalByCurrency,
+            'thisMonthByCurrency' => $thisMonthByCurrency,
+            'byType' => $byType,
+            'byPaymentMethod' => $byPaymentMethod,
+            'dailyRevenue' => $dailyRevenue,
+            'transactionsSucceeded' => $succeeded,
+            'transactionsFailed' => $failed,
+            'tauxReussite' => ($succeeded + $failed) > 0
+                ? round($succeeded / ($succeeded + $failed) * 100, 1)
+                : 0,
         ];
     }
 
