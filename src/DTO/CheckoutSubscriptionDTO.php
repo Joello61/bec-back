@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace App\DTO;
 
+use App\Service\SubscriptionService;
 use Symfony\Component\Validator\Constraints as Assert;
 
 class CheckoutSubscriptionDTO
 {
     #[Assert\NotBlank(message: 'Le plan est obligatoire')]
     public string $planCode;
+
+    #[Assert\NotBlank(message: 'Le moyen de paiement est obligatoire')]
+    #[Assert\Choice(choices: [SubscriptionService::PAYMENT_METHOD_CARD, SubscriptionService::PAYMENT_METHOD_MOBILE_MONEY], message: 'Moyen de paiement invalide')]
+    public string $paymentMethod;
 
     /**
      * Consentement exprès à un accès immédiat au service (art. L.221-28 13° Code
