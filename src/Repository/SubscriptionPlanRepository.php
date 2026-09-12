@@ -37,4 +37,17 @@ class SubscriptionPlanRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Catalogue complet pour l'admin (Lot 5) : y compris inactifs et soft-supprimés,
+     * contrairement à findAllActive() destiné à l'API publique.
+     * @return SubscriptionPlan[]
+     */
+    public function findAllForAdmin(): array
+    {
+        return $this->createQueryBuilder('p')
+            ->orderBy('p.sortOrder', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
 }

@@ -17,25 +17,25 @@ class SubscriptionPlan
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['subscription_plan:read', 'subscription_plan:list'])]
+    #[Groups(['subscription_plan:read', 'subscription_plan:list', 'admin:subscription_plan:read'])]
     private ?int $id = null;
 
     /**
      * Identifiant technique du palier (free, plus, pro)
      */
     #[ORM\Column(length: 30, unique: true)]
-    #[Groups(['subscription_plan:read', 'subscription_plan:list'])]
+    #[Groups(['subscription_plan:read', 'subscription_plan:list', 'admin:subscription_plan:read'])]
     private ?string $code = null;
 
     #[ORM\Column(length: 100)]
-    #[Groups(['subscription_plan:read', 'subscription_plan:list'])]
+    #[Groups(['subscription_plan:read', 'subscription_plan:list', 'admin:subscription_plan:read'])]
     private ?string $name = null;
 
     /**
      * Prix en euros (paiement carte). Null pour le palier gratuit.
      */
     #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
-    #[Groups(['subscription_plan:read', 'subscription_plan:list'])]
+    #[Groups(['subscription_plan:read', 'subscription_plan:list', 'admin:subscription_plan:read'])]
     private ?string $priceAmountEur = null;
 
     /**
@@ -43,39 +43,48 @@ class SubscriptionPlan
      * que le tarif Mobile Money n'a pas été fixé pour ce plan.
      */
     #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
-    #[Groups(['subscription_plan:read', 'subscription_plan:list'])]
+    #[Groups(['subscription_plan:read', 'subscription_plan:list', 'admin:subscription_plan:read'])]
     private ?string $priceAmountXaf = null;
 
     /**
      * Périodicité de facturation (mensuel uniquement en MVP, pas de plan annuel)
      */
     #[ORM\Column(length: 20)]
-    #[Groups(['subscription_plan:read', 'subscription_plan:list'])]
+    #[Groups(['subscription_plan:read', 'subscription_plan:list', 'admin:subscription_plan:read'])]
     private string $billingPeriod = 'monthly';
 
     /**
      * Nombre maximum de voyages actifs simultanés. Null = illimité.
      */
     #[ORM\Column(type: Types::INTEGER, nullable: true)]
-    #[Groups(['subscription_plan:read', 'subscription_plan:list'])]
+    #[Groups(['subscription_plan:read', 'subscription_plan:list', 'admin:subscription_plan:read'])]
     private ?int $maxActiveVoyages = null;
 
     /**
      * Nombre maximum de demandes actives simultanées. Null = illimité.
      */
     #[ORM\Column(type: Types::INTEGER, nullable: true)]
-    #[Groups(['subscription_plan:read', 'subscription_plan:list'])]
+    #[Groups(['subscription_plan:read', 'subscription_plan:list', 'admin:subscription_plan:read'])]
     private ?int $maxActiveDemandes = null;
 
     #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['subscription_plan:read', 'subscription_plan:list'])]
+    #[Groups(['subscription_plan:read', 'subscription_plan:list', 'admin:subscription_plan:read'])]
     private bool $hasBadge = false;
+
+    /**
+     * Mise en avant visuelle sur la page tarifs (Lot 5), distincte de isActive
+     * ("proposé à la souscription") et de hasBadge ("Populaire").
+     */
+    #[ORM\Column(type: Types::BOOLEAN)]
+    #[Groups(['subscription_plan:read', 'subscription_plan:list', 'admin:subscription_plan:read'])]
+    private bool $isFeatured = false;
 
     /**
      * Identifiant du Price Stripe correspondant (mode subscription). Null tant que non
      * configuré côté Stripe Dashboard - le checkout échoue proprement dans ce cas.
      */
     #[ORM\Column(length: 255, nullable: true, unique: true)]
+    #[Groups(['admin:subscription_plan:read'])]
     private ?string $stripePriceId = null;
 
     /**
@@ -83,7 +92,7 @@ class SubscriptionPlan
      * rétrograder", distinct du soft-delete ci-dessous).
      */
     #[ORM\Column(type: Types::BOOLEAN)]
-    #[Groups(['subscription_plan:read', 'subscription_plan:list'])]
+    #[Groups(['subscription_plan:read', 'subscription_plan:list', 'admin:subscription_plan:read'])]
     private bool $isActive = true;
 
     /**
@@ -91,16 +100,19 @@ class SubscriptionPlan
      * historiques doit rester en base (cf. ../CLAUDE.md §8, jamais de suppression physique).
      */
     #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
+    #[Groups(['admin:subscription_plan:read'])]
     private ?\DateTimeInterface $deletedAt = null;
 
     #[ORM\Column(type: Types::INTEGER)]
-    #[Groups(['subscription_plan:read', 'subscription_plan:list'])]
+    #[Groups(['subscription_plan:read', 'subscription_plan:list', 'admin:subscription_plan:read'])]
     private int $sortOrder = 0;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
+    #[Groups(['admin:subscription_plan:read'])]
     private ?\DateTimeInterface $createdAt = null;
 
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
+    #[Groups(['admin:subscription_plan:read'])]
     private ?\DateTimeInterface $updatedAt = null;
 
     #[ORM\PrePersist]
@@ -206,6 +218,17 @@ class SubscriptionPlan
     public function setHasBadge(bool $hasBadge): static
     {
         $this->hasBadge = $hasBadge;
+        return $this;
+    }
+
+    public function isFeatured(): bool
+    {
+        return $this->isFeatured;
+    }
+
+    public function setIsFeatured(bool $isFeatured): static
+    {
+        $this->isFeatured = $isFeatured;
         return $this;
     }
 
