@@ -30,6 +30,10 @@ parameters:
     app.stripe_price_id_plus: '%env(STRIPE_PRICE_ID_PLUS)%'
     app.stripe_price_id_pro: '%env(STRIPE_PRICE_ID_PRO)%'
 
+    # Notch Pay (Mobile Money Cameroun, Lot 3 monetisation)
+    app.notchpay_secret_key: '%env(NOTCHPAY_SECRET_KEY)%'
+    app.notchpay_webhook_secret: '%env(NOTCHPAY_WEBHOOK_SECRET)%'
+
     sms_verification.enabled: '%env(bool:SMS_VERIFICATION_ENABLED)%'
     email_verification_enabled: '%env(bool:EMAIL_VERIFICATION_ENABLED)%'
 
@@ -83,6 +87,20 @@ services:
     Stripe\StripeClient:
         arguments:
             - '%app.stripe_secret_key%'
+
+    # ==================== SELECTEUR MULTI-PROVIDER DE PAIEMENT (Lot 3) ====================
+    # Cle du tag = famille de paiement ('card'/'mobile_money'), pas le nom du vendor -
+    # SubscriptionService/BoostService injectent #[AutowireLocator('app.payment_provider',
+    # indexAttribute: 'key')] et resolvent par cette cle au moment du checkout.
+    App\Service\Payment\StripePaymentProvider:
+        tags:
+            - { name: 'app.payment_provider', key: 'card' }
+
+    App\Service\Payment\NotchPayPaymentProvider:
+        arguments:
+            $notchPaySecretKey: '%app.notchpay_secret_key%'
+        tags:
+            - { name: 'app.payment_provider', key: 'mobile_money' }
 
     # ==================== CONFIGURATION TWILIO ====================
     # Client Twilio injecte comme service dedie (au lieu d'etre instancie en dur dans le

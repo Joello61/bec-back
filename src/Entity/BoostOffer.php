@@ -36,6 +36,14 @@ class BoostOffer
     #[Groups(['boost_offer:read', 'boost_offer:list'])]
     private ?string $priceAmountEur = null;
 
+    /**
+     * Prix en XAF (paiement Mobile Money, Lot 3). Null tant que le tarif Mobile Money
+     * n'a pas été fixé pour cette offre.
+     */
+    #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
+    #[Groups(['boost_offer:read', 'boost_offer:list'])]
+    private ?string $priceAmountXaf = null;
+
     #[ORM\Column(type: Types::BOOLEAN)]
     #[Groups(['boost_offer:read', 'boost_offer:list'])]
     private bool $isActive = true;
@@ -105,6 +113,17 @@ class BoostOffer
     public function setPriceAmountEur(string $priceAmountEur): static
     {
         $this->priceAmountEur = $priceAmountEur;
+        return $this;
+    }
+
+    public function getPriceAmountXaf(): ?string
+    {
+        return $this->priceAmountXaf;
+    }
+
+    public function setPriceAmountXaf(?string $priceAmountXaf): static
+    {
+        $this->priceAmountXaf = $priceAmountXaf;
         return $this;
     }
 

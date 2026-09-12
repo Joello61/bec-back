@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7aea9f3c44ccf18f6367a38caae60d61",
+    "content-hash": "f4764fb991d6d591807229854f0ffa4d",
     "packages": [
         {
             "name": "artprima/prometheus-metrics-bundle",
@@ -3272,6 +3272,81 @@
                 "source": "https://github.com/nikic/PHP-Parser/tree/v5.8.0"
             },
             "time": "2026-07-04T14:30:18+00:00"
+        },
+        {
+            "name": "notchpay/notchpay-php",
+            "version": "2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/notchpay/notchpay-php.git",
+                "reference": "0964e77adab2c463a74e261da99609f5e5480430"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/notchpay/notchpay-php/zipball/0964e77adab2c463a74e261da99609f5e5480430",
+                "reference": "0964e77adab2c463a74e261da99609f5e5480430",
+                "shasum": ""
+            },
+            "require": {
+                "ext-json": "*",
+                "guzzlehttp/guzzle": "^7.2.0",
+                "php": "^7.4|^8.0|^8.1|^8.2"
+            },
+            "require-dev": {
+                "friendsofphp/php-cs-fixer": "^2.16",
+                "mockery/mockery": "^1.4",
+                "php-coveralls/php-coveralls": "^2.2",
+                "phpunit/phpunit": "^9.0",
+                "scrutinizer/ocular": "^1.7",
+                "vimeo/psalm": "^3.11"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "NotchPay\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Chapdel KAMGA",
+                    "email": "drop@chapdel.me",
+                    "homepage": "https://github.com/chapdel",
+                    "role": "Owner"
+                },
+                {
+                    "name": "Tim Oladoyinbo",
+                    "email": "hello@digikraaft.ng",
+                    "homepage": "https://digikraaft.com",
+                    "role": "Base credit"
+                }
+            ],
+            "description": "Notch Pay PHP Wrapper.",
+            "homepage": "https://github.com/notchpay/notchpay-php",
+            "keywords": [
+                "Orange Money",
+                "accept money",
+                "api",
+                "curl",
+                "customer",
+                "disable",
+                "enable",
+                "gateway",
+                "mtn momo",
+                "notchpay",
+                "payment",
+                "payment processing",
+                "transaction",
+                "verify"
+            ],
+            "support": {
+                "issues": "https://github.com/notchpay/notchpay-php/issues",
+                "source": "https://github.com/notchpay/notchpay-php/tree/2.0"
+            },
+            "time": "2025-05-24T10:43:17+00:00"
         },
         {
             "name": "nyholm/psr7-server",

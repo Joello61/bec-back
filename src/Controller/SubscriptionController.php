@@ -104,6 +104,7 @@ class SubscriptionController extends AbstractController
         $result = $this->subscriptionService->checkout(
             $user,
             $dto->planCode,
+            $dto->paymentMethod,
             sprintf('%s/dashboard/settings/subscription/success', $this->frontendUrl),
             sprintf('%s/dashboard/settings/subscription/cancel', $this->frontendUrl),
         );

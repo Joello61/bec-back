@@ -30,6 +30,7 @@ class Transaction
     public const STATUS_REFUNDED = 'refunded';
 
     public const METHOD_FAMILY_CARD = 'card';
+    public const METHOD_FAMILY_MOBILE_MONEY = 'mobile_money';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]

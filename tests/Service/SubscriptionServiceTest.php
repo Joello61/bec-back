@@ -15,6 +15,7 @@ use App\Service\PaymentService;
 use App\Service\SubscriptionService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Psr\Container\ContainerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -39,20 +40,24 @@ class SubscriptionServiceTest extends TestCase
         $this->em = $this->createMock(EntityManagerInterface::class);
         $paymentService = $this->createMock(PaymentService::class);
 
+        $paymentProviders = $this->createMock(ContainerInterface::class);
+        $paymentProviders->method('has')->willReturn(true);
+        $paymentProviders->method('get')->willReturn($this->paymentProvider);
+
         $this->service = new SubscriptionService(
             $this->em,
             $this->planRepository,
             $this->subscriptionRepository,
-            $this->paymentProvider,
+            $paymentProviders,
             $paymentService,
             new NullLogger(),
         );
     }
 
-    private function plan(string $code, ?string $priceEur = null, ?string $stripePriceId = 'price_123'): SubscriptionPlan
+    private function plan(string $code, ?string $priceEur = null, ?string $stripePriceId = 'price_123', ?string $priceXaf = null): SubscriptionPlan
     {
         $plan = new SubscriptionPlan();
-        $plan->setCode($code)->setName(ucfirst($code))->setPriceAmountEur($priceEur)->setStripePriceId($stripePriceId)->setIsActive(true);
+        $plan->setCode($code)->setName(ucfirst($code))->setPriceAmountEur($priceEur)->setStripePriceId($stripePriceId)->setPriceAmountXaf($priceXaf)->setIsActive(true);
 
         return $plan;
     }
@@ -88,7 +93,7 @@ class SubscriptionServiceTest extends TestCase
 
         $this->expectException(NotFoundHttpException::class);
 
-        $this->service->checkout($user, 'inexistant', 'https://ok', 'https://ko');
+        $this->service->checkout($user, 'inexistant', 'card', 'https://ok', 'https://ko');
     }
 
     public function testCheckoutRejectsTheFreePlan(): void
@@ -98,17 +103,24 @@ class SubscriptionServiceTest extends TestCase
 
         $this->expectException(BadRequestHttpException::class);
 
-        $this->service->checkout($user, 'free', 'https://ok', 'https://ko');
+        $this->service->checkout($user, 'free', 'card', 'https://ok', 'https://ko');
     }
 
-    public function testCheckoutFailsClearlyWhenPlanHasNoStripePriceConfigured(): void
+    public function testCheckoutPropagatesProviderConfigurationFailure(): void
     {
+        // Depuis le Lot 3, la validation de configuration (ex. plan sans Price Stripe)
+        // est déplacée dans chaque provider (StripePaymentProvider) - le service se
+        // contente de propager l'exception.
         $user = new User();
         $this->planRepository->method('findByCode')->willReturn($this->plan('plus', '4.99', null));
+        $this->subscriptionRepository->method('findActiveForUser')->willReturn(null);
+        $this->paymentProvider->method('createCheckoutSession')->willThrowException(
+            new \RuntimeException('Le plan "plus" n\'a pas de Price Stripe configuré')
+        );
 
         $this->expectException(\RuntimeException::class);
 
-        $this->service->checkout($user, 'plus', 'https://ok', 'https://ko');
+        $this->service->checkout($user, 'plus', 'card', 'https://ok', 'https://ko');
     }
 
     public function testCheckoutRejectsWhenAnActiveSubscriptionAlreadyExists(): void
@@ -119,7 +131,7 @@ class SubscriptionServiceTest extends TestCase
 
         $this->expectException(BadRequestHttpException::class);
 
-        $this->service->checkout($user, 'plus', 'https://ok', 'https://ko');
+        $this->service->checkout($user, 'plus', 'card', 'https://ok', 'https://ko');
     }
 
     public function testCheckoutCreatesAnIncompleteSubscriptionWithAmountFrozenFromThePlanAndDelegatesToTheProvider(): void
@@ -141,7 +153,7 @@ class SubscriptionServiceTest extends TestCase
             ->method('createCheckoutSession')
             ->willReturn(new CheckoutSessionResult('https://checkout.stripe.com/session/xyz'));
 
-        $result = $this->service->checkout($user, 'plus', 'https://ok', 'https://ko');
+        $result = $this->service->checkout($user, 'plus', 'card', 'https://ok', 'https://ko');
 
         self::assertSame('https://checkout.stripe.com/session/xyz', $result->checkoutUrl);
         self::assertNotNull($capturedSubscription);
@@ -149,6 +161,103 @@ class SubscriptionServiceTest extends TestCase
         self::assertSame('4.99', $capturedSubscription->getAmount(), 'le montant doit etre fige depuis le plan au moment du checkout');
         self::assertSame('EUR', $capturedSubscription->getCurrency());
         self::assertNotNull($capturedSubscription->getWithdrawalWaiverConsentedAt());
+    }
+
+    public function testCheckoutWithMobileMoneyFreezesXafAmountAndNotchPayProvider(): void
+    {
+        $user = new User();
+        $plan = $this->plan('plus', priceXaf: '3000');
+        $this->planRepository->method('findByCode')->willReturn($plan);
+        $this->subscriptionRepository->method('findActiveForUser')->willReturn(null);
+        $this->subscriptionRepository->method('findLatestProviderCustomerId')->willReturn(null);
+
+        $capturedSubscription = null;
+        $this->em->method('persist')->willReturnCallback(function ($entity) use (&$capturedSubscription) {
+            if ($entity instanceof UserSubscription) {
+                $capturedSubscription = $entity;
+            }
+        });
+
+        $this->paymentProvider->expects(self::once())
+            ->method('createCheckoutSession')
+            ->willReturn(new CheckoutSessionResult('https://notchpay.co/pay/xyz'));
+
+        $this->service->checkout($user, 'plus', 'mobile_money', 'https://ok', 'https://ko');
+
+        self::assertNotNull($capturedSubscription);
+        self::assertSame('3000', $capturedSubscription->getAmount());
+        self::assertSame('XAF', $capturedSubscription->getCurrency());
+        self::assertSame(UserSubscription::PROVIDER_NOTCHPAY, $capturedSubscription->getProvider());
+    }
+
+    public function testCheckoutRejectsMobileMoneyWhenPlanHasNoXafPriceConfigured(): void
+    {
+        $user = new User();
+        $this->planRepository->method('findByCode')->willReturn($this->plan('plus', '4.99'));
+        $this->subscriptionRepository->method('findActiveForUser')->willReturn(null);
+
+        $this->expectException(BadRequestHttpException::class);
+
+        $this->service->checkout($user, 'plus', 'mobile_money', 'https://ok', 'https://ko');
+    }
+
+    public function testCheckoutRejectsAnUnknownPaymentMethod(): void
+    {
+        $user = new User();
+        $this->planRepository->method('findByCode')->willReturn($this->plan('plus', '4.99'));
+        $this->subscriptionRepository->method('findActiveForUser')->willReturn(null);
+
+        $paymentProviders = $this->createMock(ContainerInterface::class);
+        $paymentProviders->method('has')->willReturn(false);
+        $service = new SubscriptionService(
+            $this->em,
+            $this->planRepository,
+            $this->subscriptionRepository,
+            $paymentProviders,
+            $this->createMock(PaymentService::class),
+            new NullLogger(),
+        );
+
+        $this->expectException(BadRequestHttpException::class);
+
+        $service->checkout($user, 'plus', 'virement', 'https://ok', 'https://ko');
+    }
+
+    public function testHandleNotchPayPaymentCompletedActivatesTheSubscriptionAndSetsAOneMonthPeriod(): void
+    {
+        $subscription = (new UserSubscription())->setUser(new User())->setStatus(UserSubscription::STATUS_INCOMPLETE);
+        $this->subscriptionRepository->method('find')->with(42)->willReturn($subscription);
+        $this->em->expects(self::once())->method('flush');
+
+        $this->service->handleNotchPayPaymentCompleted([
+            'id' => 'pay_123',
+            'reference' => '42',
+            'amount' => 3000,
+            'currency' => 'XAF',
+        ]);
+
+        self::assertSame(UserSubscription::STATUS_ACTIVE, $subscription->getStatus());
+        self::assertNotNull($subscription->getCurrentPeriodStart());
+        self::assertNotNull($subscription->getCurrentPeriodEnd());
+    }
+
+    public function testHandleNotchPayPaymentCompletedDoesNothingWhenReferenceIsUnknown(): void
+    {
+        $this->subscriptionRepository->method('find')->willReturn(null);
+        $this->em->expects(self::never())->method('flush');
+
+        $this->service->handleNotchPayPaymentCompleted(['id' => 'pay_123', 'reference' => '999']);
+    }
+
+    public function testHandleNotchPayPaymentFailedSetsThePastDueStatus(): void
+    {
+        $subscription = (new UserSubscription())->setUser(new User())->setStatus(UserSubscription::STATUS_ACTIVE);
+        $this->subscriptionRepository->method('find')->with(42)->willReturn($subscription);
+        $this->em->expects(self::once())->method('flush');
+
+        $this->service->handleNotchPayPaymentFailed(['id' => 'pay_123', 'reference' => '42', 'amount' => 3000]);
+
+        self::assertSame(UserSubscription::STATUS_PAST_DUE, $subscription->getStatus());
     }
 
     public function testCancelSubscriptionThrowsWhenNoActiveSubscriptionExists(): void

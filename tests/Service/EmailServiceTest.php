@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Service;
 
+use App\Entity\SubscriptionPlan;
 use App\Entity\User;
 use App\Entity\UserSettings;
+use App\Entity\UserSubscription;
 use App\Service\EmailService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -130,6 +132,25 @@ class EmailServiceTest extends TestCase
         $this->service->sendPasswordChangedEmail($user);
 
         self::assertSame('Votre mot de passe a été modifié', $captured->getSubject());
+    }
+
+    public function testSendRenewalReminderEmailIsAlwaysSentAndLinksToTheSubscriptionSettings(): void
+    {
+        // Lot 3 : email transactionnel (toujours envoyé, indépendant des préférences) - un
+        // renouvellement manqué fait perdre le service, ce n'est pas une gêne marketing.
+        $user = $this->user(canReceiveEmails: false);
+        $plan = (new SubscriptionPlan())->setCode('plus')->setName('Plus');
+        $subscription = (new UserSubscription())->setPlan($plan)->setCurrentPeriodEnd(new \DateTime('2026-09-20'));
+
+        $captured = null;
+        $this->mailer->expects(self::once())->method('send')->willReturnCallback(function (Email $email) use (&$captured) {
+            $captured = $email;
+        });
+
+        $this->service->sendRenewalReminderEmail($user, $subscription);
+
+        self::assertStringContainsString('https://cobage.test/dashboard/settings/subscription', $captured->getHtmlBody());
+        self::assertStringContainsString('20/09/2026', $captured->getHtmlBody());
     }
 
     public function testTransportExceptionPropagates(): void

@@ -88,6 +88,7 @@ class BoostController extends AbstractController
             $dto->targetType,
             $dto->targetId,
             $dto->offerId,
+            $dto->paymentMethod,
             $this->frontendUrl . $detailsPath,
             $this->frontendUrl . $detailsPath,
         );
