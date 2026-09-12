@@ -6,7 +6,10 @@ namespace App\Security\Voter;
 
 use App\Entity\User;
 use App\Entity\Voyage;
+use App\Repository\VoyageRepository;
+use App\Service\SubscriptionService;
 use App\Service\VisibilityService;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
@@ -21,7 +24,10 @@ class VoyageVoter extends Voter
     public const CREATE = 'VOYAGE_CREATE'; // <- NOUVEAU
 
     public function __construct(
-        private readonly VisibilityService $visibilityService
+        private readonly VisibilityService $visibilityService,
+        private readonly SubscriptionService $subscriptionService,
+        private readonly VoyageRepository $voyageRepository,
+        private readonly LoggerInterface $logger,
     ) {}
 
     protected function supports(string $attribute, mixed $subject): bool
@@ -67,6 +73,24 @@ class VoyageVoter extends Voter
 
         // ==================== VÉRIFICATION PROFIL COMPLET ====================
         if (!$user->isProfileComplete()) {
+            return false;
+        }
+
+        // ==================== QUOTA FREEMIUM (monétisation Lot 1) ====================
+        // Fail-open : un catalogue d'abonnement mal configure/non seede (SubscriptionPlan
+        // "free" absent) ne doit jamais bloquer la creation de voyages, fonctionnalite
+        // preexistante a la monetisation - seul un quota effectivement determine peut
+        // refuser la creation.
+        try {
+            $maxActiveVoyages = $this->subscriptionService->getEffectivePlan($user)->getMaxActiveVoyages();
+        } catch (\Throwable $e) {
+            $this->logger->error('Quota freemium indisponible (catalogue d\'abonnement non seede ?) - creation autorisee par defaut', [
+                'exception' => $e->getMessage(),
+            ]);
+            return true;
+        }
+
+        if ($maxActiveVoyages !== null && $this->voyageRepository->countActiveByUser($user) >= $maxActiveVoyages) {
             return false;
         }
 
