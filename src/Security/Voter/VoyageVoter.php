@@ -6,6 +6,8 @@ namespace App\Security\Voter;
 
 use App\Entity\User;
 use App\Entity\Voyage;
+use App\Repository\VoyageRepository;
+use App\Service\SubscriptionService;
 use App\Service\VisibilityService;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
@@ -21,7 +23,9 @@ class VoyageVoter extends Voter
     public const CREATE = 'VOYAGE_CREATE'; // <- NOUVEAU
 
     public function __construct(
-        private readonly VisibilityService $visibilityService
+        private readonly VisibilityService $visibilityService,
+        private readonly SubscriptionService $subscriptionService,
+        private readonly VoyageRepository $voyageRepository,
     ) {}
 
     protected function supports(string $attribute, mixed $subject): bool
@@ -67,6 +71,13 @@ class VoyageVoter extends Voter
 
         // ==================== VÉRIFICATION PROFIL COMPLET ====================
         if (!$user->isProfileComplete()) {
+            return false;
+        }
+
+        // ==================== QUOTA FREEMIUM (monétisation Lot 1) ====================
+        $maxActiveVoyages = $this->subscriptionService->getEffectivePlan($user)->getMaxActiveVoyages();
+
+        if ($maxActiveVoyages !== null && $this->voyageRepository->countActiveByUser($user) >= $maxActiveVoyages) {
             return false;
         }
 

@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Tests\Security\Voter;
 
 use App\Entity\Demande;
+use App\Entity\SubscriptionPlan;
 use App\Entity\User;
 use App\Entity\UserSettings;
+use App\Repository\DemandeRepository;
 use App\Security\Voter\DemandeVoter;
+use App\Service\SubscriptionService;
 use App\Service\VisibilityService;
 use App\Tests\Support\InMemoryUserTrait;
 use App\Tests\Support\MockTokenTrait;
@@ -25,10 +28,28 @@ class DemandeVoterTest extends TestCase
     use MockTokenTrait;
 
     private DemandeVoter $voter;
+    private SubscriptionService $subscriptionService;
+    private DemandeRepository $demandeRepository;
 
     protected function setUp(): void
     {
-        $this->voter = new DemandeVoter(new VisibilityService());
+        $this->subscriptionService = $this->createMock(SubscriptionService::class);
+        $this->demandeRepository = $this->createMock(DemandeRepository::class);
+
+        // Par défaut (sauf surcharge explicite dans un test) : plan illimité, aucune
+        // demande active - ne doit jamais bloquer les tests existants sur le quota.
+        $this->subscriptionService->method('getEffectivePlan')->willReturn($this->planWithQuota(null));
+        $this->demandeRepository->method('countActiveByUser')->willReturn(0);
+
+        $this->voter = new DemandeVoter(new VisibilityService(), $this->subscriptionService, $this->demandeRepository);
+    }
+
+    private function planWithQuota(?int $maxActiveDemandes): SubscriptionPlan
+    {
+        $plan = new SubscriptionPlan();
+        $plan->setCode('test')->setName('Test')->setMaxActiveDemandes($maxActiveDemandes);
+
+        return $plan;
     }
 
     private function demande(User $client, string $statut = 'en_recherche'): Demande
@@ -165,5 +186,35 @@ class DemandeVoterTest extends TestCase
         $result = $this->voter->vote($this->tokenFor($admin), null, [DemandeVoter::CREATE]);
 
         self::assertSame(VoterInterface::ACCESS_GRANTED, $result);
+    }
+
+    public function testCreateDeniedWhenFreemiumQuotaReached(): void
+    {
+        $user = $this->makeUser([], profileComplete: true);
+
+        $subscriptionService = $this->createMock(SubscriptionService::class);
+        $subscriptionService->method('getEffectivePlan')->willReturn($this->planWithQuota(3));
+        $demandeRepository = $this->createMock(DemandeRepository::class);
+        $demandeRepository->method('countActiveByUser')->willReturn(3);
+        $voter = new DemandeVoter(new VisibilityService(), $subscriptionService, $demandeRepository);
+
+        $result = $voter->vote($this->tokenFor($user), null, [DemandeVoter::CREATE]);
+
+        self::assertSame(VoterInterface::ACCESS_DENIED, $result, 'le quota freemium (3 demandes actives) doit bloquer une nouvelle creation');
+    }
+
+    public function testCreateGrantedWhenPlanHasUnlimitedQuotaEvenAboveFreeThreshold(): void
+    {
+        $user = $this->makeUser([], profileComplete: true);
+
+        $subscriptionService = $this->createMock(SubscriptionService::class);
+        $subscriptionService->method('getEffectivePlan')->willReturn($this->planWithQuota(null));
+        $demandeRepository = $this->createMock(DemandeRepository::class);
+        $demandeRepository->method('countActiveByUser')->willReturn(10);
+        $voter = new DemandeVoter(new VisibilityService(), $subscriptionService, $demandeRepository);
+
+        $result = $voter->vote($this->tokenFor($user), null, [DemandeVoter::CREATE]);
+
+        self::assertSame(VoterInterface::ACCESS_GRANTED, $result, 'un plan payant sans limite (max=null) ne doit jamais bloquer la creation');
     }
 }

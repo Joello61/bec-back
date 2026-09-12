@@ -6,6 +6,8 @@ namespace App\Security\Voter;
 
 use App\Entity\Demande;
 use App\Entity\User;
+use App\Repository\DemandeRepository;
+use App\Service\SubscriptionService;
 use App\Service\VisibilityService;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
@@ -21,7 +23,9 @@ class DemandeVoter extends Voter
     public const CREATE = 'DEMANDE_CREATE'; // <- NOUVEAU
 
     public function __construct(
-        private readonly VisibilityService $visibilityService
+        private readonly VisibilityService $visibilityService,
+        private readonly SubscriptionService $subscriptionService,
+        private readonly DemandeRepository $demandeRepository,
     ) {}
 
     protected function supports(string $attribute, mixed $subject): bool
@@ -66,6 +70,13 @@ class DemandeVoter extends Voter
         }
 
         if (!$user->isProfileComplete()) {
+            return false;
+        }
+
+        // ==================== QUOTA FREEMIUM (monétisation Lot 1) ====================
+        $maxActiveDemandes = $this->subscriptionService->getEffectivePlan($user)->getMaxActiveDemandes();
+
+        if ($maxActiveDemandes !== null && $this->demandeRepository->countActiveByUser($user) >= $maxActiveDemandes) {
             return false;
         }
 
