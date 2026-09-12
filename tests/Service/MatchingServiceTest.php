@@ -9,6 +9,7 @@ use App\Entity\Voyage;
 use App\Repository\DemandeRepository;
 use App\Repository\VoyageRepository;
 use App\Service\MatchingService;
+use App\Service\SubscriptionService;
 use App\Service\VisibilityService;
 use PHPUnit\Framework\TestCase;
 
@@ -31,7 +32,7 @@ class MatchingServiceTest extends TestCase
         $this->service = new MatchingService(
             $this->createStub(VoyageRepository::class),
             $this->createStub(DemandeRepository::class),
-            new VisibilityService(),
+            new VisibilityService($this->createStub(SubscriptionService::class)),
         );
     }
 
