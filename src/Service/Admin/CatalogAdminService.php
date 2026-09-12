@@ -43,6 +43,8 @@ readonly class CatalogAdminService
             ->setName($dto->name)
             ->setPriceAmountEur($dto->priceAmountEur)
             ->setPriceAmountXaf($dto->priceAmountXaf)
+            ->setPriceAmountEurYearly($dto->priceAmountEurYearly)
+            ->setPriceAmountXafYearly($dto->priceAmountXafYearly)
             ->setBillingPeriod($dto->billingPeriod)
             ->setMaxActiveVoyages($dto->maxActiveVoyages)
             ->setMaxActiveDemandes($dto->maxActiveDemandes)
@@ -51,7 +53,8 @@ readonly class CatalogAdminService
             ->setIsFeatured($dto->isFeatured)
             ->setIsActive($dto->isActive)
             ->setSortOrder($dto->sortOrder)
-            ->setStripePriceId($dto->stripePriceId);
+            ->setStripePriceId($dto->stripePriceId)
+            ->setStripePriceIdYearly($dto->stripePriceIdYearly);
 
         $this->entityManager->persist($plan);
         $this->entityManager->flush();
@@ -75,6 +78,8 @@ readonly class CatalogAdminService
         $plan->setName($dto->name)
             ->setPriceAmountEur($dto->priceAmountEur)
             ->setPriceAmountXaf($dto->priceAmountXaf)
+            ->setPriceAmountEurYearly($dto->priceAmountEurYearly)
+            ->setPriceAmountXafYearly($dto->priceAmountXafYearly)
             ->setBillingPeriod($dto->billingPeriod)
             ->setMaxActiveVoyages($dto->maxActiveVoyages)
             ->setMaxActiveDemandes($dto->maxActiveDemandes)
@@ -83,7 +88,8 @@ readonly class CatalogAdminService
             ->setIsFeatured($dto->isFeatured)
             ->setIsActive($dto->isActive)
             ->setSortOrder($dto->sortOrder)
-            ->setStripePriceId($dto->stripePriceId);
+            ->setStripePriceId($dto->stripePriceId)
+            ->setStripePriceIdYearly($dto->stripePriceIdYearly);
 
         $this->entityManager->flush();
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\DTO;
 
+use App\Entity\UserSubscription;
 use App\Service\SubscriptionService;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -15,6 +16,14 @@ class CheckoutSubscriptionDTO
     #[Assert\NotBlank(message: 'Le moyen de paiement est obligatoire')]
     #[Assert\Choice(choices: [SubscriptionService::PAYMENT_METHOD_CARD, SubscriptionService::PAYMENT_METHOD_MOBILE_MONEY], message: 'Moyen de paiement invalide')]
     public string $paymentMethod;
+
+    /**
+     * Cadence de facturation (Lot 6.3) - choisie au checkout, jamais figee sur le plan
+     * (cf. SubscriptionPlan::billingPeriod, vestige non exploite).
+     */
+    #[Assert\NotBlank(message: 'La cadence de facturation est obligatoire')]
+    #[Assert\Choice(choices: [UserSubscription::BILLING_PERIOD_MONTHLY, UserSubscription::BILLING_PERIOD_YEARLY], message: 'Cadence de facturation invalide')]
+    public string $billingPeriod = UserSubscription::BILLING_PERIOD_MONTHLY;
 
     /**
      * Consentement exprès à un accès immédiat au service (art. L.221-28 13° Code

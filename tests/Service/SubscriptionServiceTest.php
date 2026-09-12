@@ -93,7 +93,7 @@ class SubscriptionServiceTest extends TestCase
 
         $this->expectException(NotFoundHttpException::class);
 
-        $this->service->checkout($user, 'inexistant', 'card', 'https://ok', 'https://ko');
+        $this->service->checkout($user, 'inexistant', 'card', 'monthly', 'https://ok', 'https://ko');
     }
 
     public function testCheckoutRejectsTheFreePlan(): void
@@ -103,7 +103,7 @@ class SubscriptionServiceTest extends TestCase
 
         $this->expectException(BadRequestHttpException::class);
 
-        $this->service->checkout($user, 'free', 'card', 'https://ok', 'https://ko');
+        $this->service->checkout($user, 'free', 'card', 'monthly', 'https://ok', 'https://ko');
     }
 
     public function testCheckoutPropagatesProviderConfigurationFailure(): void
@@ -120,7 +120,7 @@ class SubscriptionServiceTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
 
-        $this->service->checkout($user, 'plus', 'card', 'https://ok', 'https://ko');
+        $this->service->checkout($user, 'plus', 'card', 'monthly', 'https://ok', 'https://ko');
     }
 
     public function testCheckoutRejectsWhenAnActiveSubscriptionAlreadyExists(): void
@@ -131,7 +131,7 @@ class SubscriptionServiceTest extends TestCase
 
         $this->expectException(BadRequestHttpException::class);
 
-        $this->service->checkout($user, 'plus', 'card', 'https://ok', 'https://ko');
+        $this->service->checkout($user, 'plus', 'card', 'monthly', 'https://ok', 'https://ko');
     }
 
     public function testCheckoutCreatesAnIncompleteSubscriptionWithAmountFrozenFromThePlanAndDelegatesToTheProvider(): void
@@ -153,7 +153,7 @@ class SubscriptionServiceTest extends TestCase
             ->method('createCheckoutSession')
             ->willReturn(new CheckoutSessionResult('https://checkout.stripe.com/session/xyz'));
 
-        $result = $this->service->checkout($user, 'plus', 'card', 'https://ok', 'https://ko');
+        $result = $this->service->checkout($user, 'plus', 'card', 'monthly', 'https://ok', 'https://ko');
 
         self::assertSame('https://checkout.stripe.com/session/xyz', $result->checkoutUrl);
         self::assertNotNull($capturedSubscription);
@@ -182,12 +182,49 @@ class SubscriptionServiceTest extends TestCase
             ->method('createCheckoutSession')
             ->willReturn(new CheckoutSessionResult('https://notchpay.co/pay/xyz'));
 
-        $this->service->checkout($user, 'plus', 'mobile_money', 'https://ok', 'https://ko');
+        $this->service->checkout($user, 'plus', 'mobile_money', 'monthly', 'https://ok', 'https://ko');
 
         self::assertNotNull($capturedSubscription);
         self::assertSame('3000', $capturedSubscription->getAmount());
         self::assertSame('XAF', $capturedSubscription->getCurrency());
         self::assertSame(UserSubscription::PROVIDER_NOTCHPAY, $capturedSubscription->getProvider());
+    }
+
+    public function testCheckoutWithYearlyBillingPeriodFreezesTheYearlyAmountAndPersistsIt(): void
+    {
+        $user = new User();
+        $plan = $this->plan('plus', '4.99');
+        $plan->setPriceAmountEurYearly('49.99');
+        $this->planRepository->method('findByCode')->willReturn($plan);
+        $this->subscriptionRepository->method('findActiveForUser')->willReturn(null);
+        $this->subscriptionRepository->method('findLatestProviderCustomerId')->willReturn(null);
+
+        $capturedSubscription = null;
+        $this->em->method('persist')->willReturnCallback(function ($entity) use (&$capturedSubscription) {
+            if ($entity instanceof UserSubscription) {
+                $capturedSubscription = $entity;
+            }
+        });
+
+        $this->paymentProvider->method('createCheckoutSession')
+            ->willReturn(new CheckoutSessionResult('https://checkout.stripe.com/session/xyz'));
+
+        $this->service->checkout($user, 'plus', 'card', 'yearly', 'https://ok', 'https://ko');
+
+        self::assertNotNull($capturedSubscription);
+        self::assertSame('49.99', $capturedSubscription->getAmount(), 'le montant annuel, pas mensuel, doit etre fige');
+        self::assertSame(UserSubscription::BILLING_PERIOD_YEARLY, $capturedSubscription->getBillingPeriod());
+    }
+
+    public function testCheckoutRejectsYearlyBillingWhenPlanHasNoYearlyPriceConfigured(): void
+    {
+        $user = new User();
+        $this->planRepository->method('findByCode')->willReturn($this->plan('plus', '4.99'));
+        $this->subscriptionRepository->method('findActiveForUser')->willReturn(null);
+
+        $this->expectException(BadRequestHttpException::class);
+
+        $this->service->checkout($user, 'plus', 'card', 'yearly', 'https://ok', 'https://ko');
     }
 
     public function testCheckoutRejectsMobileMoneyWhenPlanHasNoXafPriceConfigured(): void
@@ -198,7 +235,7 @@ class SubscriptionServiceTest extends TestCase
 
         $this->expectException(BadRequestHttpException::class);
 
-        $this->service->checkout($user, 'plus', 'mobile_money', 'https://ok', 'https://ko');
+        $this->service->checkout($user, 'plus', 'mobile_money', 'monthly', 'https://ok', 'https://ko');
     }
 
     public function testCheckoutRejectsAnUnknownPaymentMethod(): void
@@ -220,7 +257,7 @@ class SubscriptionServiceTest extends TestCase
 
         $this->expectException(BadRequestHttpException::class);
 
-        $service->checkout($user, 'plus', 'virement', 'https://ok', 'https://ko');
+        $service->checkout($user, 'plus', 'virement', 'monthly', 'https://ok', 'https://ko');
     }
 
     public function testHandleNotchPayPaymentCompletedActivatesTheSubscriptionAndSetsAOneMonthPeriod(): void
@@ -238,7 +275,35 @@ class SubscriptionServiceTest extends TestCase
 
         self::assertSame(UserSubscription::STATUS_ACTIVE, $subscription->getStatus());
         self::assertNotNull($subscription->getCurrentPeriodStart());
-        self::assertNotNull($subscription->getCurrentPeriodEnd());
+        self::assertEqualsWithDelta(
+            (clone $subscription->getCurrentPeriodStart())->modify('+1 month')->getTimestamp(),
+            $subscription->getCurrentPeriodEnd()->getTimestamp(),
+            2,
+            'un abonnement mensuel doit avoir une echeance a +1 mois'
+        );
+    }
+
+    public function testHandleNotchPayPaymentCompletedSetsAOneYearPeriodForAYearlySubscription(): void
+    {
+        $subscription = (new UserSubscription())
+            ->setUser(new User())
+            ->setStatus(UserSubscription::STATUS_INCOMPLETE)
+            ->setBillingPeriod(UserSubscription::BILLING_PERIOD_YEARLY);
+        $this->subscriptionRepository->method('find')->with(42)->willReturn($subscription);
+
+        $this->service->handleNotchPayPaymentCompleted([
+            'id' => 'pay_123',
+            'reference' => '42',
+            'amount' => 30000,
+            'currency' => 'XAF',
+        ]);
+
+        self::assertEqualsWithDelta(
+            (clone $subscription->getCurrentPeriodStart())->modify('+1 year')->getTimestamp(),
+            $subscription->getCurrentPeriodEnd()->getTimestamp(),
+            2,
+            'un abonnement annuel doit avoir une echeance a +1 an, jamais +1 mois'
+        );
     }
 
     public function testHandleNotchPayPaymentCompletedDoesNothingWhenReferenceIsUnknown(): void

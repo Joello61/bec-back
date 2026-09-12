@@ -35,16 +35,24 @@ readonly class NotchPayPaymentProvider implements PaymentProviderInterface
     public function createCheckoutSession(
         User $user,
         SubscriptionPlan $plan,
+        string $billingPeriod,
         string $clientReferenceId,
         ?string $existingProviderCustomerId,
         string $successUrl,
         string $cancelUrl,
     ): CheckoutSessionResult {
-        if ($plan->getPriceAmountXaf() === null) {
-            throw new \RuntimeException(sprintf('Le plan "%s" n\'a pas de tarif Mobile Money (XAF) configuré', $plan->getCode()));
+        $isYearly = $billingPeriod === UserSubscription::BILLING_PERIOD_YEARLY;
+        $amount = $isYearly ? $plan->getPriceAmountXafYearly() : $plan->getPriceAmountXaf();
+
+        if ($amount === null) {
+            throw new \RuntimeException(sprintf(
+                'Le plan "%s" n\'a pas de tarif Mobile Money (XAF) %s configuré',
+                $plan->getCode(),
+                $isYearly ? 'annuel' : 'mensuel'
+            ));
         }
 
-        return $this->initializePayment($user, $plan->getName(), $plan->getPriceAmountXaf(), $clientReferenceId, $successUrl);
+        return $this->initializePayment($user, $plan->getName(), $amount, $clientReferenceId, $successUrl);
     }
 
     public function cancelSubscription(UserSubscription $subscription): void

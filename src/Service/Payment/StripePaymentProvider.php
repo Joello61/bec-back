@@ -20,19 +20,27 @@ readonly class StripePaymentProvider implements PaymentProviderInterface
     public function createCheckoutSession(
         User $user,
         SubscriptionPlan $plan,
+        string $billingPeriod,
         string $clientReferenceId,
         ?string $existingProviderCustomerId,
         string $successUrl,
         string $cancelUrl,
     ): CheckoutSessionResult {
-        if ($plan->getStripePriceId() === null) {
-            throw new \RuntimeException(sprintf('Le plan "%s" n\'a pas de Price Stripe configuré', $plan->getCode()));
+        $isYearly = $billingPeriod === UserSubscription::BILLING_PERIOD_YEARLY;
+        $stripePriceId = $isYearly ? $plan->getStripePriceIdYearly() : $plan->getStripePriceId();
+
+        if ($stripePriceId === null) {
+            throw new \RuntimeException(sprintf(
+                'Le plan "%s" n\'a pas de Price Stripe %s configuré',
+                $plan->getCode(),
+                $isYearly ? 'annuel' : 'mensuel'
+            ));
         }
 
         $params = [
             'mode' => 'subscription',
             'line_items' => [
-                ['price' => $plan->getStripePriceId(), 'quantity' => 1],
+                ['price' => $stripePriceId, 'quantity' => 1],
             ],
             'client_reference_id' => $clientReferenceId,
             'success_url' => $successUrl,
