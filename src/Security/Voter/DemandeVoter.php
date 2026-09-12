@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Repository\DemandeRepository;
 use App\Service\SubscriptionService;
 use App\Service\VisibilityService;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 
@@ -26,6 +27,7 @@ class DemandeVoter extends Voter
         private readonly VisibilityService $visibilityService,
         private readonly SubscriptionService $subscriptionService,
         private readonly DemandeRepository $demandeRepository,
+        private readonly LoggerInterface $logger,
     ) {}
 
     protected function supports(string $attribute, mixed $subject): bool
@@ -74,7 +76,16 @@ class DemandeVoter extends Voter
         }
 
         // ==================== QUOTA FREEMIUM (monétisation Lot 1) ====================
-        $maxActiveDemandes = $this->subscriptionService->getEffectivePlan($user)->getMaxActiveDemandes();
+        // Fail-open : cf. VoyageVoter::canCreate() - un catalogue non seede ne doit jamais
+        // bloquer la creation de demandes, fonctionnalite preexistante a la monetisation.
+        try {
+            $maxActiveDemandes = $this->subscriptionService->getEffectivePlan($user)->getMaxActiveDemandes();
+        } catch (\Throwable $e) {
+            $this->logger->error('Quota freemium indisponible (catalogue d\'abonnement non seede ?) - creation autorisee par defaut', [
+                'exception' => $e->getMessage(),
+            ]);
+            return true;
+        }
 
         if ($maxActiveDemandes !== null && $this->demandeRepository->countActiveByUser($user) >= $maxActiveDemandes) {
             return false;

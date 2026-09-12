@@ -15,6 +15,7 @@ use App\Service\VisibilityService;
 use App\Tests\Support\InMemoryUserTrait;
 use App\Tests\Support\MockTokenTrait;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Symfony\Component\Security\Core\Authorization\Voter\VoterInterface;
 
 /**
@@ -41,7 +42,7 @@ class DemandeVoterTest extends TestCase
         $this->subscriptionService->method('getEffectivePlan')->willReturn($this->planWithQuota(null));
         $this->demandeRepository->method('countActiveByUser')->willReturn(0);
 
-        $this->voter = new DemandeVoter(new VisibilityService(), $this->subscriptionService, $this->demandeRepository);
+        $this->voter = new DemandeVoter(new VisibilityService(), $this->subscriptionService, $this->demandeRepository, new NullLogger());
     }
 
     private function planWithQuota(?int $maxActiveDemandes): SubscriptionPlan
@@ -196,7 +197,7 @@ class DemandeVoterTest extends TestCase
         $subscriptionService->method('getEffectivePlan')->willReturn($this->planWithQuota(3));
         $demandeRepository = $this->createMock(DemandeRepository::class);
         $demandeRepository->method('countActiveByUser')->willReturn(3);
-        $voter = new DemandeVoter(new VisibilityService(), $subscriptionService, $demandeRepository);
+        $voter = new DemandeVoter(new VisibilityService(), $subscriptionService, $demandeRepository, new NullLogger());
 
         $result = $voter->vote($this->tokenFor($user), null, [DemandeVoter::CREATE]);
 
@@ -211,10 +212,30 @@ class DemandeVoterTest extends TestCase
         $subscriptionService->method('getEffectivePlan')->willReturn($this->planWithQuota(null));
         $demandeRepository = $this->createMock(DemandeRepository::class);
         $demandeRepository->method('countActiveByUser')->willReturn(10);
-        $voter = new DemandeVoter(new VisibilityService(), $subscriptionService, $demandeRepository);
+        $voter = new DemandeVoter(new VisibilityService(), $subscriptionService, $demandeRepository, new NullLogger());
 
         $result = $voter->vote($this->tokenFor($user), null, [DemandeVoter::CREATE]);
 
         self::assertSame(VoterInterface::ACCESS_GRANTED, $result, 'un plan payant sans limite (max=null) ne doit jamais bloquer la creation');
+    }
+
+    public function testCreateGrantedWhenSubscriptionServiceFailsFailOpen(): void
+    {
+        $user = $this->makeUser([], profileComplete: true);
+
+        $subscriptionService = $this->createMock(SubscriptionService::class);
+        $subscriptionService->method('getEffectivePlan')->willThrowException(
+            new \RuntimeException('Plan gratuit introuvable - la base n\'a pas été seedée')
+        );
+        $demandeRepository = $this->createMock(DemandeRepository::class);
+        $voter = new DemandeVoter(new VisibilityService(), $subscriptionService, $demandeRepository, new NullLogger());
+
+        $result = $voter->vote($this->tokenFor($user), null, [DemandeVoter::CREATE]);
+
+        self::assertSame(
+            VoterInterface::ACCESS_GRANTED,
+            $result,
+            'un catalogue d\'abonnement non seede/en erreur ne doit jamais bloquer la creation de demandes (fail-open, cf. incident E2E)'
+        );
     }
 }

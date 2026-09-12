@@ -15,6 +15,7 @@ use App\Service\VisibilityService;
 use App\Tests\Support\InMemoryUserTrait;
 use App\Tests\Support\MockTokenTrait;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Symfony\Component\Security\Core\Authorization\Voter\VoterInterface;
 
 /**
@@ -40,7 +41,7 @@ class VoyageVoterTest extends TestCase
         $this->subscriptionService->method('getEffectivePlan')->willReturn($this->planWithQuota(null));
         $this->voyageRepository->method('countActiveByUser')->willReturn(0);
 
-        $this->voter = new VoyageVoter($this->visibilityService(), $this->subscriptionService, $this->voyageRepository);
+        $this->voter = new VoyageVoter($this->visibilityService(), $this->subscriptionService, $this->voyageRepository, new NullLogger());
     }
 
     private function visibilityService(): VisibilityService
@@ -200,7 +201,7 @@ class VoyageVoterTest extends TestCase
         $subscriptionService->method('getEffectivePlan')->willReturn($this->planWithQuota(3));
         $voyageRepository = $this->createMock(VoyageRepository::class);
         $voyageRepository->method('countActiveByUser')->willReturn(3);
-        $voter = new VoyageVoter($this->visibilityService(), $subscriptionService, $voyageRepository);
+        $voter = new VoyageVoter($this->visibilityService(), $subscriptionService, $voyageRepository, new NullLogger());
 
         $result = $voter->vote($this->tokenFor($user), null, [VoyageVoter::CREATE]);
 
@@ -215,10 +216,30 @@ class VoyageVoterTest extends TestCase
         $subscriptionService->method('getEffectivePlan')->willReturn($this->planWithQuota(null));
         $voyageRepository = $this->createMock(VoyageRepository::class);
         $voyageRepository->method('countActiveByUser')->willReturn(10);
-        $voter = new VoyageVoter($this->visibilityService(), $subscriptionService, $voyageRepository);
+        $voter = new VoyageVoter($this->visibilityService(), $subscriptionService, $voyageRepository, new NullLogger());
 
         $result = $voter->vote($this->tokenFor($user), null, [VoyageVoter::CREATE]);
 
         self::assertSame(VoterInterface::ACCESS_GRANTED, $result, 'un plan payant sans limite (max=null) ne doit jamais bloquer la creation');
+    }
+
+    public function testCreateGrantedWhenSubscriptionServiceFailsFailOpen(): void
+    {
+        $user = $this->makeUser([], profileComplete: true);
+
+        $subscriptionService = $this->createMock(SubscriptionService::class);
+        $subscriptionService->method('getEffectivePlan')->willThrowException(
+            new \RuntimeException('Plan gratuit introuvable - la base n\'a pas été seedée')
+        );
+        $voyageRepository = $this->createMock(VoyageRepository::class);
+        $voter = new VoyageVoter($this->visibilityService(), $subscriptionService, $voyageRepository, new NullLogger());
+
+        $result = $voter->vote($this->tokenFor($user), null, [VoyageVoter::CREATE]);
+
+        self::assertSame(
+            VoterInterface::ACCESS_GRANTED,
+            $result,
+            'un catalogue d\'abonnement non seede/en erreur ne doit jamais bloquer la creation de voyages (fail-open, cf. incident E2E)'
+        );
     }
 }
