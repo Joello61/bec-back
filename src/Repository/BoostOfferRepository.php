@@ -37,4 +37,17 @@ class BoostOfferRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Catalogue complet pour l'admin (Lot 5) : y compris inactives et soft-supprimées,
+     * contrairement à findAllActive() destiné à l'API publique.
+     * @return BoostOffer[]
+     */
+    public function findAllForAdmin(): array
+    {
+        return $this->createQueryBuilder('o')
+            ->orderBy('o.sortOrder', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
 }
