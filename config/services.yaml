@@ -140,6 +140,10 @@ services:
         arguments:
             $metricsScrapeToken: '%env(METRICS_SCRAPE_TOKEN)%'
 
+    App\Controller\SubscriptionController:
+        arguments:
+            $frontendUrl: '%app.frontend_url%'
+
     App\Service\Tracer:
         arguments:
             $tempoOtlpEndpoint: '%env(TEMPO_OTLP_ENDPOINT)%'
