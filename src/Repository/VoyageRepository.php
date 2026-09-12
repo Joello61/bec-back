@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
+use App\Entity\Boost;
 use App\Entity\User;
 use App\Entity\Voyage;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -15,9 +16,49 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class VoyageRepository extends ServiceEntityRepository
 {
-    public function __construct(ManagerRegistry $registry)
-    {
+    public function __construct(
+        ManagerRegistry $registry,
+        private readonly BoostRepository $boostRepository,
+    ) {
         parent::__construct($registry, Voyage::class);
+    }
+
+    /**
+     * Positionne Voyage::isCurrentlyBoosted sur chaque element de $voyages via une
+     * requete batch (pas de N+1) - monetisation Lot 2.
+     * @param Voyage[] $voyages
+     */
+    private function markCurrentlyBoosted(array $voyages): void
+    {
+        if ($voyages === []) {
+            return;
+        }
+
+        $ids = array_map(static fn (Voyage $v) => $v->getId(), $voyages);
+        $boostedIds = $this->boostRepository->findActiveVoyageIds($ids);
+
+        foreach ($voyages as $voyage) {
+            $voyage->setIsCurrentlyBoosted(in_array($voyage->getId(), $boostedIds, true));
+        }
+    }
+
+    /**
+     * Boostes en tete, puis tri habituel par date - jamais d'addSelect ici (garde
+     * l'hydratation de $qb en Voyage[] pur, isCurrentlyBoosted est positionne a part
+     * via markCurrentlyBoosted() apres la requete principale) - monetisation Lot 2.
+     */
+    private function applyBoostOrdering(QueryBuilder $qb): void
+    {
+        $qb->leftJoin(
+            Boost::class,
+            'boost',
+            'WITH',
+            'boost.voyage = v.id AND boost.status = :boostStatus AND boost.endAt > :boostNow'
+        )
+            ->setParameter('boostStatus', Boost::STATUS_ACTIVE)
+            ->setParameter('boostNow', new \DateTime())
+            ->orderBy('CASE WHEN boost.id IS NOT NULL THEN 0 ELSE 1 END', 'ASC')
+            ->addOrderBy('v.createdAt', 'DESC');
     }
 
     /**
@@ -66,15 +107,16 @@ class VoyageRepository extends ServiceEntityRepository
             ->leftJoin('v.voyageur', 'u')
             ->leftJoin('u.settings', 's')
             ->addSelect('u', 's')
-            ->orderBy('v.createdAt', 'DESC')
             ->andWhere('v.statut = :statut')
             ->setParameter('statut', 'actif')
             ->setFirstResult($offset)
             ->setMaxResults($limit);
 
+        $this->applyBoostOrdering($qb);
         $this->applyFilters($qb, $filters);
 
         $voyages = $qb->getQuery()->getResult();
+        $this->markCurrentlyBoosted($voyages);
 
         $countQb = $this->createQueryBuilder('v')
             ->select('COUNT(v.id)')
@@ -116,9 +158,10 @@ class VoyageRepository extends ServiceEntityRepository
             // ==================== FILTRER PAR VISIBILITÉ ====================
             ->where('s.privacy.showInSearchResults = :visible OR s.id IS NULL')
             ->setParameter('visible', true)
-            ->orderBy('v.createdAt', 'DESC')
             ->setFirstResult($offset)
             ->setMaxResults($limit);
+
+        $this->applyBoostOrdering($qb);
 
         if ($excludeUser && !in_array('ROLE_ADMIN', $excludeUser->getRoles(), true)) {
             $qb->andWhere('v.voyageur != :excludedUser')
@@ -136,6 +179,7 @@ class VoyageRepository extends ServiceEntityRepository
         }
 
         $voyages = $qb->getQuery()->getResult();
+        $this->markCurrentlyBoosted($voyages);
 
         $countQb = $this->createQueryBuilder('v')
             ->select('COUNT(v.id)')
