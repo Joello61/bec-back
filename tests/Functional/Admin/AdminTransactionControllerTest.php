@@ -100,6 +100,11 @@ class AdminTransactionControllerTest extends WebTestCase
         $data = json_decode($this->client->getResponse()->getContent(), true);
         $this->assertArrayHasKey('data', $data);
         $this->assertArrayHasKey('pagination', $data);
+        $this->assertSame(
+            $user->getEmail(),
+            $data['data'][0]['user']['email'] ?? null,
+            'un admin doit pouvoir identifier a qui appartient la transaction'
+        );
     }
 
     // ==================== refund ====================
