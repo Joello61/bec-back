@@ -15,6 +15,7 @@ use App\Service\PaymentService;
 use App\Service\SubscriptionService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Psr\Container\ContainerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -39,11 +40,15 @@ class SubscriptionServiceTest extends TestCase
         $this->em = $this->createMock(EntityManagerInterface::class);
         $paymentService = $this->createMock(PaymentService::class);
 
+        $paymentProviders = $this->createMock(ContainerInterface::class);
+        $paymentProviders->method('has')->willReturn(true);
+        $paymentProviders->method('get')->willReturn($this->paymentProvider);
+
         $this->service = new SubscriptionService(
             $this->em,
             $this->planRepository,
             $this->subscriptionRepository,
-            $this->paymentProvider,
+            $paymentProviders,
             $paymentService,
             new NullLogger(),
         );
@@ -88,7 +93,7 @@ class SubscriptionServiceTest extends TestCase
 
         $this->expectException(NotFoundHttpException::class);
 
-        $this->service->checkout($user, 'inexistant', 'https://ok', 'https://ko');
+        $this->service->checkout($user, 'inexistant', 'card', 'https://ok', 'https://ko');
     }
 
     public function testCheckoutRejectsTheFreePlan(): void
@@ -98,17 +103,24 @@ class SubscriptionServiceTest extends TestCase
 
         $this->expectException(BadRequestHttpException::class);
 
-        $this->service->checkout($user, 'free', 'https://ok', 'https://ko');
+        $this->service->checkout($user, 'free', 'card', 'https://ok', 'https://ko');
     }
 
-    public function testCheckoutFailsClearlyWhenPlanHasNoStripePriceConfigured(): void
+    public function testCheckoutPropagatesProviderConfigurationFailure(): void
     {
+        // Depuis le Lot 3, la validation de configuration (ex. plan sans Price Stripe)
+        // est déplacée dans chaque provider (StripePaymentProvider) - le service se
+        // contente de propager l'exception.
         $user = new User();
         $this->planRepository->method('findByCode')->willReturn($this->plan('plus', '4.99', null));
+        $this->subscriptionRepository->method('findActiveForUser')->willReturn(null);
+        $this->paymentProvider->method('createCheckoutSession')->willThrowException(
+            new \RuntimeException('Le plan "plus" n\'a pas de Price Stripe configuré')
+        );
 
         $this->expectException(\RuntimeException::class);
 
-        $this->service->checkout($user, 'plus', 'https://ok', 'https://ko');
+        $this->service->checkout($user, 'plus', 'card', 'https://ok', 'https://ko');
     }
 
     public function testCheckoutRejectsWhenAnActiveSubscriptionAlreadyExists(): void
@@ -119,7 +131,7 @@ class SubscriptionServiceTest extends TestCase
 
         $this->expectException(BadRequestHttpException::class);
 
-        $this->service->checkout($user, 'plus', 'https://ok', 'https://ko');
+        $this->service->checkout($user, 'plus', 'card', 'https://ok', 'https://ko');
     }
 
     public function testCheckoutCreatesAnIncompleteSubscriptionWithAmountFrozenFromThePlanAndDelegatesToTheProvider(): void
@@ -141,7 +153,7 @@ class SubscriptionServiceTest extends TestCase
             ->method('createCheckoutSession')
             ->willReturn(new CheckoutSessionResult('https://checkout.stripe.com/session/xyz'));
 
-        $result = $this->service->checkout($user, 'plus', 'https://ok', 'https://ko');
+        $result = $this->service->checkout($user, 'plus', 'card', 'https://ok', 'https://ko');
 
         self::assertSame('https://checkout.stripe.com/session/xyz', $result->checkoutUrl);
         self::assertNotNull($capturedSubscription);

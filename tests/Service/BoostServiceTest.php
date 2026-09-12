@@ -20,6 +20,7 @@ use App\Service\Payment\PaymentProviderInterface;
 use App\Service\PaymentService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Psr\Container\ContainerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -50,6 +51,10 @@ class BoostServiceTest extends TestCase
         $this->em = $this->createMock(EntityManagerInterface::class);
         $paymentService = $this->createMock(PaymentService::class);
 
+        $paymentProviders = $this->createMock(ContainerInterface::class);
+        $paymentProviders->method('has')->willReturn(true);
+        $paymentProviders->method('get')->willReturn($this->paymentProvider);
+
         $this->service = new BoostService(
             $this->em,
             $this->boostOfferRepository,
@@ -57,7 +62,7 @@ class BoostServiceTest extends TestCase
             $this->voyageRepository,
             $this->demandeRepository,
             $this->userSubscriptionRepository,
-            $this->paymentProvider,
+            $paymentProviders,
             $paymentService,
             new NullLogger(),
         );
@@ -77,7 +82,7 @@ class BoostServiceTest extends TestCase
 
         $this->expectException(NotFoundHttpException::class);
 
-        $this->service->checkout(new User(), BoostService::TARGET_VOYAGE, 1, 99, 'https://ok', 'https://ko');
+        $this->service->checkout(new User(), BoostService::TARGET_VOYAGE, 1, 99, 'card', 'https://ok', 'https://ko');
     }
 
     public function testCheckoutRejectsAnInvalidTargetType(): void
@@ -86,7 +91,7 @@ class BoostServiceTest extends TestCase
 
         $this->expectException(BadRequestHttpException::class);
 
-        $this->service->checkout(new User(), 'invalide', 1, 1, 'https://ok', 'https://ko');
+        $this->service->checkout(new User(), 'invalide', 1, 1, 'card', 'https://ok', 'https://ko');
     }
 
     public function testCheckoutRejectsAnUnknownVoyage(): void
@@ -96,7 +101,7 @@ class BoostServiceTest extends TestCase
 
         $this->expectException(NotFoundHttpException::class);
 
-        $this->service->checkout(new User(), BoostService::TARGET_VOYAGE, 1, 1, 'https://ok', 'https://ko');
+        $this->service->checkout(new User(), BoostService::TARGET_VOYAGE, 1, 1, 'card', 'https://ok', 'https://ko');
     }
 
     public function testCheckoutCreatesAPendingBoostWithAmountFrozenFromTheOfferAndDelegatesToTheProvider(): void
@@ -121,7 +126,7 @@ class BoostServiceTest extends TestCase
             ->method('createOneTimeCheckoutSession')
             ->willReturn(new CheckoutSessionResult('https://checkout.stripe.com/session/boost'));
 
-        $result = $this->service->checkout($user, BoostService::TARGET_VOYAGE, 1, 1, 'https://ok', 'https://ko');
+        $result = $this->service->checkout($user, BoostService::TARGET_VOYAGE, 1, 1, 'card', 'https://ok', 'https://ko');
 
         self::assertSame('https://checkout.stripe.com/session/boost', $result->checkoutUrl);
         self::assertNotNull($capturedBoost);
