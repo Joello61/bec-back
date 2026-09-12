@@ -76,6 +76,7 @@ class Transaction
      * Métadonnées provider uniquement (id, type d'événement, statut...) - jamais de
      * PAN/CVV ni de numéro de téléphone Mobile Money complet.
      */
+    /** @var array<string, mixed>|null */
     #[ORM\Column(type: Types::JSON, nullable: true)]
     private ?array $rawPayload = null;
 
