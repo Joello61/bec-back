@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Scheduler;
 
 use App\Message\ExpireBansMessage;
+use App\Message\ExpireBoostsMessage;
 use App\Message\ExpireDemandesMessage;
 use App\Message\ExpireVoyagesMessage;
 use App\Scheduler\ExpirationScheduleProvider;
@@ -32,11 +33,11 @@ class ExpirationScheduleProviderTest extends TestCase
         return iterator_to_array($recurringMessage->getMessages($context));
     }
 
-    public function testScheduleRegistersExactlyThreeRecurringMessages(): void
+    public function testScheduleRegistersExactlyFourRecurringMessages(): void
     {
         $schedule = (new ExpirationScheduleProvider())->getSchedule();
 
-        self::assertCount(3, $schedule->getRecurringMessages());
+        self::assertCount(4, $schedule->getRecurringMessages());
     }
 
     public function testVoyagesExpirationRunsDailyAtTwoAm(): void
@@ -79,5 +80,19 @@ class ExpirationScheduleProviderTest extends TestCase
 
         self::assertNotFalse($banEntry, 'aucun RecurringMessage ne porte ExpireBansMessage');
         self::assertStringContainsString('every 1 hour', (string) $banEntry->getTrigger());
+    }
+
+    public function testBoostsExpirationRunsDailyAtThreeAm(): void
+    {
+        $schedule = (new ExpirationScheduleProvider())->getSchedule();
+        $recurringMessages = $schedule->getRecurringMessages();
+
+        $boostEntry = current(array_filter(
+            $recurringMessages,
+            fn (RecurringMessage $rm) => $this->messagesFor($rm)[0] instanceof ExpireBoostsMessage
+        ));
+
+        self::assertNotFalse($boostEntry, 'aucun RecurringMessage ne porte ExpireBoostsMessage');
+        self::assertStringContainsString('0 3 * * *', (string) $boostEntry->getTrigger());
     }
 }
