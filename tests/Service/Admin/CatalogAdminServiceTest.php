@@ -65,6 +65,8 @@ class CatalogAdminServiceTest extends TestCase
         $dto->name = 'Plus';
         $dto->priceAmountEur = '4.99';
         $dto->priceAmountXaf = '3000';
+        $dto->priceAmountEurYearly = '49.99';
+        $dto->priceAmountXafYearly = '30000';
 
         return $dto;
     }
@@ -74,6 +76,7 @@ class CatalogAdminServiceTest extends TestCase
         $dto = new UpdateSubscriptionPlanDTO();
         $dto->name = 'Plus (renommé)';
         $dto->priceAmountEur = '5.99';
+        $dto->priceAmountEurYearly = '59.99';
 
         return $dto;
     }
@@ -105,6 +108,7 @@ class CatalogAdminServiceTest extends TestCase
 
         self::assertSame('plus', $plan->getCode());
         self::assertSame('4.99', $plan->getPriceAmountEur());
+        self::assertSame('49.99', $plan->getPriceAmountEurYearly());
     }
 
     public function testUpdateSubscriptionPlanThrowsWhenPlanIsMissing(): void
@@ -127,6 +131,7 @@ class CatalogAdminServiceTest extends TestCase
 
         self::assertSame('Plus (renommé)', $updated->getName());
         self::assertSame('5.99', $updated->getPriceAmountEur());
+        self::assertSame('59.99', $updated->getPriceAmountEurYearly());
         self::assertSame('plus', $updated->getCode(), 'le code ne doit jamais changer via UpdateSubscriptionPlanDTO');
     }
 

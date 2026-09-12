@@ -23,6 +23,12 @@ class UpdateSubscriptionPlanDTO
     #[Assert\PositiveOrZero(message: 'Le prix XAF doit être positif ou nul')]
     public ?string $priceAmountXaf = null;
 
+    #[Assert\PositiveOrZero(message: 'Le prix EUR annuel doit être positif ou nul')]
+    public ?string $priceAmountEurYearly = null;
+
+    #[Assert\PositiveOrZero(message: 'Le prix XAF annuel doit être positif ou nul')]
+    public ?string $priceAmountXafYearly = null;
+
     #[Assert\NotBlank]
     #[Assert\Choice(choices: ['monthly'], message: 'Seule la périodicité mensuelle est supportée')]
     public string $billingPeriod = 'monthly';
@@ -45,4 +51,7 @@ class UpdateSubscriptionPlanDTO
 
     #[Assert\Length(max: 255)]
     public ?string $stripePriceId = null;
+
+    #[Assert\Length(max: 255)]
+    public ?string $stripePriceIdYearly = null;
 }

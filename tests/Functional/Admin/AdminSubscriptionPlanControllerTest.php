@@ -49,6 +49,8 @@ class AdminSubscriptionPlanControllerTest extends WebTestCase
             'name' => 'Plus',
             'priceAmountEur' => '4.99',
             'priceAmountXaf' => '3000',
+            'priceAmountEurYearly' => '49.99',
+            'priceAmountXafYearly' => '30000',
             'billingPeriod' => 'monthly',
             'maxActiveVoyages' => null,
             'maxActiveDemandes' => null,
@@ -58,6 +60,7 @@ class AdminSubscriptionPlanControllerTest extends WebTestCase
             'isActive' => true,
             'sortOrder' => 1,
             'stripePriceId' => null,
+            'stripePriceIdYearly' => null,
         ];
     }
 
@@ -144,6 +147,7 @@ class AdminSubscriptionPlanControllerTest extends WebTestCase
         self::assertSame($code, $payload['code']);
         self::assertArrayHasKey('isFeatured', $payload);
         self::assertFalse($payload['hasViewStats']);
+        self::assertSame('49.99', $payload['priceAmountEurYearly']);
     }
 
     // ==================== update ====================
