@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Admin;
 
 use App\Entity\AdminLog;
+use App\Entity\Transaction;
 use App\Entity\User;
 use App\Tests\Support\JwtAuthenticationTrait;
 use App\Tests\Support\UserFactoryTrait;
@@ -120,6 +121,50 @@ class AdminDashboardControllerTest extends WebTestCase
         $this->client->request('GET', '/api/admin/stats/engagement');
 
         self::assertResponseIsSuccessful();
+    }
+
+    // ==================== revenue (Lot 5) ====================
+
+    public function testRevenueStatsSucceeds(): void
+    {
+        $this->authenticateAs($this->admin('admin-dash-revenue'));
+
+        $this->client->request('GET', '/api/admin/stats/revenue?days=7');
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertArrayHasKey('totalByCurrency', $payload);
+        self::assertArrayHasKey('thisMonthByCurrency', $payload);
+        self::assertArrayHasKey('byType', $payload);
+        self::assertArrayHasKey('byPaymentMethod', $payload);
+        self::assertCount(7, $payload['dailyRevenue']);
+    }
+
+    public function testRevenueStatsAggregatesSucceededTransactionsByCurrency(): void
+    {
+        $user = $this->createUser('admin-dash-revenue-user');
+        $transaction = new Transaction();
+        $transaction->setUser($user)
+            ->setType(Transaction::TYPE_SUBSCRIPTION_INITIAL)
+            ->setProvider('stripe')
+            ->setProviderPaymentId('pi_revenue_test_' . uniqid())
+            ->setPaymentMethodFamily(Transaction::METHOD_FAMILY_CARD)
+            ->setAmount('4.99')
+            ->setCurrency('EUR')
+            ->setStatus(Transaction::STATUS_SUCCEEDED);
+        $this->em->persist($transaction);
+        $this->em->flush();
+
+        $this->authenticateAs($this->admin('admin-dash-revenue-agg'));
+
+        $this->client->request('GET', '/api/admin/stats/revenue');
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertArrayHasKey('EUR', $payload['totalByCurrency']);
+        self::assertGreaterThanOrEqual(4.99, (float) $payload['totalByCurrency']['EUR']);
+        self::assertArrayHasKey(Transaction::TYPE_SUBSCRIPTION_INITIAL, $payload['byType']);
+        self::assertArrayHasKey(Transaction::METHOD_FAMILY_CARD, $payload['byPaymentMethod']);
     }
 
     // ==================== logs ====================

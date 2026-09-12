@@ -198,6 +198,31 @@ class AdminDashboardController extends AbstractController
     }
 
     /**
+     * Statistiques de revenus (abonnements, boosts)
+     */
+    #[Route('/stats/revenue', name: 'stats_revenue', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/admin/stats/revenue',
+        summary: 'Statistiques de revenus (abonnements, boosts)',
+        security: [['cookieAuth' => []]]
+    )]
+    #[OA\Parameter(
+        name: 'days',
+        in: 'query',
+        description: 'Nombre de jours pour la courbe de revenus',
+        schema: new OA\Schema(type: 'integer', default: 30)
+    )]
+    #[OA\Response(response: 200, description: 'Statistiques de revenus')]
+    public function revenueStats(Request $request): JsonResponse
+    {
+        $days = $request->query->getInt('days', 30);
+
+        $stats = $this->adminStatsService->getRevenueStats($days);
+
+        return $this->json($stats, Response::HTTP_OK);
+    }
+
+    /**
      * Liste des logs d'actions admin
      */
     #[Route('/logs', name: 'logs', methods: ['GET'])]
