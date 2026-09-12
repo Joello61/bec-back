@@ -78,6 +78,15 @@ class Demande
     #[Groups(['public:demande:list', 'demande:read', 'demande:list', 'favori:list'])]
     private bool $isCurrentlyBoosted = false;
 
+    /**
+     * Nombre de vues par des tiers (Lot 6.2) - jamais incremente pour le proprietaire
+     * lui-meme. Jamais de groupe de serialisation : toujours injecte manuellement par
+     * VisibilityService::injectViewsCountIfEntitled() selon qui consulte et son plan,
+     * jamais expose au normalizer standard (evite une fuite vers un tiers).
+     */
+    #[ORM\Column(type: Types::INTEGER)]
+    private int $nombreVues = 0;
+
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
     #[Groups(['demande:read'])]
     private ?\DateTimeInterface $createdAt = null;
@@ -245,6 +254,17 @@ class Demande
     public function setIsCurrentlyBoosted(bool $isCurrentlyBoosted): static
     {
         $this->isCurrentlyBoosted = $isCurrentlyBoosted;
+        return $this;
+    }
+
+    public function getNombreVues(): int
+    {
+        return $this->nombreVues;
+    }
+
+    public function setNombreVues(int $nombreVues): static
+    {
+        $this->nombreVues = $nombreVues;
         return $this;
     }
 

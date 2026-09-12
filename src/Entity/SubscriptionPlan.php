@@ -72,6 +72,15 @@ class SubscriptionPlan
     private bool $hasBadge = false;
 
     /**
+     * Deverrouille l'affichage du nombre de vues (Voyage::nombreVues/Demande::nombreVues)
+     * au proprietaire d'une annonce (Lot 6.2) - avantage differenciant des plans payants,
+     * jamais une donnee publique. Cf. VisibilityService::injectViewsCountIfEntitled().
+     */
+    #[ORM\Column(type: Types::BOOLEAN)]
+    #[Groups(['subscription_plan:read', 'subscription_plan:list', 'admin:subscription_plan:read'])]
+    private bool $hasViewStats = false;
+
+    /**
      * Mise en avant visuelle sur la page tarifs (Lot 5), distincte de isActive
      * ("proposé à la souscription") et de hasBadge ("Populaire").
      */
@@ -218,6 +227,17 @@ class SubscriptionPlan
     public function setHasBadge(bool $hasBadge): static
     {
         $this->hasBadge = $hasBadge;
+        return $this;
+    }
+
+    public function hasViewStats(): bool
+    {
+        return $this->hasViewStats;
+    }
+
+    public function setHasViewStats(bool $hasViewStats): static
+    {
+        $this->hasViewStats = $hasViewStats;
         return $this;
     }
 
