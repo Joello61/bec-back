@@ -39,6 +39,14 @@ class SubscriptionPlan
     private ?string $priceAmountEur = null;
 
     /**
+     * Prix en XAF (paiement Mobile Money, Lot 3). Null pour le palier gratuit ou tant
+     * que le tarif Mobile Money n'a pas été fixé pour ce plan.
+     */
+    #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
+    #[Groups(['subscription_plan:read', 'subscription_plan:list'])]
+    private ?string $priceAmountXaf = null;
+
+    /**
      * Périodicité de facturation (mensuel uniquement en MVP, pas de plan annuel)
      */
     #[ORM\Column(length: 20)]
@@ -143,6 +151,17 @@ class SubscriptionPlan
     public function setPriceAmountEur(?string $priceAmountEur): static
     {
         $this->priceAmountEur = $priceAmountEur;
+        return $this;
+    }
+
+    public function getPriceAmountXaf(): ?string
+    {
+        return $this->priceAmountXaf;
+    }
+
+    public function setPriceAmountXaf(?string $priceAmountXaf): static
+    {
+        $this->priceAmountXaf = $priceAmountXaf;
         return $this;
     }
 
