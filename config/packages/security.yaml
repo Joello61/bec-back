@@ -83,6 +83,9 @@ security:
         # monétisation Lot 1.
         - { path: ^/api/subscriptions/plans, methods: [GET], roles: PUBLIC_ACCESS }
 
+        # Catalogue des offres de boost : donnée référentielle publique, monétisation Lot 2.
+        - { path: ^/api/boosts/offers, methods: [GET], roles: PUBLIC_ACCESS }
+
         # Webhooks Stripe/Notch Pay : appelés par le provider de paiement, jamais par un
         # utilisateur authentifié - l'authenticité est garantie par la vérification de
         # signature dans le RequestParser dédié (jamais par le firewall/JWT), monétisation
