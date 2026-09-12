@@ -145,6 +145,7 @@ class VoyageController extends AbstractController
             ?? $this->currencyService->getDefaultCurrency();
 
         $voyage = $this->voyageService->getVoyage($id);
+        $this->voyageService->registerView($voyage, $currentUser);
         $dataVoyage = $normalizer->normalize($voyage, null, ['groups' => ['voyage:read']]);
 
         $noteAvisMoyen = $this->avisService->getStatsByUser($voyage->getVoyageur()->getId())['average'] ?? 0;
@@ -154,6 +155,12 @@ class VoyageController extends AbstractController
             'voyageur',
             $voyage->getVoyageur(),
             $currentUser
+        );
+        $dataVoyage = $this->visibilityService->injectViewsCountIfEntitled(
+            $dataVoyage,
+            $voyage->getVoyageur(),
+            $currentUser,
+            $voyage->getNombreVues()
         );
 
         // ==================== CONVERSION AUTOMATIQUE ====================

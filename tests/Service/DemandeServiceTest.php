@@ -351,4 +351,24 @@ class DemandeServiceTest extends TestCase
         $this->expectException(NotFoundHttpException::class);
         $this->service->getDemande(999);
     }
+
+    // ==================== registerView (Lot 6.2) ====================
+
+    public function testRegisterViewIncrementsForAThirdParty(): void
+    {
+        $demande = $this->demande(1, $this->user(1));
+        $viewer = $this->user(2);
+        $this->demandeRepository->expects(self::once())->method('incrementNombreVues')->with(1);
+
+        $this->service->registerView($demande, $viewer);
+    }
+
+    public function testRegisterViewDoesNotIncrementForTheOwner(): void
+    {
+        $owner = $this->user(1);
+        $demande = $this->demande(1, $owner);
+        $this->demandeRepository->expects(self::never())->method('incrementNombreVues');
+
+        $this->service->registerView($demande, $owner);
+    }
 }

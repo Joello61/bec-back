@@ -383,4 +383,20 @@ class VoyageRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Incrementation atomique (Lot 6.2) - jamais un cycle load-entite/flush, qui
+     * perdrait des vues sous acces concurrents (meme patron que
+     * MessageRepository::markConversationAsRead()).
+     */
+    public function incrementNombreVues(int $id): void
+    {
+        $this->createQueryBuilder('v')
+            ->update()
+            ->set('v.nombreVues', 'v.nombreVues + 1')
+            ->where('v.id = :id')
+            ->setParameter('id', $id)
+            ->getQuery()
+            ->execute();
+    }
 }

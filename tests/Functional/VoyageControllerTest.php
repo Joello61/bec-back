@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Functional;
 
 use App\Entity\Demande;
+use App\Entity\SubscriptionPlan;
 use App\Entity\User;
+use App\Entity\UserSubscription;
 use App\Entity\Voyage;
 use App\Tests\Support\JwtAuthenticationTrait;
 use App\Tests\Support\UserFactoryTrait;
@@ -66,6 +68,63 @@ class VoyageControllerTest extends WebTestCase
         $payload = json_decode($this->client->getResponse()->getContent(), true);
         self::assertSame($owner->getEmail(), $payload['voyageur']['email']);
         self::assertSame($owner->getTelephone(), $payload['voyageur']['telephone']);
+    }
+
+    // ==================== nombreVues (Lot 6.2) ====================
+
+    public function testShowNeverExposesViewsCountToAThirdParty(): void
+    {
+        $owner = $this->createUser('owner-views-third-party');
+        $viewer = $this->createUser('viewer-views-third-party');
+        $voyage = $this->createVoyage($owner);
+        $this->authenticateAs($viewer);
+
+        $this->client->request('GET', '/api/voyages/' . $voyage->getId());
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertArrayNotHasKey('nombreVues', $payload);
+        self::assertArrayNotHasKey('nombreVuesLocked', $payload);
+    }
+
+    public function testShowLocksViewsCountForAnOwnerWithoutTheEntitlement(): void
+    {
+        $owner = $this->createUser('owner-views-locked');
+        $voyage = $this->createVoyage($owner);
+        $this->authenticateAs($owner);
+
+        $this->client->request('GET', '/api/voyages/' . $voyage->getId());
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertTrue($payload['nombreVuesLocked']);
+        self::assertArrayNotHasKey('nombreVues', $payload);
+    }
+
+    public function testShowRevealsTheRealViewsCountForAnEntitledOwnerAndIncrementsForThirdParties(): void
+    {
+        $owner = $this->createUser('owner-views-entitled');
+        $this->activeSubscription($owner, $this->planWithViewStats('plus-views-entitled'));
+        $voyage = $this->createVoyage($owner);
+
+        $viewer1 = $this->createUser('viewer-views-1');
+        $this->authenticateAs($viewer1);
+        $this->client->request('GET', '/api/voyages/' . $voyage->getId());
+        self::assertResponseIsSuccessful();
+
+        $viewer2 = $this->createUser('viewer-views-2');
+        $this->authenticateAs($viewer2);
+        $this->client->request('GET', '/api/voyages/' . $voyage->getId());
+        self::assertResponseIsSuccessful();
+
+        // Une vue du propriétaire lui-même ne doit jamais compter.
+        $this->authenticateAs($owner);
+        $this->client->request('GET', '/api/voyages/' . $voyage->getId());
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertSame(2, $payload['nombreVues']);
+        self::assertArrayNotHasKey('nombreVuesLocked', $payload);
     }
 
     public function testListDoesNotMixContactVisibilityBetweenDifferentVoyageurs(): void
@@ -210,6 +269,32 @@ class VoyageControllerTest extends WebTestCase
         $this->em->flush();
 
         return $voyage;
+    }
+
+    private function planWithViewStats(string $code): SubscriptionPlan
+    {
+        $plan = new SubscriptionPlan();
+        $plan->setCode($code)->setName(ucfirst($code))->setPriceAmountEur('4.99')->setHasViewStats(true);
+        $this->em->persist($plan);
+
+        return $plan;
+    }
+
+    private function activeSubscription(User $user, SubscriptionPlan $plan): UserSubscription
+    {
+        $subscription = new UserSubscription();
+        $subscription->setUser($user)
+            ->setPlan($plan)
+            ->setProvider(UserSubscription::PROVIDER_STRIPE)
+            ->setStatus(UserSubscription::STATUS_ACTIVE)
+            ->setAmount('4.99')
+            ->setCurrency('EUR')
+            ->setCurrentPeriodStart(new \DateTime('-1 day'))
+            ->setCurrentPeriodEnd(new \DateTime('+29 days'));
+        $this->em->persist($subscription);
+        $this->em->flush();
+
+        return $subscription;
     }
 
     private function findByVoyageurId(array $items, int $voyageurId): array

@@ -39,6 +39,8 @@ class CreateSubscriptionPlanDTO
 
     public bool $hasBadge = false;
 
+    public bool $hasViewStats = false;
+
     public bool $isFeatured = false;
 
     public bool $isActive = true;

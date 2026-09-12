@@ -42,7 +42,7 @@ class DemandeVoterTest extends TestCase
         $this->subscriptionService->method('getEffectivePlan')->willReturn($this->planWithQuota(null));
         $this->demandeRepository->method('countActiveByUser')->willReturn(0);
 
-        $this->voter = new DemandeVoter(new VisibilityService(), $this->subscriptionService, $this->demandeRepository, new NullLogger());
+        $this->voter = new DemandeVoter(new VisibilityService($this->createStub(SubscriptionService::class)), $this->subscriptionService, $this->demandeRepository, new NullLogger());
     }
 
     private function planWithQuota(?int $maxActiveDemandes): SubscriptionPlan
@@ -197,7 +197,7 @@ class DemandeVoterTest extends TestCase
         $subscriptionService->method('getEffectivePlan')->willReturn($this->planWithQuota(3));
         $demandeRepository = $this->createMock(DemandeRepository::class);
         $demandeRepository->method('countActiveByUser')->willReturn(3);
-        $voter = new DemandeVoter(new VisibilityService(), $subscriptionService, $demandeRepository, new NullLogger());
+        $voter = new DemandeVoter(new VisibilityService($this->createStub(SubscriptionService::class)), $subscriptionService, $demandeRepository, new NullLogger());
 
         $result = $voter->vote($this->tokenFor($user), null, [DemandeVoter::CREATE]);
 
@@ -212,7 +212,7 @@ class DemandeVoterTest extends TestCase
         $subscriptionService->method('getEffectivePlan')->willReturn($this->planWithQuota(null));
         $demandeRepository = $this->createMock(DemandeRepository::class);
         $demandeRepository->method('countActiveByUser')->willReturn(10);
-        $voter = new DemandeVoter(new VisibilityService(), $subscriptionService, $demandeRepository, new NullLogger());
+        $voter = new DemandeVoter(new VisibilityService($this->createStub(SubscriptionService::class)), $subscriptionService, $demandeRepository, new NullLogger());
 
         $result = $voter->vote($this->tokenFor($user), null, [DemandeVoter::CREATE]);
 
@@ -228,7 +228,7 @@ class DemandeVoterTest extends TestCase
             new \RuntimeException('Plan gratuit introuvable - la base n\'a pas été seedée')
         );
         $demandeRepository = $this->createMock(DemandeRepository::class);
-        $voter = new DemandeVoter(new VisibilityService(), $subscriptionService, $demandeRepository, new NullLogger());
+        $voter = new DemandeVoter(new VisibilityService($this->createStub(SubscriptionService::class)), $subscriptionService, $demandeRepository, new NullLogger());
 
         $result = $voter->vote($this->tokenFor($user), null, [DemandeVoter::CREATE]);
 
