@@ -84,4 +84,23 @@ class BoostRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Boosts actifs arrivant a echeance avant $before et pas encore relances (Lot N7) -
+     * consomme par SendBoostEndingReminderHandler, meme forme que
+     * UserSubscriptionRepository::findNeedingRenewalReminder.
+     * @return Boost[]
+     */
+    public function findNeedingEndingReminder(\DateTimeInterface $before): array
+    {
+        return $this->createQueryBuilder('b')
+            ->andWhere('b.status = :status')
+            ->andWhere('b.endAt IS NOT NULL')
+            ->andWhere('b.endAt <= :before')
+            ->andWhere('b.boostEndingReminderSentAt IS NULL')
+            ->setParameter('status', Boost::STATUS_ACTIVE)
+            ->setParameter('before', $before)
+            ->getQuery()
+            ->getResult();
+    }
 }

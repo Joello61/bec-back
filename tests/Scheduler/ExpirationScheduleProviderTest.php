@@ -9,6 +9,7 @@ use App\Message\ExpireBoostsMessage;
 use App\Message\ExpireDemandesMessage;
 use App\Message\ExpireNotchPaySubscriptionsMessage;
 use App\Message\ExpireVoyagesMessage;
+use App\Message\SendBoostEndingReminderMessage;
 use App\Message\SendRenewalReminderMessage;
 use App\Scheduler\ExpirationScheduleProvider;
 use PHPUnit\Framework\TestCase;
@@ -35,11 +36,11 @@ class ExpirationScheduleProviderTest extends TestCase
         return iterator_to_array($recurringMessage->getMessages($context));
     }
 
-    public function testScheduleRegistersExactlySixRecurringMessages(): void
+    public function testScheduleRegistersExactlySevenRecurringMessages(): void
     {
         $schedule = (new ExpirationScheduleProvider())->getSchedule();
 
-        self::assertCount(6, $schedule->getRecurringMessages());
+        self::assertCount(7, $schedule->getRecurringMessages());
     }
 
     public function testVoyagesExpirationRunsDailyAtTwoAm(): void
@@ -124,5 +125,19 @@ class ExpirationScheduleProviderTest extends TestCase
 
         self::assertNotFalse($expireEntry, 'aucun RecurringMessage ne porte ExpireNotchPaySubscriptionsMessage');
         self::assertStringContainsString('30 4 * * *', (string) $expireEntry->getTrigger());
+    }
+
+    public function testBoostEndingReminderRunsDailyAtFiveAm(): void
+    {
+        $schedule = (new ExpirationScheduleProvider())->getSchedule();
+        $recurringMessages = $schedule->getRecurringMessages();
+
+        $reminderEntry = current(array_filter(
+            $recurringMessages,
+            fn (RecurringMessage $rm) => $this->messagesFor($rm)[0] instanceof SendBoostEndingReminderMessage
+        ));
+
+        self::assertNotFalse($reminderEntry, 'aucun RecurringMessage ne porte SendBoostEndingReminderMessage');
+        self::assertStringContainsString('0 5 * * *', (string) $reminderEntry->getTrigger());
     }
 }

@@ -9,6 +9,7 @@ use App\Message\ExpireBoostsMessage;
 use App\Message\ExpireDemandesMessage;
 use App\Message\ExpireNotchPaySubscriptionsMessage;
 use App\Message\ExpireVoyagesMessage;
+use App\Message\SendBoostEndingReminderMessage;
 use App\Message\SendRenewalReminderMessage;
 use Symfony\Component\Scheduler\Attribute\AsSchedule;
 use Symfony\Component\Scheduler\RecurringMessage;
@@ -76,6 +77,15 @@ class ExpirationScheduleProvider implements ScheduleProviderInterface
                 RecurringMessage::cron(
                     '30 4 * * *',
                     new ExpireNotchPaySubscriptionsMessage()
+                )
+            )
+
+            // ==================== RAPPEL DE FIN DE BOOST IMMINENTE (Lot N7) ====================
+            // Tous les jours à 5h du matin - rappel J-3 avant l'echeance d'un boost actif.
+            ->add(
+                RecurringMessage::cron(
+                    '0 5 * * *',
+                    new SendBoostEndingReminderMessage()
                 )
             );
     }
