@@ -23,6 +23,7 @@ readonly class VoyageService
         private NotificationService $notificationService,
         private MatchingService $matchingService,
         private CurrencyService $currencyService,
+        private SubscriptionService $subscriptionService,
         private LoggerInterface $logger,
         private RealtimeNotifier $notifier,
     ) {}
@@ -154,7 +155,46 @@ readonly class VoyageService
         // Notifier les demandes matchées
         $this->notificationService->notifyMatchingDemandes($voyage);
 
+        $this->notifyIfQuotaJustReached($user);
+
         return $voyage;
+    }
+
+    /**
+     * Alerte reactive (Lot N6 monetisation) : previent l'utilisateur des qu'il occupe
+     * le dernier emplacement disponible de son quota effectif, au moment ou il l'atteint.
+     *
+     * Fail-open obligatoire (meme principe que VoyageVoter::canCreate()) : un catalogue
+     * d'abonnement indisponible ne doit jamais faire echouer la creation du voyage,
+     * cette verification est annexe a la creation elle-meme.
+     */
+    private function notifyIfQuotaJustReached(User $user): void
+    {
+        try {
+            $maxActiveVoyages = $this->subscriptionService->getEffectivePlan($user)->getMaxActiveVoyages();
+
+            if ($maxActiveVoyages === null) {
+                return;
+            }
+
+            if ($this->voyageRepository->countActiveByUser($user) === $maxActiveVoyages) {
+                $this->notificationService->createNotification(
+                    $user,
+                    'quota_warning',
+                    'Quota de voyages actifs atteint',
+                    sprintf(
+                        'Vous avez atteint votre quota de %d voyage(s) actif(s) simultané(s). Passez à un plan supérieur pour en publier davantage.',
+                        $maxActiveVoyages
+                    ),
+                    ['maxActiveVoyages' => $maxActiveVoyages]
+                );
+            }
+        } catch (\Throwable $e) {
+            $this->logger->error('Alerte de quota (voyages) indisponible - ignoree', [
+                'user_id' => $user->getId(),
+                'exception' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function updateVoyage(int $id, UpdateVoyageDTO $dto): Voyage

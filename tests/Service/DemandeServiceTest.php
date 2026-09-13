@@ -17,6 +17,7 @@ use App\Service\DemandeService;
 use App\Service\MatchingService;
 use App\Service\NotificationService;
 use App\Service\RealtimeNotifier;
+use App\Service\SubscriptionService;
 use App\Tests\Support\EntityIdTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
@@ -38,6 +39,7 @@ class DemandeServiceTest extends TestCase
     private NotificationService&\PHPUnit\Framework\MockObject\MockObject $notificationService;
     private MatchingService&\PHPUnit\Framework\MockObject\MockObject $matchingService;
     private CurrencyService&\PHPUnit\Framework\MockObject\MockObject $currencyService;
+    private SubscriptionService&\PHPUnit\Framework\MockObject\MockObject $subscriptionService;
     private RealtimeNotifier&\PHPUnit\Framework\MockObject\MockObject $notifier;
     private DemandeService $service;
 
@@ -48,6 +50,7 @@ class DemandeServiceTest extends TestCase
         $this->notificationService = $this->createMock(NotificationService::class);
         $this->matchingService = $this->createMock(MatchingService::class);
         $this->currencyService = $this->createMock(CurrencyService::class);
+        $this->subscriptionService = $this->createMock(SubscriptionService::class);
         $this->notifier = $this->createMock(RealtimeNotifier::class);
 
         $this->service = new DemandeService(
@@ -56,6 +59,7 @@ class DemandeServiceTest extends TestCase
             $this->notificationService,
             $this->matchingService,
             $this->currencyService,
+            $this->subscriptionService,
             $this->notifier,
             new NullLogger(),
         );
@@ -172,6 +176,49 @@ class DemandeServiceTest extends TestCase
         $result = $this->service->createDemande($this->createDto(), $user);
 
         self::assertSame('USD', $result->getCurrency());
+    }
+
+    public function testCreateDemandeTriggersQuotaWarningWhenLastSlotIsReached(): void
+    {
+        $this->currencyService->method('isSupported')->willReturn(true);
+        $user = $this->user(1);
+        $plan = new \App\Entity\SubscriptionPlan();
+        $plan->setMaxActiveDemandes(3);
+        $this->subscriptionService->method('getEffectivePlan')->willReturn($plan);
+        $this->demandeRepository->method('countActiveByUser')->willReturn(3);
+
+        $this->notificationService->expects(self::once())
+            ->method('createNotification')
+            ->with($user, 'quota_warning', self::anything(), self::anything(), self::anything());
+
+        $this->service->createDemande($this->createDto(), $user);
+    }
+
+    public function testCreateDemandeDoesNotTriggerQuotaWarningBelowTheLimit(): void
+    {
+        $this->currencyService->method('isSupported')->willReturn(true);
+        $user = $this->user(1);
+        $plan = new \App\Entity\SubscriptionPlan();
+        $plan->setMaxActiveDemandes(3);
+        $this->subscriptionService->method('getEffectivePlan')->willReturn($plan);
+        $this->demandeRepository->method('countActiveByUser')->willReturn(2);
+
+        $this->notificationService->expects(self::never())->method('createNotification');
+
+        $this->service->createDemande($this->createDto(), $user);
+    }
+
+    public function testCreateDemandeFailsOpenWhenSubscriptionCatalogIsUnavailable(): void
+    {
+        $this->currencyService->method('isSupported')->willReturn(true);
+        $user = $this->user(1);
+        $this->subscriptionService->method('getEffectivePlan')->willThrowException(new \RuntimeException('catalogue indisponible'));
+
+        $this->notificationService->expects(self::never())->method('createNotification');
+
+        $result = $this->service->createDemande($this->createDto(), $user);
+
+        self::assertSame($user, $result->getClient());
     }
 
     // ==================== updateDemande ====================

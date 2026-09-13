@@ -23,6 +23,7 @@ readonly class DemandeService
         private NotificationService $notificationService,
         private MatchingService $matchingService,
         private CurrencyService $currencyService,
+        private SubscriptionService $subscriptionService,
         private RealtimeNotifier $notifier,
         private LoggerInterface $logger,
     ) {}
@@ -152,7 +153,46 @@ readonly class DemandeService
         // Notifier les voyages matchés
         $this->notificationService->notifyMatchingVoyages($demande);
 
+        $this->notifyIfQuotaJustReached($user);
+
         return $demande;
+    }
+
+    /**
+     * Alerte reactive (Lot N6 monetisation) : previent l'utilisateur des qu'il occupe
+     * le dernier emplacement disponible de son quota effectif, au moment ou il l'atteint.
+     *
+     * Fail-open obligatoire (meme principe que DemandeVoter::canCreate()) : un catalogue
+     * d'abonnement indisponible ne doit jamais faire echouer la creation de la demande,
+     * cette verification est annexe a la creation elle-meme.
+     */
+    private function notifyIfQuotaJustReached(User $user): void
+    {
+        try {
+            $maxActiveDemandes = $this->subscriptionService->getEffectivePlan($user)->getMaxActiveDemandes();
+
+            if ($maxActiveDemandes === null) {
+                return;
+            }
+
+            if ($this->demandeRepository->countActiveByUser($user) === $maxActiveDemandes) {
+                $this->notificationService->createNotification(
+                    $user,
+                    'quota_warning',
+                    'Quota de demandes actives atteint',
+                    sprintf(
+                        'Vous avez atteint votre quota de %d demande(s) active(s) simultanée(s). Passez à un plan supérieur pour en publier davantage.',
+                        $maxActiveDemandes
+                    ),
+                    ['maxActiveDemandes' => $maxActiveDemandes]
+                );
+            }
+        } catch (\Throwable $e) {
+            $this->logger->error('Alerte de quota (demandes) indisponible - ignoree', [
+                'user_id' => $user->getId(),
+                'exception' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function updateDemande(int $id, UpdateDemandeDTO $dto): Demande

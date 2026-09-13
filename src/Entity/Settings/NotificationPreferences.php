@@ -34,6 +34,9 @@ class NotificationPreferences
     #[ORM\Column(type: Types::BOOLEAN)]
     private bool $notifyOnFavoriUpdate = true;
 
+    #[ORM\Column(type: Types::BOOLEAN)]
+    private bool $notifyOnQuotaWarning = true;
+
     public function isEmailNotificationsEnabled(): bool
     {
         return $this->emailNotificationsEnabled;
@@ -119,6 +122,17 @@ class NotificationPreferences
     public function setNotifyOnFavoriUpdate(bool $notifyOnFavoriUpdate): static
     {
         $this->notifyOnFavoriUpdate = $notifyOnFavoriUpdate;
+        return $this;
+    }
+
+    public function isNotifyOnQuotaWarning(): bool
+    {
+        return $this->notifyOnQuotaWarning;
+    }
+
+    public function setNotifyOnQuotaWarning(bool $notifyOnQuotaWarning): static
+    {
+        $this->notifyOnQuotaWarning = $notifyOnQuotaWarning;
         return $this;
     }
 

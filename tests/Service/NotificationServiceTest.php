@@ -144,6 +144,14 @@ class NotificationServiceTest extends TestCase
         self::assertNull($this->service->createNotification($user, 'favori_update', 'T', 'M'));
     }
 
+    public function testCreateNotificationRespectsQuotaWarningPreferenceDenied(): void
+    {
+        [$user, $settings] = $this->userWithSettings(1);
+        $settings->setNotifyOnQuotaWarning(false);
+
+        self::assertNull($this->service->createNotification($user, 'quota_warning', 'T', 'M'));
+    }
+
     public function testCreateNotificationAllowsAnUnknownSystemTypeRegardlessOfSettings(): void
     {
         [$user, $settings] = $this->userWithSettings(1);

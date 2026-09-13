@@ -16,6 +16,7 @@ use App\Service\CurrencyService;
 use App\Service\MatchingService;
 use App\Service\NotificationService;
 use App\Service\RealtimeNotifier;
+use App\Service\SubscriptionService;
 use App\Service\VoyageService;
 use App\Tests\Support\EntityIdTrait;
 use Doctrine\ORM\EntityManagerInterface;
@@ -39,6 +40,7 @@ class VoyageServiceTest extends TestCase
     private NotificationService&\PHPUnit\Framework\MockObject\MockObject $notificationService;
     private MatchingService&\PHPUnit\Framework\MockObject\MockObject $matchingService;
     private CurrencyService&\PHPUnit\Framework\MockObject\MockObject $currencyService;
+    private SubscriptionService&\PHPUnit\Framework\MockObject\MockObject $subscriptionService;
     private RealtimeNotifier&\PHPUnit\Framework\MockObject\MockObject $notifier;
     private VoyageService $service;
 
@@ -49,6 +51,7 @@ class VoyageServiceTest extends TestCase
         $this->notificationService = $this->createMock(NotificationService::class);
         $this->matchingService = $this->createMock(MatchingService::class);
         $this->currencyService = $this->createMock(CurrencyService::class);
+        $this->subscriptionService = $this->createMock(SubscriptionService::class);
         $this->notifier = $this->createMock(RealtimeNotifier::class);
 
         $this->service = new VoyageService(
@@ -57,6 +60,7 @@ class VoyageServiceTest extends TestCase
             $this->notificationService,
             $this->matchingService,
             $this->currencyService,
+            $this->subscriptionService,
             new NullLogger(),
             $this->notifier,
         );
@@ -179,6 +183,49 @@ class VoyageServiceTest extends TestCase
 
         self::assertSame('15', $result->getPoidsDisponible());
         self::assertSame('15', $result->getPoidsDisponibleRestant());
+    }
+
+    public function testCreateVoyageTriggersQuotaWarningWhenLastSlotIsReached(): void
+    {
+        $this->currencyService->method('isSupported')->willReturn(true);
+        $user = $this->user(1);
+        $plan = new \App\Entity\SubscriptionPlan();
+        $plan->setMaxActiveVoyages(3);
+        $this->subscriptionService->method('getEffectivePlan')->willReturn($plan);
+        $this->voyageRepository->method('countActiveByUser')->willReturn(3);
+
+        $this->notificationService->expects(self::once())
+            ->method('createNotification')
+            ->with($user, 'quota_warning', self::anything(), self::anything(), self::anything());
+
+        $this->service->createVoyage($this->createDto(), $user);
+    }
+
+    public function testCreateVoyageDoesNotTriggerQuotaWarningBelowTheLimit(): void
+    {
+        $this->currencyService->method('isSupported')->willReturn(true);
+        $user = $this->user(1);
+        $plan = new \App\Entity\SubscriptionPlan();
+        $plan->setMaxActiveVoyages(3);
+        $this->subscriptionService->method('getEffectivePlan')->willReturn($plan);
+        $this->voyageRepository->method('countActiveByUser')->willReturn(2);
+
+        $this->notificationService->expects(self::never())->method('createNotification');
+
+        $this->service->createVoyage($this->createDto(), $user);
+    }
+
+    public function testCreateVoyageFailsOpenWhenSubscriptionCatalogIsUnavailable(): void
+    {
+        $this->currencyService->method('isSupported')->willReturn(true);
+        $user = $this->user(1);
+        $this->subscriptionService->method('getEffectivePlan')->willThrowException(new \RuntimeException('catalogue indisponible'));
+
+        $this->notificationService->expects(self::never())->method('createNotification');
+
+        $result = $this->service->createVoyage($this->createDto(), $user);
+
+        self::assertSame($user, $result->getVoyageur());
     }
 
     // ==================== updateVoyage ====================

@@ -80,6 +80,9 @@ readonly class SettingsService
         if ($dto->notifyOnFavoriUpdate !== null) {
             $settings->setNotifyOnFavoriUpdate($dto->notifyOnFavoriUpdate);
         }
+        if ($dto->notifyOnQuotaWarning !== null) {
+            $settings->setNotifyOnQuotaWarning($dto->notifyOnQuotaWarning);
+        }
 
         // Confidentialité
         if ($dto->profileVisibility !== null) {
