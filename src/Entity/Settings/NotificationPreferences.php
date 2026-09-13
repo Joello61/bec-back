@@ -37,6 +37,9 @@ class NotificationPreferences
     #[ORM\Column(type: Types::BOOLEAN)]
     private bool $notifyOnQuotaWarning = true;
 
+    #[ORM\Column(type: Types::BOOLEAN)]
+    private bool $notifyOnBoostEndingSoon = true;
+
     public function isEmailNotificationsEnabled(): bool
     {
         return $this->emailNotificationsEnabled;
@@ -133,6 +136,17 @@ class NotificationPreferences
     public function setNotifyOnQuotaWarning(bool $notifyOnQuotaWarning): static
     {
         $this->notifyOnQuotaWarning = $notifyOnQuotaWarning;
+        return $this;
+    }
+
+    public function isNotifyOnBoostEndingSoon(): bool
+    {
+        return $this->notifyOnBoostEndingSoon;
+    }
+
+    public function setNotifyOnBoostEndingSoon(bool $notifyOnBoostEndingSoon): static
+    {
+        $this->notifyOnBoostEndingSoon = $notifyOnBoostEndingSoon;
         return $this;
     }
 

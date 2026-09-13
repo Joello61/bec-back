@@ -205,6 +205,18 @@ class UserSettings
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
+    public function isNotifyOnBoostEndingSoon(): bool
+    {
+        return $this->notifications->isNotifyOnBoostEndingSoon();
+    }
+
+    public function setNotifyOnBoostEndingSoon(bool $notifyOnBoostEndingSoon): static
+    {
+        $this->notifications->setNotifyOnBoostEndingSoon($notifyOnBoostEndingSoon);
+        return $this;
+    }
+
     // ==================== CONFIDENTIALITÉ (delegation vers PrivacySettings) ====================
 
     #[Groups(['settings:read', 'settings:write'])]

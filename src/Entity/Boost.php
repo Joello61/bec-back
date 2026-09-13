@@ -77,6 +77,14 @@ class Boost
     #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
     private ?\DateTimeInterface $withdrawalWaiverConsentedAt = null;
 
+    /**
+     * Horodatage de l'alerte de fin de boost imminente (Lot N7 monetisation) - meme role
+     * que UserSubscription::renewalReminderSentAt, garantit l'idempotence du rappel J-3
+     * planifie meme si le job tourne plusieurs fois.
+     */
+    #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
+    private ?\DateTimeInterface $boostEndingReminderSentAt = null;
+
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
     private ?\DateTimeInterface $createdAt = null;
 
@@ -213,6 +221,17 @@ class Boost
     public function setWithdrawalWaiverConsentedAt(?\DateTimeInterface $withdrawalWaiverConsentedAt): static
     {
         $this->withdrawalWaiverConsentedAt = $withdrawalWaiverConsentedAt;
+        return $this;
+    }
+
+    public function getBoostEndingReminderSentAt(): ?\DateTimeInterface
+    {
+        return $this->boostEndingReminderSentAt;
+    }
+
+    public function setBoostEndingReminderSentAt(?\DateTimeInterface $boostEndingReminderSentAt): static
+    {
+        $this->boostEndingReminderSentAt = $boostEndingReminderSentAt;
         return $this;
     }
 
