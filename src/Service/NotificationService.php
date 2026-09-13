@@ -50,6 +50,7 @@ readonly class NotificationService
             'new_avis' => $settings->isNotifyOnNewAvis(),
             'favori_update' => $settings->isNotifyOnFavoriUpdate(),
             'quota_warning' => $settings->isNotifyOnQuotaWarning(),
+            'boost_ending_soon' => $settings->isNotifyOnBoostEndingSoon(),
             default => true, // Pour les types système (vérification, etc.)
         };
     }

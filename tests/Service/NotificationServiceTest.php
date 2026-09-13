@@ -152,6 +152,14 @@ class NotificationServiceTest extends TestCase
         self::assertNull($this->service->createNotification($user, 'quota_warning', 'T', 'M'));
     }
 
+    public function testCreateNotificationRespectsBoostEndingSoonPreferenceDenied(): void
+    {
+        [$user, $settings] = $this->userWithSettings(1);
+        $settings->setNotifyOnBoostEndingSoon(false);
+
+        self::assertNull($this->service->createNotification($user, 'boost_ending_soon', 'T', 'M'));
+    }
+
     public function testCreateNotificationAllowsAnUnknownSystemTypeRegardlessOfSettings(): void
     {
         [$user, $settings] = $this->userWithSettings(1);
