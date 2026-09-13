@@ -24,6 +24,8 @@ readonly class PaymentService
     public function __construct(
         private EntityManagerInterface $entityManager,
         private TransactionRepository $transactionRepository,
+        private InvoiceService $invoiceService,
+        private EmailService $emailService,
         private LoggerInterface $logger,
     ) {}
 
@@ -55,7 +57,7 @@ readonly class PaymentService
         }
 
         try {
-            return $this->entityManager->wrapInTransaction(
+            $transaction = $this->entityManager->wrapInTransaction(
                 function () use (
                     $provider,
                     $providerPaymentId,
@@ -90,7 +92,8 @@ readonly class PaymentService
             );
         } catch (UniqueConstraintViolationException) {
             // Course concurrente avec un autre retry du meme webhook : la ligne existe
-            // desormais, on la relit plutot que de propager l'erreur.
+            // desormais, on la relit plutot que de propager l'erreur - jamais de nouvel
+            // envoi d'email ici, ce n'est pas une creation reelle.
             $existing = $this->transactionRepository->findByProviderPaymentId($provider, $providerPaymentId);
 
             if ($existing === null) {
@@ -100,6 +103,30 @@ readonly class PaymentService
             }
 
             return $existing;
+        }
+
+        // Email de facture (Lot N5) - uniquement sur une creation reelle (jamais sur les
+        // deux retours anticipes ci-dessus, qui correspondent a un retry idempotent) et
+        // uniquement si le paiement a reussi. Toujours apres le retour de
+        // wrapInTransaction : un echec d'envoi ne doit jamais faire echouer/annuler
+        // l'ecriture en base, deja commitee a ce stade.
+        if ($status === Transaction::STATUS_SUCCEEDED) {
+            $this->sendPaymentReceiptEmailSafely($transaction);
+        }
+
+        return $transaction;
+    }
+
+    private function sendPaymentReceiptEmailSafely(Transaction $transaction): void
+    {
+        try {
+            $pdfContent = $this->invoiceService->getContent($transaction);
+            $this->emailService->sendPaymentReceiptEmail($transaction->getUser(), $transaction, $pdfContent);
+        } catch (\Throwable $e) {
+            $this->logger->error('Erreur lors de l\'envoi de la facture par email', [
+                'transaction_id' => $transaction->getId(),
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 }

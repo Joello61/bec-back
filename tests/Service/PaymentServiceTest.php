@@ -8,6 +8,8 @@ use App\Entity\Boost;
 use App\Entity\Transaction;
 use App\Entity\User;
 use App\Repository\TransactionRepository;
+use App\Service\EmailService;
+use App\Service\InvoiceService;
 use App\Service\PaymentService;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
@@ -24,13 +26,23 @@ class PaymentServiceTest extends TestCase
 {
     private TransactionRepository&\PHPUnit\Framework\MockObject\MockObject $transactionRepository;
     private EntityManagerInterface&\PHPUnit\Framework\MockObject\MockObject $em;
+    private InvoiceService&\PHPUnit\Framework\MockObject\MockObject $invoiceService;
+    private EmailService&\PHPUnit\Framework\MockObject\MockObject $emailService;
     private PaymentService $paymentService;
 
     protected function setUp(): void
     {
         $this->transactionRepository = $this->createMock(TransactionRepository::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
-        $this->paymentService = new PaymentService($this->em, $this->transactionRepository, new NullLogger());
+        $this->invoiceService = $this->createMock(InvoiceService::class);
+        $this->emailService = $this->createMock(EmailService::class);
+        $this->paymentService = new PaymentService(
+            $this->em,
+            $this->transactionRepository,
+            $this->invoiceService,
+            $this->emailService,
+            new NullLogger(),
+        );
     }
 
     private function call(User $user): Transaction
@@ -151,5 +163,80 @@ class PaymentServiceTest extends TestCase
 
         self::assertSame($boost, $transaction->getBoost());
         self::assertNull($transaction->getSubscription());
+    }
+
+    // ==================== email de facture (Lot N5) ====================
+
+    public function testSendsThePaymentReceiptEmailOnANewSuccessfulTransaction(): void
+    {
+        $user = new User();
+        $this->transactionRepository->method('findByProviderPaymentId')->willReturn(null);
+        $this->em->method('wrapInTransaction')->willReturnCallback(fn (callable $fn) => $fn());
+        $this->invoiceService->expects(self::once())->method('getContent')->willReturn('%PDF-fake');
+        $this->emailService->expects(self::once())->method('sendPaymentReceiptEmail')
+            ->with($user, self::isInstanceOf(Transaction::class), '%PDF-fake');
+
+        $this->call($user);
+    }
+
+    public function testNeverSendsAnEmailWhenTheStatusIsNotSucceeded(): void
+    {
+        $user = new User();
+        $this->transactionRepository->method('findByProviderPaymentId')->willReturn(null);
+        $this->em->method('wrapInTransaction')->willReturnCallback(fn (callable $fn) => $fn());
+        $this->invoiceService->expects(self::never())->method('getContent');
+        $this->emailService->expects(self::never())->method('sendPaymentReceiptEmail');
+
+        $this->paymentService->findOrCreateFromProviderEvent(
+            provider: 'stripe',
+            providerPaymentId: 'in_pending',
+            user: $user,
+            subscription: null,
+            type: Transaction::TYPE_SUBSCRIPTION_INITIAL,
+            paymentMethodFamily: Transaction::METHOD_FAMILY_CARD,
+            amount: '4.99',
+            currency: 'EUR',
+            status: Transaction::STATUS_PENDING,
+            rawPayload: [],
+        );
+    }
+
+    public function testNeverSendsAnEmailOnAnIdempotentRetryOfAnAlreadyKnownTransaction(): void
+    {
+        $user = new User();
+        $existing = (new Transaction())->setProvider('stripe')->setProviderPaymentId('in_123')->setStatus(Transaction::STATUS_SUCCEEDED);
+        $this->transactionRepository->method('findByProviderPaymentId')->willReturn($existing);
+        $this->invoiceService->expects(self::never())->method('getContent');
+        $this->emailService->expects(self::never())->method('sendPaymentReceiptEmail');
+
+        $this->call($user);
+    }
+
+    public function testNeverSendsAnEmailWhenConcurrentCreationIsRecoveredFromARaceCondition(): void
+    {
+        $user = new User();
+        $existingAfterRace = (new Transaction())->setProvider('stripe')->setProviderPaymentId('in_123')->setStatus(Transaction::STATUS_SUCCEEDED);
+        $this->transactionRepository
+            ->method('findByProviderPaymentId')
+            ->willReturnOnConsecutiveCalls(null, $existingAfterRace);
+        $this->em->method('wrapInTransaction')->willThrowException(
+            $this->createMock(UniqueConstraintViolationException::class)
+        );
+        $this->invoiceService->expects(self::never())->method('getContent');
+        $this->emailService->expects(self::never())->method('sendPaymentReceiptEmail');
+
+        $this->call($user);
+    }
+
+    public function testTransactionCreationSucceedsEvenWhenSendingTheReceiptEmailFails(): void
+    {
+        $user = new User();
+        $this->transactionRepository->method('findByProviderPaymentId')->willReturn(null);
+        $this->em->method('wrapInTransaction')->willReturnCallback(fn (callable $fn) => $fn());
+        $this->invoiceService->method('getContent')->willThrowException(new \RuntimeException('Erreur simulée'));
+
+        $transaction = $this->call($user);
+
+        self::assertSame('in_123', $transaction->getProviderPaymentId(), 'un echec d\'envoi d\'email ne doit jamais annuler la transaction deja committee');
     }
 }

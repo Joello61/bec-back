@@ -57,6 +57,20 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # ---------------------------------------------------------------------------
 FROM base AS dev
 
+# Contrairement au stage "prod" plus bas, aucun memory_limit explicite n'etait fixe ici -
+# le defaut Alpine (128M) s'appliquait silencieusement. Incident constate en session (CI
+# E2E, PR Lot N5 monetisation, reproduit deux fois de suite) : "/api/register", premiere
+# requete HTTP reelle sur un conteneur fraichement construit, echouait en 500 sans aucune
+# exception loggee - signature typique d'un depassement de memory_limit (PHP arrete le
+# process avant meme de pouvoir logger). Non reproduit localement (memes commandes, meme
+# image reconstruite a neuf) malgre plusieurs tentatives - cause exacte non confirmee par
+# un stack trace direct, mais l'entrypoint dev (docker/entrypoint-dev.sh) ne fait aucun
+# cache:warmup explicite (juste composer install + migrations), rendant cette hypothese
+# plausible : la premiere requete warme alors le container DI + les metadonnees Doctrine a
+# la volee, un pic memoire ponctuel plus eleve qu'en regime etabli. Aligne sur la valeur
+# de "prod" ci-dessous par prudence plutot que d'ajuster au plus juste sans certitude.
+RUN { echo 'memory_limit = 256M'; } > /usr/local/etc/php/conf.d/php-dev-memory.ini
+
 COPY composer.json composer.lock symfony.lock* ./
 RUN composer install --no-scripts --no-progress --prefer-dist
 

@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Repository\DemandeRepository;
 use App\Repository\VoyageRepository;
 use App\Service\SubscriptionService;
+use Symfony\Component\DependencyInjection\Attribute\Lazy;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
@@ -23,6 +24,17 @@ readonly class ExceptionListener
         private LoggerInterface $logger,
         private string $environment,
         private bool $debug,
+        // #[Lazy] obligatoire : SubscriptionService entraine desormais (Lots N4/N5)
+        // PaymentService -> InvoiceService -> invoices.storage -> app.r2_client, qui
+        // resout des variables d'environnement R2_* au moment de la CONSTRUCTION (pas de
+        // l'appel). Sans #[Lazy], la moindre exception geree par ce listener - meme sans
+        // aucun rapport avec le quota - forcerait la construction de toute cette chaine et
+        // ferait echouer la gestion de l'exception elle-meme si R2_* est absent/mal
+        // configure (constate en session : /api/health, /api/register plantaient tous les
+        // deux en 500 sans lien avec leur propre logique). Un service lazy ne construit la
+        // vraie instance qu'au premier appel de methode - ici, uniquement pour un
+        // VOYAGE_CREATE/DEMANDE_CREATE refuse, jamais pour les autres exceptions.
+        #[Lazy]
         private ?SubscriptionService $subscriptionService = null,
         private ?VoyageRepository $voyageRepository = null,
         private ?DemandeRepository $demandeRepository = null,

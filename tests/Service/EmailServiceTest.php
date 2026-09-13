@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Service;
 
 use App\Entity\SubscriptionPlan;
+use App\Entity\Transaction;
 use App\Entity\User;
 use App\Entity\UserSettings;
 use App\Entity\UserSubscription;
@@ -151,6 +152,34 @@ class EmailServiceTest extends TestCase
 
         self::assertStringContainsString('https://cobage.test/dashboard/settings/subscription', $captured->getHtmlBody());
         self::assertStringContainsString('20/09/2026', $captured->getHtmlBody());
+    }
+
+    public function testSendPaymentReceiptEmailIsAlwaysSentAndAttachesTheInvoicePdf(): void
+    {
+        // Lot N5 : un recu de paiement est une obligation comptable/legale, toujours
+        // envoye independamment des preferences (comme sendRenewalReminderEmail).
+        $user = $this->user(canReceiveEmails: false);
+        $transaction = (new Transaction())
+            ->setType(Transaction::TYPE_BOOST)
+            ->setProvider('stripe')
+            ->setProviderPaymentId('pi_test_123')
+            ->setPaymentMethodFamily(Transaction::METHOD_FAMILY_CARD)
+            ->setAmount('2.99')
+            ->setCurrency('EUR')
+            ->setInvoiceNumber('INV-2026-00001');
+
+        $captured = null;
+        $this->mailer->expects(self::once())->method('send')->willReturnCallback(function (Email $email) use (&$captured) {
+            $captured = $email;
+        });
+
+        $this->service->sendPaymentReceiptEmail($user, $transaction, '%PDF-fake-content');
+
+        $attachments = $captured->getAttachments();
+        self::assertCount(1, $attachments);
+        self::assertSame('INV-2026-00001.pdf', $attachments[0]->getFilename());
+        self::assertSame('application/pdf', $attachments[0]->getContentType());
+        self::assertStringContainsString('2.99 EUR', $captured->getHtmlBody());
     }
 
     public function testTransportExceptionPropagates(): void
