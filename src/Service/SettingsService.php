@@ -83,6 +83,9 @@ readonly class SettingsService
         if ($dto->notifyOnQuotaWarning !== null) {
             $settings->setNotifyOnQuotaWarning($dto->notifyOnQuotaWarning);
         }
+        if ($dto->notifyOnBoostEndingSoon !== null) {
+            $settings->setNotifyOnBoostEndingSoon($dto->notifyOnBoostEndingSoon);
+        }
 
         // Confidentialité
         if ($dto->profileVisibility !== null) {

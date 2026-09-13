@@ -37,6 +37,9 @@ class UpdateSettingsDTO
     #[Assert\Type('bool')]
     public ?bool $notifyOnQuotaWarning = null;
 
+    #[Assert\Type('bool')]
+    public ?bool $notifyOnBoostEndingSoon = null;
+
     // ==================== CONFIDENTIALITÉ ====================
 
     #[Assert\Choice(

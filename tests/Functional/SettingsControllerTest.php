@@ -133,6 +133,26 @@ class SettingsControllerTest extends WebTestCase
         self::assertFalse($payload['notifyOnQuotaWarning']);
     }
 
+    public function testUpdateSettingsPersistsTheBoostEndingSoonPreference(): void
+    {
+        $this->authenticateAs($this->createUser('settings-update-boost-ending-soon'));
+
+        $this->client->request(
+            'PATCH',
+            '/api/settings',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode(['notifyOnBoostEndingSoon' => false])
+        );
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertFalse($payload['notifyOnBoostEndingSoon']);
+
+        $this->client->request('GET', '/api/settings');
+        $payload = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertFalse($payload['notifyOnBoostEndingSoon']);
+    }
+
     public function testUpdateSettingsRejectsAnInvalidCurrency(): void
     {
         $this->authenticateAs($this->createUser('settings-update-devise-invalide'));

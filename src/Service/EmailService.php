@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Entity\Boost;
 use App\Entity\Transaction;
 use App\Entity\User;
 use App\Entity\UserSubscription;
@@ -163,6 +164,27 @@ readonly class EmailService
     }
 
     /**
+     * Rappel J-3 avant la fin d'un boost actif (Lot N7) - toujours transactionnel, meme
+     * patron que sendRenewalReminderEmail (rappel operationnel, pas une notification
+     * marketing soumise aux preferences).
+     * @throws TransportExceptionInterface
+     */
+    public function sendBoostEndingReminderEmail(User $user, Boost $boost): void
+    {
+        $targetUrl = $boost->getVoyage() !== null
+            ? sprintf('%s/dashboard/mes-voyages/%d', $this->frontendUrl, $boost->getVoyage()->getId())
+            : sprintf('%s/dashboard/mes-demandes/%d', $this->frontendUrl, $boost->getDemande()?->getId());
+
+        $email = (new Email())
+            ->from('noreply@cobage.joeltech.dev')
+            ->to($user->getEmail())
+            ->subject('Votre boost Cobage arrive à échéance')
+            ->html($this->getBoostEndingReminderContent($user, $boost, $targetUrl));
+
+        $this->send($email, $user, true); // Transactionnel
+    }
+
+    /**
      * Email de notification générique (respecte les préférences)
      * @throws TransportExceptionInterface
      */
@@ -315,6 +337,34 @@ readonly class EmailService
             $subscription->getPlan()?->getName() ?? '',
             $periodEnd,
             $renewUrl
+        );
+    }
+
+    private function getBoostEndingReminderContent(User $user, Boost $boost, string $targetUrl): string
+    {
+        $endAt = $boost->getEndAt()?->format('d/m/Y') ?? '-';
+        $target = $boost->getVoyage() ?? $boost->getDemande();
+        $label = $target !== null
+            ? sprintf('%s → %s', $target->getVilleDepart(), $target->getVilleArrivee())
+            : '';
+
+        return sprintf(
+            '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+                <h1 style="color:#00695c;">Votre boost arrive à échéance</h1>
+                <p>Bonjour %s,</p>
+                <p>Le boost sur votre annonce <strong>%s</strong> se termine le <strong>%s</strong>.</p>
+                <p>Passé cette date, votre annonce perdra sa mise en avant prioritaire dans les résultats de
+                recherche.</p>
+                <div style="text-align:center;margin:32px 0;">
+                    <a href="%s" style="display:inline-block;padding:14px 28px;background-color:#00695c;color:white;text-decoration:none;border-radius:6px;font-weight:bold;">
+                        Renouveler mon boost
+                    </a>
+                </div>
+            </div>',
+            $user->getPrenom(),
+            $label,
+            $endAt,
+            $targetUrl
         );
     }
 }
