@@ -193,6 +193,18 @@ class UserSettings
         return $this;
     }
 
+    #[Groups(['settings:read', 'settings:write'])]
+    public function isNotifyOnQuotaWarning(): bool
+    {
+        return $this->notifications->isNotifyOnQuotaWarning();
+    }
+
+    public function setNotifyOnQuotaWarning(bool $notifyOnQuotaWarning): static
+    {
+        $this->notifications->setNotifyOnQuotaWarning($notifyOnQuotaWarning);
+        return $this;
+    }
+
     // ==================== CONFIDENTIALITÉ (delegation vers PrivacySettings) ====================
 
     #[Groups(['settings:read', 'settings:write'])]
