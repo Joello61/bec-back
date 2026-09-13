@@ -107,6 +107,23 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
+     * Nombre de factures deja numerotees pour une annee donnee (Lot N4) - sert de base
+     * au compteur sequentiel provisoire INV-{annee}-{sequence}. Best-effort, pas de
+     * verrou : une collision concurrente sur la meme seconde reste possible (rejetee par
+     * la contrainte UNIQUE sur invoiceNumber), acceptable pour un schema explicitement
+     * provisoire en attendant une validation comptable/juridique.
+     */
+    public function countInvoicedTransactionsForYear(int $year): int
+    {
+        return (int) $this->createQueryBuilder('t')
+            ->select('COUNT(t.id)')
+            ->andWhere('t.invoiceNumber LIKE :prefix')
+            ->setParameter('prefix', sprintf('INV-%d-%%', $year))
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
      * Somme des montants par devise (EUR/XAF ne se cumulent jamais entre eux) pour un
      * statut donné, optionnellement bornée dans le temps - réutilisée pour le total, le
      * "ce mois-ci" et le calcul jour par jour (Lot 5, AdminStatsService::getRevenueStats).

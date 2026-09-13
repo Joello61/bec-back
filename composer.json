@@ -13,6 +13,7 @@
         "doctrine/doctrine-bundle": "^2.16",
         "doctrine/doctrine-migrations-bundle": "^3.4",
         "doctrine/orm": "^3.5",
+        "dompdf/dompdf": "^3.1",
         "dragonmantank/cron-expression": "^3.4",
         "firebase/php-jwt": "^7.1",
         "league/flysystem-aws-s3-v3": "^3.35",

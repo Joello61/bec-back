@@ -95,6 +95,25 @@ class Transaction
     #[ORM\Column(type: Types::JSON, nullable: true)]
     private ?array $rawPayload = null;
 
+    /**
+     * Numero de facture (Lot N4) - genere une seule fois, a la premiere generation du
+     * PDF (jamais au moment ou la transaction devient succeeded, cf. InvoiceService).
+     * Format INV-{annee}-{sequence} explicitement provisoire : la numerotation legale
+     * definitive reste a valider par un comptable/juriste avant tout lancement commercial
+     * reel (plan-complements-monetisation-cobage.md, Partie A Lot N4, decision du
+     * 2026-09-13).
+     */
+    #[ORM\Column(length: 30, nullable: true, unique: true)]
+    #[Groups(['transaction:read', 'admin:transaction:list'])]
+    private ?string $invoiceNumber = null;
+
+    /**
+     * Chemin de stockage du PDF de facture (Lot N4) - jamais expose au client, sert
+     * uniquement InvoiceService/TransactionController::invoice() en interne.
+     */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $invoiceStoragePath = null;
+
     #[ORM\Column(type: Types::DATETIME_MUTABLE)]
     #[Groups(['transaction:read', 'admin:transaction:list'])]
     private ?\DateTimeInterface $createdAt = null;
@@ -251,6 +270,28 @@ class Transaction
     public function setRawPayload(?array $rawPayload): static
     {
         $this->rawPayload = $rawPayload;
+        return $this;
+    }
+
+    public function getInvoiceNumber(): ?string
+    {
+        return $this->invoiceNumber;
+    }
+
+    public function setInvoiceNumber(?string $invoiceNumber): static
+    {
+        $this->invoiceNumber = $invoiceNumber;
+        return $this;
+    }
+
+    public function getInvoiceStoragePath(): ?string
+    {
+        return $this->invoiceStoragePath;
+    }
+
+    public function setInvoiceStoragePath(?string $invoiceStoragePath): static
+    {
+        $this->invoiceStoragePath = $invoiceStoragePath;
         return $this;
     }
 

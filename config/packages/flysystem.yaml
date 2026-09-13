@@ -10,6 +10,15 @@ flysystem:
             options:
                 directory: '%kernel.project_dir%/public/uploads/avatars'
 
+        # Factures (Lot N4, plan-complements-monetisation-cobage.md) - jamais sous
+        # public/ contrairement aux avatars : une facture n'est accessible qu'apres
+        # verification d'ownership par TransactionController, jamais servie directement
+        # par nginx/un CDN. "var/" (hors document root nginx) plutot que "public/".
+        invoices.storage:
+            adapter: 'local'
+            options:
+                directory: '%kernel.project_dir%/var/invoices'
+
 when@prod:
     flysystem:
         storages:
@@ -18,3 +27,12 @@ when@prod:
                 options:
                     client: 'app.r2_client'
                     bucket: '%env(R2_BUCKET)%'
+
+            # Bucket R2 distinct de celui des avatars (R2_BUCKET) et volontairement sans
+            # equivalent de R2_PUBLIC_URL : ce bucket ne doit jamais etre mappe sur un
+            # domaine public/CDN, la confidentialite des factures en depend entierement.
+            invoices.storage:
+                adapter: 'aws'
+                options:
+                    client: 'app.r2_client'
+                    bucket: '%env(R2_INVOICES_BUCKET)%'
