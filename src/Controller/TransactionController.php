@@ -6,11 +6,14 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\TransactionRepository;
+use App\Security\Voter\TransactionVoter;
+use App\Service\InvoiceService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -20,6 +23,7 @@ class TransactionController extends AbstractController
 {
     public function __construct(
         private readonly TransactionRepository $transactionRepository,
+        private readonly InvoiceService $invoiceService,
     ) {}
 
     /**
@@ -48,5 +52,41 @@ class TransactionController extends AbstractController
         $result = $this->transactionRepository->findAllPaginatedForUser($user, $page, $limit);
 
         return $this->json($result, Response::HTTP_OK, [], ['groups' => ['transaction:read']]);
+    }
+
+    /**
+     * Téléchargement de la facture PDF d'une transaction (Lot N4) - générée à la volée
+     * au premier appel si elle n'existe pas encore (transaction déjà réussie mais
+     * facture pas encore émise), jamais régénérée ensuite (InvoiceService::ensureGenerated).
+     */
+    #[Route('/{id}/invoice', name: 'invoice', requirements: ['id' => '\d+'], methods: ['GET'])]
+    #[IsGranted('ROLE_USER')]
+    #[OA\Get(
+        path: '/api/transactions/{id}/invoice',
+        summary: 'Télécharge la facture PDF d\'une transaction',
+        security: [['cookieAuth' => []]]
+    )]
+    #[OA\Response(response: 200, description: 'Fichier PDF de la facture')]
+    #[OA\Response(response: 403, description: 'La transaction n\'appartient pas à l\'appelant')]
+    #[OA\Response(response: 404, description: 'Transaction introuvable')]
+    public function invoice(int $id): Response
+    {
+        $transaction = $this->transactionRepository->find($id);
+
+        if ($transaction === null) {
+            throw new NotFoundHttpException('Transaction introuvable');
+        }
+
+        $this->denyAccessUnlessGranted(TransactionVoter::DOWNLOAD_INVOICE, $transaction);
+
+        $content = $this->invoiceService->getContent($transaction);
+
+        return new Response($content, Response::HTTP_OK, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => sprintf(
+                'attachment; filename="%s.pdf"',
+                $transaction->getInvoiceNumber() ?? 'facture'
+            ),
+        ]);
     }
 }

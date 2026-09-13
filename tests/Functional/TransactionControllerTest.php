@@ -126,4 +126,55 @@ class TransactionControllerTest extends WebTestCase
         $data = json_decode($this->client->getResponse()->getContent(), true);
         self::assertSame(50, $data['pagination']['limit'], 'la limite doit toujours etre plafonnee a 50');
     }
+
+    // ==================== invoice (Lot N4) ====================
+
+    public function testInvoiceReturnsAPdfToItsOwner(): void
+    {
+        $owner = $this->createUser('tx-invoice-owner');
+        $transaction = $this->transaction($owner);
+        $this->authenticateAs($owner);
+
+        $this->client->request('GET', '/api/transactions/' . $transaction->getId() . '/invoice');
+
+        self::assertResponseIsSuccessful();
+        self::assertSame('application/pdf', $this->client->getResponse()->headers->get('Content-Type'));
+        self::assertStringStartsWith('%PDF', $this->client->getResponse()->getContent());
+    }
+
+    public function testInvoiceRejectsANonOwner(): void
+    {
+        $owner = $this->createUser('tx-invoice-owner2');
+        $intruder = $this->createUser('tx-invoice-intruder');
+        $transaction = $this->transaction($owner);
+        $this->authenticateAs($intruder);
+
+        $this->client->request('GET', '/api/transactions/' . $transaction->getId() . '/invoice');
+
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testInvoiceReturns404ForAnUnknownTransaction(): void
+    {
+        $this->authenticateAs($this->createUser('tx-invoice-unknown'));
+
+        $this->client->request('GET', '/api/transactions/999999/invoice');
+
+        self::assertResponseStatusCodeSame(404);
+    }
+
+    public function testInvoiceNumberIsStableAcrossRepeatedDownloads(): void
+    {
+        $owner = $this->createUser('tx-invoice-stable');
+        $transaction = $this->transaction($owner);
+        $this->authenticateAs($owner);
+
+        $this->client->request('GET', '/api/transactions/' . $transaction->getId() . '/invoice');
+        $firstDisposition = $this->client->getResponse()->headers->get('Content-Disposition');
+
+        $this->client->request('GET', '/api/transactions/' . $transaction->getId() . '/invoice');
+        $secondDisposition = $this->client->getResponse()->headers->get('Content-Disposition');
+
+        self::assertSame($firstDisposition, $secondDisposition, 'le numero de facture ne doit jamais changer une fois genere');
+    }
 }
