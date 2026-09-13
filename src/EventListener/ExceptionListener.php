@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\EventListener;
 
 use App\Entity\User;
+use App\Repository\DemandeRepository;
+use App\Repository\VoyageRepository;
+use App\Service\SubscriptionService;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
@@ -19,7 +22,10 @@ readonly class ExceptionListener
     public function __construct(
         private LoggerInterface $logger,
         private string $environment,
-        private bool $debug
+        private bool $debug,
+        private ?SubscriptionService $subscriptionService = null,
+        private ?VoyageRepository $voyageRepository = null,
+        private ?DemandeRepository $demandeRepository = null,
     ) {}
 
     public function onKernelException(ExceptionEvent $event): void
@@ -82,6 +88,20 @@ readonly class ExceptionListener
 
                 $event->setResponse($response);
                 return;
+            }
+
+            // ==================== QUOTA FREEMIUM DÉPASSÉ (monétisation, Partie A Lot N1) ====================
+            // Recalcule la même vérification que VoyageVoter::canCreate()/DemandeVoter::canCreate()
+            // pour distinguer un quota dépassé d'un ACCESS_DENIED générique, et donner un message
+            // actionnable au frontend. Fail-open : cf. Voters, une erreur ici ne doit jamais faire
+            // planter la gestion de l'exception elle-même - on retombe simplement sur ACCESS_DENIED.
+            $quotaAttribute = $this->getQuotaCreateAttribute($exception);
+            if ($user instanceof User && $quotaAttribute !== null) {
+                $quotaExceededResponse = $this->buildQuotaExceededResponseIfApplicable($user, $quotaAttribute);
+                if ($quotaExceededResponse !== null) {
+                    $event->setResponse($quotaExceededResponse);
+                    return;
+                }
             }
 
             // Autres cas d'access denied
@@ -149,5 +169,62 @@ readonly class ExceptionListener
         }
 
         return $missing;
+    }
+
+    /**
+     * Retourne 'VOYAGE_CREATE'/'DEMANDE_CREATE' si l'AccessDeniedException porte l'un de ces
+     * deux attributs (setAttributes() appelé par denyAccessUnlessGranted(), cf.
+     * AbstractController::denyAccessUnlessGranted()), sinon null.
+     */
+    private function getQuotaCreateAttribute(\Throwable $exception): ?string
+    {
+        if (!$exception instanceof AccessDeniedException) {
+            return null;
+        }
+
+        foreach (['VOYAGE_CREATE', 'DEMANDE_CREATE'] as $attribute) {
+            if (in_array($attribute, $exception->getAttributes(), true)) {
+                return $attribute;
+            }
+        }
+
+        return null;
+    }
+
+    private function buildQuotaExceededResponseIfApplicable(User $user, string $quotaAttribute): ?JsonResponse
+    {
+        if ($this->subscriptionService === null || $this->voyageRepository === null || $this->demandeRepository === null) {
+            return null;
+        }
+
+        try {
+            $plan = $this->subscriptionService->getEffectivePlan($user);
+
+            if ($quotaAttribute === 'VOYAGE_CREATE') {
+                $limit = $plan->getMaxActiveVoyages();
+                $current = $this->voyageRepository->countActiveByUser($user);
+            } else {
+                $limit = $plan->getMaxActiveDemandes();
+                $current = $this->demandeRepository->countActiveByUser($user);
+            }
+        } catch (\Throwable $e) {
+            $this->logger->error('Quota freemium indisponible pour enrichir le message 403 (catalogue d\'abonnement non seede ?)', [
+                'exception' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        if ($limit === null || $current < $limit) {
+            return null;
+        }
+
+        return new JsonResponse([
+            'success' => false,
+            'error' => 'QUOTA_EXCEEDED',
+            'message' => 'Vous avez atteint la limite de votre plan actuel. Passez à un plan supérieur pour continuer.',
+            'currentPlan' => $plan->getCode(),
+            'limit' => $limit,
+        ], Response::HTTP_FORBIDDEN);
     }
 }
