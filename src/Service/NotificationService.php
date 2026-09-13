@@ -49,6 +49,7 @@ readonly class NotificationService
             'matching_demande' => $settings->isNotifyOnMatchingDemande(),
             'new_avis' => $settings->isNotifyOnNewAvis(),
             'favori_update' => $settings->isNotifyOnFavoriUpdate(),
+            'quota_warning' => $settings->isNotifyOnQuotaWarning(),
             default => true, // Pour les types système (vérification, etc.)
         };
     }
