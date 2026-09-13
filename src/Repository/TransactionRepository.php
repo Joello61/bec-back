@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\Transaction;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -56,6 +57,43 @@ class TransactionRepository extends ServiceEntityRepository
 
         $transactions = $qb->getQuery()->getResult();
         $total = $countQb->getQuery()->getSingleScalarResult();
+
+        return [
+            'data' => $transactions,
+            'pagination' => [
+                'page' => $page,
+                'limit' => $limit,
+                'total' => $total,
+                'pages' => (int) ceil($total / $limit),
+            ],
+        ];
+    }
+
+    /**
+     * Liste paginee des transactions d'un seul utilisateur (Lot N3, historique de ses
+     * propres paiements) - copie de findAllPaginatedAdmin() sans les filtres admin,
+     * filtree sur le proprietaire au lieu d'etre ouverte a toute la table.
+     * @return array{data: Transaction[], pagination: array{page: int, limit: int, total: int, pages: int}}
+     */
+    public function findAllPaginatedForUser(User $user, int $page, int $limit): array
+    {
+        $offset = ($page - 1) * $limit;
+
+        $transactions = $this->createQueryBuilder('t')
+            ->andWhere('t.user = :user')
+            ->setParameter('user', $user)
+            ->orderBy('t.createdAt', 'DESC')
+            ->setFirstResult($offset)
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+
+        $total = (int) $this->createQueryBuilder('t')
+            ->select('COUNT(t.id)')
+            ->andWhere('t.user = :user')
+            ->setParameter('user', $user)
+            ->getQuery()
+            ->getSingleScalarResult();
 
         return [
             'data' => $transactions,

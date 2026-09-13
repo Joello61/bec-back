@@ -79,12 +79,12 @@ class Transaction
     private string $status = self::STATUS_PENDING;
 
     /**
-     * Date d'exécution du remboursement (Lot 6.1) - jamais exposée cote utilisateur,
-     * uniquement à l'admin. Raison et admin responsable tracés via AuditLogService,
-     * jamais dupliqués ici.
+     * Date d'exécution du remboursement (Lot 6.1) - exposée à l'utilisateur concerné
+     * depuis le Lot N3 (historique de ses propres paiements), en plus de l'admin. Raison
+     * et admin responsable tracés via AuditLogService, jamais dupliqués ici.
      */
     #[ORM\Column(type: Types::DATETIME_MUTABLE, nullable: true)]
-    #[Groups(['admin:transaction:list'])]
+    #[Groups(['transaction:read', 'admin:transaction:list'])]
     private ?\DateTimeInterface $refundedAt = null;
 
     /**
