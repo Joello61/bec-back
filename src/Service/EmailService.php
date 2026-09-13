@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Entity\Transaction;
 use App\Entity\User;
 use App\Entity\UserSubscription;
 use Psr\Log\LoggerInterface;
@@ -144,6 +145,24 @@ readonly class EmailService
     }
 
     /**
+     * Facture jointe à chaque paiement réussi (Lot N5) - toujours transactionnel, même
+     * patron que sendRenewalReminderEmail : un reçu de paiement est une obligation
+     * comptable/légale, pas une notification marketing soumise aux préférences.
+     * @throws TransportExceptionInterface
+     */
+    public function sendPaymentReceiptEmail(User $user, Transaction $transaction, string $invoicePdf): void
+    {
+        $email = (new Email())
+            ->from('noreply@cobage.joeltech.dev')
+            ->to($user->getEmail())
+            ->subject('Votre facture Cobage')
+            ->html($this->getPaymentReceiptContent($user, $transaction))
+            ->attach($invoicePdf, ($transaction->getInvoiceNumber() ?? 'facture') . '.pdf', 'application/pdf');
+
+        $this->send($email, $user, true); // Transactionnel
+    }
+
+    /**
      * Email de notification générique (respecte les préférences)
      * @throws TransportExceptionInterface
      */
@@ -250,6 +269,25 @@ readonly class EmailService
             </div>',
             $user->getPrenom(),
             (new \DateTime())->format('d/m/Y à H:i')
+        );
+    }
+
+    private function getPaymentReceiptContent(User $user, Transaction $transaction): string
+    {
+        return sprintf(
+            '<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+                <h1 style="color:#00695c;">Merci pour votre paiement</h1>
+                <p>Bonjour %s,</p>
+                <p>Nous confirmons la bonne réception de votre paiement de <strong>%s %s</strong>.</p>
+                <p>Vous trouverez votre facture en pièce jointe de cet email.</p>
+                <hr style="margin-top:32px;border:none;border-top:1px solid #e0e0e0;">
+                <p style="font-size:12px;color:#666;">
+                    Vous pouvez retrouver l\'historique de vos paiements à tout moment depuis votre espace Cobage.
+                </p>
+            </div>',
+            $user->getPrenom(),
+            $transaction->getAmount(),
+            $transaction->getCurrency()
         );
     }
 
