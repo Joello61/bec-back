@@ -22,6 +22,16 @@ php bin/console lexik:jwt:generate-keypair --skip-if-exists
 # sur une base déjà à jour.
 php bin/console doctrine:migrations:migrate --no-interaction
 
+# var/invoices est gitignore (Lot N4 monetisation, jamais versionne - stockage prive des
+# factures PDF, config/packages/flysystem.yaml) : sur un checkout neuf/conteneur fraichement
+# construit, ce repertoire n'existe pas encore. Sans cette creation explicite, le premier
+# appel a invoices.storage (League\Flysystem\Local\LocalFilesystemAdapter) tentait son
+# propre mkdir() a la volee et echouait en "Permission denied" - constate en session (CI
+# E2E), faisant planter des endpoints n'ayant pourtant aucun rapport avec la facturation
+# des lors que le conteneur DI touchait cette chaine de dependances.
+mkdir -p /app/var/invoices
+chmod 777 /app/var/invoices
+
 # Les services "worker" et "scheduler" (bec-infra/docker-compose.yml) partagent la même
 # image et le même bind-mount source que ce conteneur : ils n'ont pas besoin de refaire
 # composer install/génération de clés JWT (dont ils n'ont de toute façon pas l'usage) -
