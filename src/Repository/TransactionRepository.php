@@ -31,6 +31,19 @@ class TransactionRepository extends ServiceEntityRepository
     }
 
     /**
+     * Point de recherche pour la réconciliation d'un remboursement déclenché hors du
+     * flux admin (webhook charge.refunded) : ce payload ne porte que le payment_intent,
+     * jamais le providerPaymentId (id de facture pour un abonnement).
+     */
+    public function findByProviderChargeId(string $provider, string $providerChargeId): ?Transaction
+    {
+        return $this->findOneBy([
+            'provider' => $provider,
+            'providerChargeId' => $providerChargeId,
+        ]);
+    }
+
+    /**
      * Liste paginee pour l'admin (Lot 6.1) - necessaire pour retrouver la transaction a
      * rembourser. Filtres optionnels : status, type, provider.
      * @param array<string, mixed> $filters

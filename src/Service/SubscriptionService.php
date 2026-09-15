@@ -266,7 +266,33 @@ readonly class SubscriptionService
             currency: strtoupper((string) ($invoice['currency'] ?? 'eur')),
             status: Transaction::STATUS_SUCCEEDED,
             rawPayload: ['stripe_event' => 'invoice.paid', 'invoice_id' => $invoice['id'] ?? null, 'billing_reason' => $invoice['billing_reason'] ?? null],
+            providerChargeId: $this->extractDefaultPaymentIntentFromInvoice($invoice),
         );
+    }
+
+    /**
+     * Le PaymentIntent du paiement par défaut d'une facture (Invoice::$payments,
+     * inclus par défaut sans expand) - jamais l'inverse (PaymentIntent/Charge ne
+     * portent plus de champ "invoice" depuis l'API Stripe 2025-03-31, cf. réconciliation
+     * webhook des remboursements, RefundService::reconcileExternalRefund()).
+     * @param array<string, mixed> $invoice
+     */
+    private function extractDefaultPaymentIntentFromInvoice(array $invoice): ?string
+    {
+        $payments = $invoice['payments']['data'] ?? [];
+
+        if (!is_array($payments)) {
+            return null;
+        }
+
+        foreach ($payments as $invoicePayment) {
+            if (($invoicePayment['is_default'] ?? false) === true) {
+                $paymentIntentId = $invoicePayment['payment']['payment_intent'] ?? null;
+                return is_string($paymentIntentId) ? $paymentIntentId : null;
+            }
+        }
+
+        return null;
     }
 
     /**
