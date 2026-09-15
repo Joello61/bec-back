@@ -58,7 +58,11 @@ class VoyageRepository extends ServiceEntityRepository
             ->setParameter('boostStatus', Boost::STATUS_ACTIVE)
             ->setParameter('boostNow', new \DateTime())
             ->orderBy('CASE WHEN boost.id IS NOT NULL THEN 0 ELSE 1 END', 'ASC')
-            ->addOrderBy('v.createdAt', 'DESC');
+            ->addOrderBy('v.createdAt', 'DESC')
+            // Tie-breaker (Partie E point 12, plan-complements-monetisation-cobage.md) :
+            // sans lui, l'ordre entre deux voyages au createdAt strictement identique
+            // (meme flush) n'est pas deterministe.
+            ->addOrderBy('v.id', 'DESC');
     }
 
     /**
