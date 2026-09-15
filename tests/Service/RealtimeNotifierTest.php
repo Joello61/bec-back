@@ -138,10 +138,11 @@ class RealtimeNotifierTest extends TestCase
         self::assertArrayHasKey('timestamp', $payload);
     }
 
-    public function testEventTypeLandsInUpdateIdNotUpdateType(): void
+    public function testEventTypeLandsInUpdateTypeNotUpdateId(): void
     {
-        // Documente le constat du bug de mapping d'argument decrit dans le docblock de
-        // la classe - comportement reel actuel, pas l'intention du nom $eventType.
+        // Regression Partie E point 10 (plan-complements-monetisation-cobage.md) : ce test
+        // documentait auparavant le bug (eventType atterrissait dans Update::getId() au
+        // lieu de getType()) - corrige, verifie desormais le comportement attendu.
         $captured = null;
         $this->hub->method('publish')->willReturnCallback(function (Update $update) use (&$captured) {
             $captured = $update;
@@ -151,8 +152,8 @@ class RealtimeNotifierTest extends TestCase
 
         $this->notifier->publishToUser($this->user(1), [], 'PROPOSITION_CREATED');
 
-        self::assertSame('PROPOSITION_CREATED', $captured->getId());
-        self::assertNull($captured->getType());
+        self::assertSame('PROPOSITION_CREATED', $captured->getType());
+        self::assertNull($captured->getId());
     }
 
     public function testPublicChannelsEnrichThePayloadWithServerTime(): void
