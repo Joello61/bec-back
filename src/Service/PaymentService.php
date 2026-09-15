@@ -44,6 +44,7 @@ readonly class PaymentService
         string $status,
         array $rawPayload,
         ?Boost $boost = null,
+        ?string $providerChargeId = null,
     ): Transaction {
         $existing = $this->transactionRepository->findByProviderPaymentId($provider, $providerPaymentId);
 
@@ -70,10 +71,12 @@ readonly class PaymentService
                     $currency,
                     $status,
                     $rawPayload,
+                    $providerChargeId,
                 ): Transaction {
                     $transaction = new Transaction();
                     $transaction->setProvider($provider)
                         ->setProviderPaymentId($providerPaymentId)
+                        ->setProviderChargeId($providerChargeId)
                         ->setUser($user)
                         ->setSubscription($subscription)
                         ->setBoost($boost)

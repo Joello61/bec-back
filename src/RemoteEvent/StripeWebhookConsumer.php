@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\RemoteEvent;
 
+use App\Service\Admin\RefundService;
 use App\Service\BoostService;
 use App\Service\SubscriptionService;
 use Psr\Log\LoggerInterface;
@@ -17,6 +18,7 @@ final readonly class StripeWebhookConsumer implements ConsumerInterface
     public function __construct(
         private SubscriptionService $subscriptionService,
         private BoostService $boostService,
+        private RefundService $refundService,
         private LoggerInterface $logger,
     ) {}
 
@@ -37,8 +39,30 @@ final readonly class StripeWebhookConsumer implements ConsumerInterface
             'invoice.payment_failed' => $this->subscriptionService->handleInvoicePaymentFailed($object),
             'customer.subscription.updated' => $this->subscriptionService->handleSubscriptionUpdated($object),
             'customer.subscription.deleted' => $this->subscriptionService->handleSubscriptionDeleted($object),
+            // Réconciliation d'un remboursement déclenché hors du flux admin (Partie C
+            // point 5, plan-complements-monetisation-cobage.md) - le prestataire a déjà
+            // remboursé, on reflète seulement l'état. Pas d'équivalent côté Notch Pay,
+            // cf. NotchPayWebhookConsumer.
+            'charge.refunded' => $this->handleChargeRefunded($object),
             default => $this->logger->debug('Événement Stripe ignoré', ['type' => $event->getName()]),
         };
+    }
+
+    /**
+     * @param array<string, mixed> $charge
+     */
+    private function handleChargeRefunded(array $charge): void
+    {
+        $paymentIntentId = $charge['payment_intent'] ?? null;
+
+        if (!is_string($paymentIntentId)) {
+            $this->logger->warning('charge.refunded sans payment_intent exploitable', [
+                'charge_id' => $charge['id'] ?? null,
+            ]);
+            return;
+        }
+
+        $this->refundService->reconcileExternalRefund('stripe', $paymentIntentId);
     }
 
     /**

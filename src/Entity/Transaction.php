@@ -16,6 +16,7 @@ use Symfony\Component\Serializer\Annotation\Groups;
 #[ORM\Entity(repositoryClass: TransactionRepository::class)]
 #[ORM\Table(name: 'transactions')]
 #[ORM\UniqueConstraint(name: 'uniq_provider_payment_id', columns: ['provider', 'provider_payment_id'])]
+#[ORM\Index(name: 'idx_provider_charge_id', columns: ['provider', 'provider_charge_id'])]
 #[ORM\HasLifecycleCallbacks]
 class Transaction
 {
@@ -61,6 +62,19 @@ class Transaction
 
     #[ORM\Column(length: 255)]
     private ?string $providerPaymentId = null;
+
+    /**
+     * Id du PaymentIntent (Stripe) - distinct de providerPaymentId pour un abonnement,
+     * qui porte l'id de la Invoice (jamais celui du PaymentIntent, l'API Stripe ne
+     * fournit plus depuis 2025-03-31 de lien direct Invoice<->PaymentIntent dans les
+     * deux sens). Renseigné uniquement à la création de la transaction, sert de clé de
+     * recherche pour réconcilier un remboursement déclenché hors du flux admin
+     * (webhook charge.refunded, dont le payload ne porte que le payment_intent, jamais
+     * l'invoice). Null pour Notch Pay (pas de distinction charge/invoice chez ce
+     * prestataire, providerPaymentId suffit).
+     */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $providerChargeId = null;
 
     #[ORM\Column(length: 20)]
     #[Groups(['transaction:read', 'admin:transaction:list'])]
@@ -202,6 +216,17 @@ class Transaction
     public function setProviderPaymentId(string $providerPaymentId): static
     {
         $this->providerPaymentId = $providerPaymentId;
+        return $this;
+    }
+
+    public function getProviderChargeId(): ?string
+    {
+        return $this->providerChargeId;
+    }
+
+    public function setProviderChargeId(?string $providerChargeId): static
+    {
+        $this->providerChargeId = $providerChargeId;
         return $this;
     }
 

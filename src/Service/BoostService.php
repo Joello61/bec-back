@@ -182,6 +182,7 @@ readonly class BoostService
             status: Transaction::STATUS_SUCCEEDED,
             rawPayload: ['stripe_event' => 'checkout.session.completed', 'session_id' => $session['id'] ?? null],
             boost: $boost,
+            providerChargeId: $paymentIntentId,
         );
     }
 
