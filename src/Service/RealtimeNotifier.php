@@ -33,11 +33,17 @@ readonly class RealtimeNotifier
             'data' => $data,
         ];
 
+        // "$eventType" occupait auparavant le 4e parametre positionnel ($id, l'identifiant
+        // SSE) au lieu du 5e ($type) - Update::getType() restait donc toujours null, le
+        // vrai type d'evenement n'etant porte que par le JSON du payload ci-dessus. Corrige
+        // ici (nomme explicitement) - verifie que rien cote frontend ne lit le type SSE
+        // natif (src/lib/handlers/index.ts dispatche uniquement sur data.eventType), donc
+        // sans impact fonctionnel (Partie E point 10, plan-complements-monetisation-cobage.md).
         $update = new Update(
             $topic,
             json_encode($payload, JSON_THROW_ON_ERROR),
             $private,
-            $eventType
+            type: $eventType
         );
 
         $this->hub->publish($update);

@@ -112,8 +112,14 @@ class VoyageRepositoryBoostTest extends KernelTestCase
             $byId[$voyage->getId()] = $voyage;
         }
 
+        // "recent" et "expiredBoosted" tombent tous les deux dans le meme bucket CASE WHEN
+        // (pas de boost actif) - lequel des deux passe en premier n'a rien a voir avec le
+        // comportement teste ici (un boost expire ne compte pas comme actif) et dependait
+        // auparavant d'un ordre non deterministe entre eux (Partie E point 12, plan-
+        // complements-monetisation-cobage.md, corrige avec un tie-breaker v.id DESC). Seule
+        // assertion pertinente ici : l'expired boost ne doit jamais etre lu comme actif.
+        self::assertContains($recent->getId(), array_keys($byId));
         self::assertFalse($byId[$expiredBoosted->getId()]->isCurrentlyBoosted());
-        self::assertSame($recent->getId(), $result['data'][0]->getId(), 'un boost expire ne doit pas faire remonter le voyage');
     }
 
     public function testIsCurrentlyBoostedIsFalseWhenNoBoostExists(): void
@@ -125,5 +131,36 @@ class VoyageRepositoryBoostTest extends KernelTestCase
         $result = $this->voyageRepository->findPublicPaginated(1, 50, ['villeDepart' => 'Douala-Boost-none']);
 
         self::assertFalse($result['data'][0]->isCurrentlyBoosted());
+    }
+
+    /**
+     * Régression Partie E point 12 (plan-complements-monetisation-cobage.md) : sans
+     * tie-breaker "v.id DESC", l'ordre entre deux voyages au createdAt strictement
+     * identique n'est pas déterministe. Force cette égalité via une UPDATE DQL directe
+     * (Voyage n'expose aucun setter public pour createdAt, positionné uniquement par le
+     * callback #[ORM\PrePersist]) plutôt que de compter sur un flush assez rapide pour
+     * produire la même seconde - non fiable d'une exécution à l'autre.
+     */
+    public function testBoostOrderingIsDeterministicWhenCreatedAtIsIdentical(): void
+    {
+        $owner = $this->createUser('boost-tie-owner');
+        $first = $this->voyage($owner, 'tie-first');
+        $second = $this->voyage($owner, 'tie-second');
+        $this->em->flush();
+
+        $sameInstant = new \DateTime('-1 hour');
+        $this->em->createQuery('UPDATE App\Entity\Voyage v SET v.createdAt = :dt WHERE v.id IN (:ids)')
+            ->setParameter('dt', $sameInstant)
+            ->setParameter('ids', [$first->getId(), $second->getId()])
+            ->execute();
+
+        $result = $this->voyageRepository->findPublicPaginated(1, 50, ['villeDepart' => 'Douala-Boost-tie']);
+        $ids = array_map(static fn (Voyage $v) => $v->getId(), $result['data']);
+
+        self::assertSame(
+            [$second->getId(), $first->getId()],
+            $ids,
+            'à createdAt identique, le tie-breaker v.id DESC doit rendre l\'ordre déterministe'
+        );
     }
 }

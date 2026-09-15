@@ -58,7 +58,11 @@ class VoyageRepository extends ServiceEntityRepository
             ->setParameter('boostStatus', Boost::STATUS_ACTIVE)
             ->setParameter('boostNow', new \DateTime())
             ->orderBy('CASE WHEN boost.id IS NOT NULL THEN 0 ELSE 1 END', 'ASC')
-            ->addOrderBy('v.createdAt', 'DESC');
+            ->addOrderBy('v.createdAt', 'DESC')
+            // Tie-breaker (Partie E point 12, plan-complements-monetisation-cobage.md) :
+            // sans lui, l'ordre entre deux voyages au createdAt strictement identique
+            // (meme flush) n'est pas deterministe.
+            ->addOrderBy('v.id', 'DESC');
     }
 
     /**
@@ -253,8 +257,14 @@ class VoyageRepository extends ServiceEntityRepository
 
     /**
      * @return Voyage[]
+     *
+     * $dateLimite recoit en realite Demande::getDateLimite() aux deux sites d'appel
+     * (MatchingService::findMatchingVoyages(), NotificationService::notifyMatchingVoyages())
+     * - jamais une date de depart, comportement fonctionnellement correct (filtre
+     * v.dateDepart >= dateLimite ci-dessous) mais nom trompeur, corrige ici (Partie E
+     * point 11, plan-complements-monetisation-cobage.md).
      */
-    public function findMatchingDemande(string $villeDepart, string $villeArrivee, ?\DateTimeInterface $dateDepart = null, ?int $excludeUserId = null): array
+    public function findMatchingDemande(string $villeDepart, string $villeArrivee, ?\DateTimeInterface $dateLimite = null, ?int $excludeUserId = null): array
     {
         $qb = $this->createQueryBuilder('v')
             ->leftJoin('v.voyageur', 'u')
@@ -275,9 +285,9 @@ class VoyageRepository extends ServiceEntityRepository
                 ->setParameter('excludeUserId', $excludeUserId);
         }
 
-        if ($dateDepart) {
-            $qb->andWhere('v.dateDepart >= :dateDepart')
-                ->setParameter('dateDepart', $dateDepart);
+        if ($dateLimite) {
+            $qb->andWhere('v.dateDepart >= :dateLimite')
+                ->setParameter('dateLimite', $dateLimite);
         }
 
         return $qb->orderBy('v.dateDepart', 'ASC')
